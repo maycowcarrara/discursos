@@ -9,9 +9,13 @@ Fase atual concluída:
 * `FASE 1 — Base do Projeto`
 * `FASE 2 — Autenticação`
 
-Próxima fase obrigatória:
+Fase atual em andamento:
 
 * `FASE 3 — Firestore`
+
+Próxima etapa obrigatória:
+
+* concluir a integração de `calendarEvents` dentro da `FASE 3 — Firestore`
 
 ## O que já foi entregue
 
@@ -41,9 +45,18 @@ Próxima fase obrigatória:
 * `FIRESTORE_SCHEMA.md` criado como fonte de verdade do banco
 * `firestore.rules` e `firestore.indexes.json` versionados
 * `firebase.json` e `.firebaserc` configurados
+* frontend padronizado para `Firebase Hosting`
 * `npm run deploy:firestore`
 * `npm run deploy:hosting`
 * `npm run deploy:all`
+
+### Início da Fase 3
+
+* tipagem TypeScript estrita para as coleções oficiais do Firestore
+* camada `services/firestore` criada
+* hooks reutilizáveis com TanStack Query para leitura inicial
+* `settings/app` conectado ao Firestore com leitura e salvamento
+* páginas de `congregations`, `themes` e `speakers` conectadas ao Firestore em modo leitura
 
 ## Próxima fase
 
@@ -56,6 +69,15 @@ Implementar:
 * hooks reutilizáveis de leitura e escrita
 * leitura inicial de `settings`
 * primeiros serviços para `congregations`, `themes` e `speakers`
+
+Entregue nesta abertura da fase:
+
+* `settings/app` com persistência real
+* listagens reais de `congregations`, `themes` e `speakers`
+
+Próximo subpasso obrigatório:
+
+* iniciar `calendarEvents` mantendo a ordem oficial da Fase 3
 
 ## Diretriz de UI e UX
 
@@ -82,3 +104,11 @@ Regra do projeto:
 * `npm run deploy:firestore`
 * `npm run deploy:hosting`
 * `npm run deploy:all`
+
+## Decisão atual de deploy
+
+Para manter a operação mais simples nesta V1:
+
+* o frontend web permanece em `Firebase Hosting`
+* `Cloudflare Workers` e `Cloudflare Cron Triggers` ficam reservados para automações futuras
+* `Cloudflare Pages` não faz parte do deploy atual

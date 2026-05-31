@@ -13,13 +13,13 @@
 * FASE 1 — Base do Projeto
 * FASE 2 — Autenticação
 
-## Fase atual concluída
-
-* FASE 2 — Autenticação
-
-## Próxima fase obrigatória
+## Fase atual em andamento
 
 * FASE 3 — Firestore
+
+## Próxima etapa obrigatória
+
+* Concluir a FASE 3 — Firestore na ordem oficial começando por `calendarEvents`
 
 ## Entregas já realizadas
 
@@ -33,6 +33,7 @@
 * Estrutura inicial de páginas por módulo
 * Identidade visual administrativa alinhada ao mockup de referência
 * Navegação mobile com atalhos principais no rodapé e prioridade real para toque
+* Frontend padronizado para deploy em Firebase Hosting
 
 ### Autenticação
 
@@ -50,6 +51,14 @@
 * `firestore.rules` versionado
 * `firestore.indexes.json` versionado
 * scripts de deploy criados
+
+### Firestore — início da Fase 3
+
+* tipagem TypeScript estrita das coleções oficiais
+* base `services/firestore` criada
+* hooks reutilizáveis com TanStack Query para leitura inicial
+* leitura e escrita inicial de `settings/app`
+* páginas de `congregations`, `themes` e `speakers` conectadas ao Firestore em modo leitura
 
 Regra de manutenção desta documentação:
 
@@ -95,9 +104,9 @@ O sistema deve operar prioritariamente dentro de serviços gratuitos.
 
 * Firebase Authentication
 * Cloud Firestore
+* Firebase Hosting
 * Cloudflare Workers
 * Cloudflare Cron Triggers
-* Cloudflare Pages
 
 ---
 
@@ -116,6 +125,7 @@ O sistema deve operar prioritariamente dentro de serviços gratuitos.
 * Não utilizar backend Node tradicional
 * Não utilizar servidor VPS
 * Todo armazenamento deve usar Firestore
+* O frontend web deve usar Firebase Hosting como hospedagem padrão desta V1
 * Toda automação deve usar Cloudflare Workers
 * TypeScript obrigatório
 * Nunca usar "any"
@@ -203,7 +213,7 @@ Critérios:
 
 Status atual:
 
-* Próxima fase
+* Em andamento
 
 Implementar coleções:
 
@@ -221,6 +231,12 @@ Criar:
 * services/firestore
 * tipagem TypeScript
 * hooks reutilizáveis
+
+Entregas já iniciadas nesta fase:
+
+* `settings/app` com leitura e salvamento real
+* `congregations`, `themes` e `speakers` em leitura real
+* validação de documentos via tipagem estrita no frontend
 
 Ordem sugerida dentro da fase:
 
@@ -541,6 +557,16 @@ Objetivos:
 * primeira carga < 2s
 * consultas rápidas
 * mínimo de leituras Firestore
+
+---
+
+# Decisão Atual de Infraestrutura
+
+Para manter a operação simples nesta V1:
+
+* o frontend permanece em `Firebase Hosting`
+* `Cloudflare Workers` e `Cloudflare Cron Triggers` ficam reservados para automações e rotinas agendadas
+* não há adoção de `Cloudflare Pages` no escopo atual
 
 ---
 

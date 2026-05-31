@@ -5,6 +5,7 @@ import {
   getAuth,
   setPersistence,
 } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
 import { env } from '@/config/env'
 
@@ -22,6 +23,7 @@ export const firebaseApp = getApps().length
   : initializeApp(firebaseConfig)
 
 export const firebaseAuth = getAuth(firebaseApp)
+export const firebaseDb = getFirestore(firebaseApp)
 export const googleProvider = new GoogleAuthProvider()
 
 let persistencePromise: Promise<void> | null = null
