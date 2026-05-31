@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSettingsDocAllowed(settingId) {
+      return settingId in ['app', 'notifications', 'calendar'];
+    }
+
+    match /settings/{settingId} {
+      allow read: if isSignedIn() && isSettingsDocAllowed(settingId);
+      allow create, update: if isSignedIn() && isSettingsDocAllowed(settingId);
+      allow delete: if false;
+    }
+
+    match /congregations/{documentId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    match /speakers/{documentId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    match /themes/{documentId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    match /calendarEvents/{documentId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    match /assignments/{documentId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    match /notifications/{documentId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    match /auditLogs/{documentId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
