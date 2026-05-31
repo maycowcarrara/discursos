@@ -245,8 +245,8 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-2xl">Escopo entregue</CardTitle>
               <CardDescription>
-                A Fase 3 agora cobre todas as colecoes oficiais do Firestore em
-                modo de fundacao e leitura.
+                A fundacao do Firestore foi concluida na Fase 3 e a Fase 4 abriu
+                o primeiro CRUD operacional completo.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
@@ -261,6 +261,11 @@ export function SettingsPage() {
                 Escrita inicial segura em
                 <span className="font-medium text-foreground"> settings/app</span>.
               </div>
+              <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
+                CRUD completo de
+                <span className="font-medium text-foreground"> congregations</span>
+                , com busca, paginacao e auditoria.
+              </div>
             </CardContent>
           </Card>
 
@@ -271,21 +276,22 @@ export function SettingsPage() {
                   <Settings2 className="size-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Fase 3 concluida</CardTitle>
+                  <CardTitle className="text-2xl">Fase 4 concluida</CardTitle>
                   <CardDescription>
-                    A base do Firestore ficou pronta para abrir os CRUDs
-                    funcionais.
+                    Congregacoes agora ja operam com CRUD completo sobre o
+                    Firestore oficial.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
-                `notifications` e `auditLogs` agora tambem leem do Firestore.
+                A base da Fase 3 continua cobrindo `notifications` e `auditLogs`
+                em leitura real.
               </p>
               <p>
-                O proximo passo obrigatorio do plano passa a ser a Fase 4 com o
-                CRUD de congregacoes.
+                O proximo passo obrigatorio do plano passa a ser a Fase 5 com o
+                CRUD de temas.
               </p>
               <p>
                 `settings/notifications` e `settings/calendar` seguem reservados,

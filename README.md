@@ -9,14 +9,15 @@ Fases concluídas:
 * `FASE 1 — Base do Projeto`
 * `FASE 2 — Autenticação`
 * `FASE 3 — Firestore`
+* `FASE 4 — Congregações`
 
 Fase atual concluída:
 
-* `FASE 3 — Firestore`
+* `FASE 4 — Congregações`
 
 Próxima etapa obrigatória:
 
-* `FASE 4 — Congregações`
+* `FASE 5 — Temas`
 
 ## O que já foi entregue
 
@@ -71,27 +72,36 @@ Próxima etapa obrigatória:
 * `auditLogs` conectado ao app com leitura real recente
 * tela de configurações consolidada como painel da fundação Firestore
 
+### Fechamento da Fase 4
+
+* CRUD completo de `congregations` na UI
+* formulário validado com React Hook Form + Zod
+* busca local e paginação sobre a base ativa
+* exclusão lógica via `isActive`
+* auditoria de create, update e delete em `auditLogs`
+
 ## Próxima fase
 
-### `FASE 4 — Congregações`
+### `FASE 5 — Temas`
 
 Implementar:
 
-* CRUD completo de congregações
+* CRUD de temas
 * cadastro, edição e exclusão
-* busca e paginação
-* aproveitamento da base já conectada ao Firestore
+* busca rápida
+* ordenação por número
 
-Entregue na Fase 3:
+Entregue até a Fase 4:
 
 * `settings/app` com persistência real
-* listagens reais de `congregations`, `themes` e `speakers`
+* CRUD completo de `congregations`
+* listagens reais de `themes` e `speakers`
 * agenda anual real com `calendarEvents`
 * leitura real de `assignments`, `notifications` e `auditLogs`
 
 Próximo subpasso obrigatório:
 
-* iniciar os CRUDs da `FASE 4 — Congregações`
+* iniciar os CRUDs da `FASE 5 — Temas`
 
 ## Diretriz de UI e UX
 

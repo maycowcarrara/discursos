@@ -13,14 +13,15 @@
 * FASE 1 — Base do Projeto
 * FASE 2 — Autenticação
 * FASE 3 — Firestore
+* FASE 4 — Congregações
 
 ## Fase atual concluída
 
-* FASE 3 — Firestore
+* FASE 4 — Congregações
 
 ## Próxima etapa obrigatória
 
-* FASE 4 — Congregações
+* FASE 5 — Temas
 
 ## Entregas já realizadas
 
@@ -73,6 +74,15 @@
 * `notifications` conectado ao app com leitura real da fila operacional
 * `auditLogs` conectado ao app com leitura real da trilha de auditoria
 * tela de configurações consolidada como painel de fundação do Firestore
+
+### Congregações — fechamento da Fase 4
+
+* CRUD completo de `congregations` implementado na UI
+* cadastro e edição com validação tipada via React Hook Form + Zod
+* exclusão lógica via `isActive`, preservando integridade e histórico operacional
+* busca local por nome, cidade, UF, endereço e dia de reunião
+* paginação local sobre a lista ativa para evitar leituras extras no Firestore
+* auditoria automática de create, update e delete em `auditLogs`
 
 Regra de manutenção desta documentação:
 
@@ -273,7 +283,7 @@ Ordem sugerida dentro da fase:
 
 Status atual:
 
-* Pendente
+* Concluída
 
 Implementar CRUD completo.
 
@@ -297,6 +307,15 @@ Critérios:
 * Exclusão
 * Busca
 * Paginação
+
+Entregas realizadas:
+
+* formulário completo com validação estrita
+* listagem com busca local e paginação
+* edição em tela
+* exclusão lógica com remoção da base ativa
+* bloqueio de exclusão quando houver oradores vinculados
+* geração de auditoria para create, update e delete
 
 ---
 

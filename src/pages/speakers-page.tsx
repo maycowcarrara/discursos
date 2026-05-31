@@ -158,10 +158,10 @@ export function SpeakersPage() {
             <div className="space-y-3">
               {filteredSpeakers.map((speaker) => {
                 const congregationName =
-                  speaker.congregationName ??
                   congregationsQuery.data?.find(
                     (congregation) => congregation.id === speaker.congregationId,
                   )?.name ??
+                  speaker.congregationName ??
                   'Congregacao nao encontrada'
 
                 const themeNumbers = speaker.themeIds
