@@ -14,14 +14,15 @@
 * FASE 2 — Autenticação
 * FASE 3 — Firestore
 * FASE 4 — Congregações
+* FASE 5 — Temas
 
 ## Fase atual concluída
 
-* FASE 4 — Congregações
+* FASE 5 — Temas
 
 ## Próxima etapa obrigatória
 
-* FASE 5 — Temas
+* FASE 6 — Oradores
 
 ## Entregas já realizadas
 
@@ -82,6 +83,16 @@
 * exclusão lógica via `isActive`, preservando integridade e histórico operacional
 * busca local por nome, cidade, UF, endereço e dia de reunião
 * paginação local sobre a lista ativa para evitar leituras extras no Firestore
+* auditoria automática de create, update e delete em `auditLogs`
+
+### Temas — fechamento da Fase 5
+
+* CRUD completo de `themes` implementado na UI
+* cadastro e edição com validação tipada via React Hook Form + Zod
+* controle administrativo de `isActive` com reativação por edição
+* exclusão lógica com remoção da base ativa e preservação do histórico
+* busca rápida local por número, título e observações
+* ordenação oficial por número mantida na listagem administrativa
 * auditoria automática de create, update e delete em `auditLogs`
 
 Regra de manutenção desta documentação:
@@ -323,7 +334,7 @@ Entregas realizadas:
 
 Status atual:
 
-* Pendente
+* Concluída
 
 Implementar CRUD.
 
@@ -338,6 +349,15 @@ Adicionar:
 
 * busca rápida
 * ordenação por número
+
+Entregas realizadas:
+
+* formulário completo com validação estrita
+* listagem administrativa real com itens ativos e inativos
+* edição em tela com controle de status ativo/inativo
+* exclusão lógica via `isActive`
+* busca local rápida por número, título e observações
+* auditoria para create, update e delete
 
 ---
 

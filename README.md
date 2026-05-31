@@ -10,14 +10,15 @@ Fases concluídas:
 * `FASE 2 — Autenticação`
 * `FASE 3 — Firestore`
 * `FASE 4 — Congregações`
+* `FASE 5 — Temas`
 
 Fase atual concluída:
 
-* `FASE 4 — Congregações`
+* `FASE 5 — Temas`
 
 Próxima etapa obrigatória:
 
-* `FASE 5 — Temas`
+* `FASE 6 — Oradores`
 
 ## O que já foi entregue
 
@@ -80,28 +81,39 @@ Próxima etapa obrigatória:
 * exclusão lógica via `isActive`
 * auditoria de create, update e delete em `auditLogs`
 
+### Fechamento da Fase 5
+
+* CRUD completo de `themes` na UI
+* formulário validado com React Hook Form + Zod
+* controle administrativo de ativo/inativo
+* busca rápida local por número, título e observações
+* ordenação oficial por número na listagem
+* exclusão lógica via `isActive`
+* auditoria de create, update e delete em `auditLogs`
+
 ## Próxima fase
 
-### `FASE 5 — Temas`
+### `FASE 6 — Oradores`
 
 Implementar:
 
-* CRUD de temas
-* cadastro, edição e exclusão
-* busca rápida
-* ordenação por número
+* CRUD de oradores
+* múltiplos temas por orador
+* filtro por congregação
+* filtro por status
 
-Entregue até a Fase 4:
+Entregue até a Fase 5:
 
 * `settings/app` com persistência real
 * CRUD completo de `congregations`
-* listagens reais de `themes` e `speakers`
+* CRUD completo de `themes`
+* listagens reais de `speakers`
 * agenda anual real com `calendarEvents`
 * leitura real de `assignments`, `notifications` e `auditLogs`
 
 Próximo subpasso obrigatório:
 
-* iniciar os CRUDs da `FASE 5 — Temas`
+* iniciar os CRUDs da `FASE 6 — Oradores`
 
 ## Diretriz de UI e UX
 
