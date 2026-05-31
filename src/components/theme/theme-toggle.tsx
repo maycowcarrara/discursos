@@ -11,7 +11,7 @@ export function ThemeToggle() {
       type="button"
       variant="outline"
       size="icon"
-      className="border-border/70 bg-card/70 backdrop-blur"
+      className="border-border/70 bg-card/70 backdrop-blur dark:bg-card/80"
       onClick={toggleTheme}
       aria-label={
         theme === 'light' ? 'Ativar tema escuro' : 'Ativar tema claro'

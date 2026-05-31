@@ -1,137 +1,248 @@
-import { ArrowRight, CalendarDays, Clock3, Mic2, TriangleAlert } from 'lucide-react'
+import {
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  MapPinned,
+  Mic2,
+  TriangleAlert,
+  UsersRound,
+} from 'lucide-react'
 
-import { SectionCard } from '@/components/app/section-card'
+import { MetricCard } from '@/components/app/metric-card'
+import { StatusPill } from '@/components/app/status-pill'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  annualPlanningMonths,
+  congregationProfile,
+  dashboardMetrics,
+  nextSaturdayAssignment,
+} from '@/data/mock-operations'
 
-const overviewCards = [
-  {
-    label: 'Proximos sabados',
-    value: '08',
-    detail: 'Janela prioritaria do planejamento operacional',
-    icon: CalendarDays,
-  },
-  {
-    label: 'Pendencias',
-    value: '03',
-    detail: 'Eventos sem confirmacao ou aguardando definicao',
-    icon: TriangleAlert,
-  },
-  {
-    label: 'Temas em rotacao',
-    value: '24',
-    detail: 'Base pronta para historico e alerta de repeticao',
-    icon: Mic2,
-  },
-  {
-    label: 'Lembretes',
-    value: '00',
-    detail: 'Automacoes entram na Fase 11 com Workers',
-    icon: Clock3,
-  },
-]
+const overviewIcons = [TriangleAlert, CalendarDays, UsersRound] as const
+
+const summaryCards = [
+  { label: 'Oradores locais', value: '22', icon: UsersRound },
+  { label: 'Oradores visitantes', value: '58', icon: Mic2 },
+  { label: 'Temas cadastrados', value: '89', icon: Bell },
+  { label: 'Congregacoes parceiras', value: '14', icon: MapPinned },
+] as const
 
 export function DashboardPage() {
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-[32px] border border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(157,128,78,0.17),transparent_32%),linear-gradient(135deg,rgba(255,250,242,0.95),rgba(246,242,233,0.85))] p-6 shadow-sm md:p-8 dark:bg-[radial-gradient(circle_at_top_left,rgba(201,162,91,0.16),transparent_30%),linear-gradient(135deg,rgba(21,24,20,0.95),rgba(17,19,18,0.88))]">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <Badge className="bg-primary/12 text-primary">Fase 1 entregue em camadas</Badge>
-            <h3 className="mt-4 font-serif text-3xl font-semibold tracking-tight text-foreground md:text-5xl">
-              Uma base pensada para planejar o ano inteiro sem improvisar o sistema.
-            </h3>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
-              A estrutura inicial agora ja nasce com rotas, layout administrativo,
-              tema claro e escuro, React Query e uma base compativel com
-              `shadcn/ui` para evoluir sem retrabalho.
-            </p>
-          </div>
+    <div className="space-y-5">
+      <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-3xl">Dashboard</CardTitle>
+                <CardDescription className="mt-1 text-base">
+                  Panorama rapido da congregacao local e do proximo sabado.
+                </CardDescription>
+              </div>
+              <Badge className="bg-primary/10 text-primary">Painel operacional</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="rounded-[22px] border border-border/70 bg-background p-5">
+              <p className="text-sm font-medium text-muted-foreground">
+                Congregacao local
+              </p>
+              <h3 className="mt-2 text-2xl font-semibold text-foreground">
+                {congregationProfile.name}
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {congregationProfile.address}
+              </p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[18px] border border-border/70 bg-card px-4 py-4">
+                  <p className="text-sm text-muted-foreground">Reuniao publica</p>
+                  <p className="mt-2 flex items-center gap-2 font-medium">
+                    <CalendarDays className="size-4 text-primary" />
+                    {congregationProfile.meetingDay}
+                  </p>
+                  <p className="mt-2 flex items-center gap-2 font-medium">
+                    <Clock3 className="size-4 text-primary" />
+                    {congregationProfile.meetingTime}
+                  </p>
+                </div>
+                <div className="rounded-[18px] border border-border/70 bg-card px-4 py-4">
+                  <p className="text-sm text-muted-foreground">Ultima revisao</p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">
+                    Junho 2026
+                  </p>
+                  <p className="mt-2 text-sm text-primary">
+                    {congregationProfile.mapsLabel}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button className="min-w-40 justify-between">
-              Abrir agenda anual
-              <ArrowRight className="size-4" />
-            </Button>
-            <Button variant="outline" className="min-w-40">
-              Revisar schema do Firestore
-            </Button>
-          </div>
-        </div>
+            <div className="rounded-[22px] border border-border/70 bg-background p-5">
+              <p className="text-sm font-medium text-muted-foreground">
+                Proximo sabado
+              </p>
+              <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start">
+                <div className="w-full max-w-[128px] rounded-[22px] border border-primary/20 bg-primary/5 px-4 py-5 text-center">
+                  <p className="text-4xl font-semibold tracking-tight text-primary">
+                    {nextSaturdayAssignment.dateDay}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-primary">
+                    {nextSaturdayAssignment.dateLabel}
+                  </p>
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    {nextSaturdayAssignment.timeLabel}
+                  </p>
+                </div>
+
+                <div className="flex-1 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-2xl font-semibold text-foreground">
+                      {nextSaturdayAssignment.speaker}
+                    </p>
+                    <StatusPill status="visitor">
+                      {nextSaturdayAssignment.speakerType}
+                    </StatusPill>
+                  </div>
+                  <div className="space-y-2 text-sm leading-6 text-muted-foreground">
+                    <p>
+                      <span className="font-medium text-foreground">Congregacao:</span>{' '}
+                      {nextSaturdayAssignment.congregation}
+                    </p>
+                    <p>
+                      <span className="font-medium text-foreground">Tema:</span>{' '}
+                      {nextSaturdayAssignment.theme}
+                    </p>
+                  </div>
+                  <div className="pt-1">
+                    <StatusPill status="confirmed">
+                      {nextSaturdayAssignment.status}
+                    </StatusPill>
+                  </div>
+                </div>
+
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <CheckCircle2 className="size-7" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Planejamento anual</CardTitle>
+            <CardDescription>
+              Visao compacta dos proximos meses com foco nas pendencias.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {annualPlanningMonths.slice(0, 4).map((month) => (
+              <div
+                key={month.month}
+                className="rounded-[20px] border border-border/70 bg-background p-4"
+              >
+                <p className="text-sm font-semibold text-foreground">{month.month}</p>
+                <div className="mt-3 space-y-2">
+                  {month.entries.slice(0, 4).map((entry) => (
+                    <div
+                      key={`${month.month}-${entry.day}-${entry.label}`}
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                    >
+                      <StatusPill status={entry.status} className="px-2 py-0.5">
+                        {entry.day}
+                      </StatusPill>
+                      <span>{entry.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {overviewCards.map((card) => {
-          const Icon = card.icon
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {dashboardMetrics.map((metric, index) => {
+          const Icon = overviewIcons[index]
 
           return (
-            <Card key={card.label} className="bg-card/88">
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">{card.label}</p>
-                  <CardTitle className="mt-3 text-4xl">{card.value}</CardTitle>
-                </div>
-                <div className="rounded-full bg-primary/12 p-3 text-primary">
-                  <Icon className="size-5" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <CardDescription>{card.detail}</CardDescription>
-              </CardContent>
-            </Card>
+            <MetricCard
+              key={metric.label}
+              label={metric.label}
+              value={metric.value}
+              detail={metric.detail}
+              tone={metric.tone}
+              icon={Icon}
+            />
           )
         })}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <SectionCard
-          eyebrow="Mapa da base"
-          title="O projeto esta pronto para entrar em autenticacao e dados reais"
-          description="A ideia aqui e tirar o projeto do template e colocar em uma espinha dorsal de produto."
-        >
-          <div className="grid gap-3 md:grid-cols-2">
+      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Acoes da semana</CardTitle>
+            <CardDescription>
+              Prioridades mais imediatas para manter a agenda sob controle.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
             {[
-              'TypeScript estrito configurado com alias @/',
-              'Tailwind v4 ativo com tokens e modo escuro',
-              'Estrutura compativel com shadcn/ui e components.json',
-              'React Router aplicado no shell administrativo',
-              'React Query pronto para as proximas fases',
-              'Sidebar, topbar e placeholders organizados por modulo',
+              'Definir orador para 20/06 e revisar tema correspondente.',
+              'Confirmar retorno do visitante de Gurupi para 27/06.',
+              'Fechar observacoes do evento especial de julho.',
             ].map((item) => (
               <div
                 key={item}
-                className="rounded-[22px] border border-border/70 bg-background/70 px-4 py-4 text-sm leading-6 text-foreground"
+                className="rounded-[18px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-foreground"
               >
                 {item}
               </div>
             ))}
-          </div>
-        </SectionCard>
+          </CardContent>
+        </Card>
 
-        <SectionCard
-          eyebrow="Proxima trilha"
-          title="Sequencia recomendada"
-          description="A fundacao da UI ja permite seguir sem retrabalho."
-        >
-          <div className="space-y-3">
-            {[
-              'Fase 2: Firebase Auth, persistencia de sessao e rotas protegidas',
-              'Fase 3: servicos tipados, schema real e hooks de leitura',
-              'Fase 4 em diante: CRUDs por modulo seguindo o schema oficial',
-            ].map((step, index) => (
-              <div
-                key={step}
-                className="flex items-start gap-3 rounded-[22px] border border-border/70 bg-background/70 px-4 py-4"
-              >
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                  {index + 1}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Resumo geral</CardTitle>
+            <CardDescription>
+              Indicadores basicos da base atual antes da Fase 3.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            {summaryCards.map((item) => {
+              const Icon = item.icon
+
+              return (
+                <div
+                  key={item.label}
+                  className="rounded-[20px] border border-border/70 bg-background px-4 py-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <Icon className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">{item.label}</p>
+                      <p className="text-2xl font-semibold text-foreground">
+                        {item.value}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <p className="pt-1 text-sm leading-6 text-foreground">{step}</p>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
+              )
+            })}
+          </CardContent>
+        </Card>
       </section>
     </div>
   )

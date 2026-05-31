@@ -6,6 +6,58 @@
 
 ---
 
+# Status Atual do Projeto
+
+## Fases concluídas
+
+* FASE 1 — Base do Projeto
+* FASE 2 — Autenticação
+
+## Fase atual concluída
+
+* FASE 2 — Autenticação
+
+## Próxima fase obrigatória
+
+* FASE 3 — Firestore
+
+## Entregas já realizadas
+
+### Infra e base
+
+* React + Vite migrado para TypeScript
+* TailwindCSS configurado
+* Base compatível com Shadcn/UI
+* React Router configurado
+* Layout principal com sidebar, topbar e tema claro/escuro
+* Estrutura inicial de páginas por módulo
+* Identidade visual administrativa alinhada ao mockup de referência
+* Navegação mobile com atalhos principais no rodapé e prioridade real para toque
+
+### Autenticação
+
+* Firebase Auth integrado
+* Login com e-mail e senha
+* Login com Google Popup
+* Persistência de sessão
+* Logout
+* Rotas protegidas
+
+### Infraestrutura Firebase
+
+* `FIRESTORE_SCHEMA.md` criado
+* `firebase.json` configurado
+* `firestore.rules` versionado
+* `firestore.indexes.json` versionado
+* scripts de deploy criados
+
+Regra de manutenção desta documentação:
+
+* sempre atualizar esta seção quando uma fase for concluída
+* sempre deixar explícita a próxima fase obrigatória
+
+---
+
 # Objetivo
 
 Desenvolver um sistema web para gerenciamento de:
@@ -70,6 +122,8 @@ O sistema deve operar prioritariamente dentro de serviços gratuitos.
 * Componentes reutilizáveis
 * Separar camada de UI da lógica de negócio
 * Validar formulários com Zod
+* Toda fase deve considerar desktop e mobile como plataformas obrigatórias
+* Não tratar UX mobile como adaptação tardia
 
 ---
 
@@ -97,6 +151,10 @@ Objetivo:
 
 Criar estrutura inicial.
 
+Status atual:
+
+* Concluída
+
 Implementar:
 
 * React + Vite + TS
@@ -107,17 +165,23 @@ Implementar:
 * Sidebar
 * Topbar
 * Tema claro/escuro
-* Estrutura responsiva
+* Estrutura responsiva com boa usabilidade em desktop e mobile
 
 Critérios de aceite:
 
 * Projeto buildando
 * Navegação funcionando
 * Layout desktop funcional
+* Layout mobile funcional
+* Menu e ações principais acessíveis em toque
 
 ---
 
 ## FASE 2 — Autenticação
+
+Status atual:
+
+* Concluída
 
 Implementar:
 
@@ -131,10 +195,15 @@ Critérios:
 
 * Usuário autenticado acessa dashboard
 * Usuário não autenticado é redirecionado
+* Fluxo de autenticação utilizável em desktop e mobile
 
 ---
 
 ## FASE 3 — Firestore
+
+Status atual:
+
+* Próxima fase
 
 Implementar coleções:
 
@@ -153,9 +222,24 @@ Criar:
 * tipagem TypeScript
 * hooks reutilizáveis
 
+Ordem sugerida dentro da fase:
+
+1. `settings`
+2. `congregations`
+3. `themes`
+4. `speakers`
+5. `calendarEvents`
+6. `assignments`
+7. `notifications`
+8. `auditLogs`
+
 ---
 
 ## FASE 4 — Congregações
+
+Status atual:
+
+* Pendente
 
 Implementar CRUD completo.
 
@@ -184,6 +268,10 @@ Critérios:
 
 ## FASE 5 — Temas
 
+Status atual:
+
+* Pendente
+
 Implementar CRUD.
 
 Campos:
@@ -202,6 +290,10 @@ Adicionar:
 
 ## FASE 6 — Oradores
 
+Status atual:
+
+* Pendente
+
 Implementar CRUD.
 
 Campos:
@@ -211,7 +303,7 @@ Campos:
 * telefone
 * congregationId
 * type
-* themes[]
+* themeIds[]
 * status
 * unavailableStart
 * unavailableEnd
@@ -234,6 +326,10 @@ Critérios:
 ---
 
 ## FASE 7 — Calendário Inteligente
+
+Status atual:
+
+* Pendente
 
 Implementar:
 
@@ -258,6 +354,10 @@ Critérios:
 
 ## FASE 8 — Designações
 
+Status atual:
+
+* Pendente
+
 Implementar:
 
 * entrada de visitantes
@@ -278,6 +378,10 @@ Status:
 
 ## FASE 9 — Dashboard
 
+Status atual:
+
+* Pendente
+
 Implementar:
 
 * próximos 8 sábados
@@ -289,6 +393,10 @@ Implementar:
 ---
 
 ## FASE 10 — Histórico
+
+Status atual:
+
+* Pendente
 
 Implementar filtros:
 
@@ -305,6 +413,10 @@ Implementar:
 ---
 
 ## FASE 11 — EmailJS
+
+Status atual:
+
+* Pendente
 
 Implementar:
 
@@ -325,6 +437,10 @@ Não expor chaves sensíveis no frontend.
 ---
 
 ## FASE 12 — Google Calendar
+
+Status atual:
+
+* Pendente
 
 Implementar:
 
@@ -401,7 +517,14 @@ Visual:
 * administrativo
 * minimalista
 * rápido
-* desktop-first
+* claro para uso frequente em desktop e mobile
+
+Obrigatório:
+
+* mobile é prioridade real de UX junto com desktop
+* toda nova tela deve ser pensada para toque, leitura rápida e ações principais sem esforço
+* filtros, formulários e listas devem funcionar bem em largura reduzida
+* não aceitar uma implementação como pronta se só estiver boa no desktop
 
 Evitar:
 

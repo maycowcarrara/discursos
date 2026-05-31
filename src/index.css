@@ -4,62 +4,62 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: oklch(0.979 0.012 84.5);
-  --foreground: oklch(0.235 0.019 80.7);
-  --card: oklch(0.995 0.004 84.1 / 0.94);
-  --card-foreground: oklch(0.235 0.019 80.7);
-  --popover: oklch(0.995 0.004 84.1);
-  --popover-foreground: oklch(0.235 0.019 80.7);
-  --primary: oklch(0.45 0.102 84.7);
-  --primary-foreground: oklch(0.985 0.01 84.2);
-  --secondary: oklch(0.942 0.013 84.2);
-  --secondary-foreground: oklch(0.315 0.022 82.3);
-  --muted: oklch(0.954 0.008 84.5);
-  --muted-foreground: oklch(0.51 0.02 80.1);
-  --accent: oklch(0.921 0.026 90.4);
-  --accent-foreground: oklch(0.285 0.019 80.7);
-  --destructive: oklch(0.61 0.21 26.8);
-  --border: oklch(0.883 0.014 82.4);
-  --input: oklch(0.883 0.014 82.4);
-  --ring: oklch(0.45 0.102 84.7);
-  --sidebar: oklch(0.297 0.029 145.8 / 0.96);
-  --sidebar-foreground: oklch(0.951 0.007 86.5);
-  --sidebar-primary: oklch(0.382 0.041 146.8);
-  --sidebar-primary-foreground: oklch(0.977 0.006 86.8);
-  --sidebar-accent: oklch(0.395 0.027 146.3 / 0.62);
-  --sidebar-accent-foreground: oklch(0.98 0.004 86.8);
-  --sidebar-border: oklch(0.455 0.021 145.3 / 0.48);
-  --radius: 1.2rem;
-  --font-sans: 'Aptos', 'Segoe UI Variable', 'Trebuchet MS', sans-serif;
-  --font-serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
+  --background: oklch(0.973 0.008 252.1);
+  --foreground: oklch(0.255 0.03 258.2);
+  --card: oklch(0.996 0.003 255.3 / 0.96);
+  --card-foreground: oklch(0.255 0.03 258.2);
+  --popover: oklch(0.996 0.003 255.3);
+  --popover-foreground: oklch(0.255 0.03 258.2);
+  --primary: oklch(0.515 0.188 259.3);
+  --primary-foreground: oklch(0.985 0.003 255.8);
+  --secondary: oklch(0.952 0.009 250.4);
+  --secondary-foreground: oklch(0.35 0.03 257.2);
+  --muted: oklch(0.957 0.008 251.1);
+  --muted-foreground: oklch(0.55 0.022 255.8);
+  --accent: oklch(0.943 0.018 247.4);
+  --accent-foreground: oklch(0.29 0.03 258.1);
+  --destructive: oklch(0.62 0.205 27.2);
+  --border: oklch(0.905 0.01 249.6);
+  --input: oklch(0.905 0.01 249.6);
+  --ring: oklch(0.515 0.188 259.3);
+  --sidebar: oklch(0.248 0.046 260.4 / 0.99);
+  --sidebar-foreground: oklch(0.962 0.005 255.2);
+  --sidebar-primary: oklch(0.33 0.06 258.1);
+  --sidebar-primary-foreground: oklch(0.986 0.003 255.8);
+  --sidebar-accent: oklch(0.46 0.145 259.5 / 0.86);
+  --sidebar-accent-foreground: oklch(0.99 0.003 255.8);
+  --sidebar-border: oklch(0.39 0.04 258.8 / 0.56);
+  --radius: 1.1rem;
+  --font-sans: 'Aptos', 'Aptos Display', 'Segoe UI Variable', 'Trebuchet MS', sans-serif;
+  --font-serif: 'Aptos', 'Aptos Display', 'Segoe UI Variable', sans-serif;
 }
 
 .dark {
-  --background: oklch(0.184 0.013 95.9);
-  --foreground: oklch(0.93 0.01 85.2);
-  --card: oklch(0.228 0.012 94.8 / 0.92);
-  --card-foreground: oklch(0.93 0.01 85.2);
-  --popover: oklch(0.228 0.012 94.8);
-  --popover-foreground: oklch(0.93 0.01 85.2);
-  --primary: oklch(0.76 0.103 86.7);
-  --primary-foreground: oklch(0.205 0.013 96.1);
-  --secondary: oklch(0.275 0.012 95.3);
-  --secondary-foreground: oklch(0.89 0.01 85.2);
-  --muted: oklch(0.258 0.012 95.4);
-  --muted-foreground: oklch(0.716 0.014 84.2);
-  --accent: oklch(0.314 0.02 91.2);
-  --accent-foreground: oklch(0.95 0.01 85.2);
+  --background: oklch(0.165 0.02 259.8);
+  --foreground: oklch(0.952 0.008 255.2);
+  --card: oklch(0.225 0.022 258.4 / 0.94);
+  --card-foreground: oklch(0.952 0.008 255.2);
+  --popover: oklch(0.225 0.022 258.4 / 0.98);
+  --popover-foreground: oklch(0.952 0.008 255.2);
+  --primary: oklch(0.71 0.18 258.9);
+  --primary-foreground: oklch(0.2 0.018 259.4);
+  --secondary: oklch(0.275 0.022 257.2);
+  --secondary-foreground: oklch(0.952 0.008 255.2);
+  --muted: oklch(0.255 0.018 257.8);
+  --muted-foreground: oklch(0.77 0.014 255.6);
+  --accent: oklch(0.33 0.038 256.4);
+  --accent-foreground: oklch(0.958 0.008 255.4);
   --destructive: oklch(0.69 0.19 25.8);
-  --border: oklch(0.31 0.013 94.4);
-  --input: oklch(0.31 0.013 94.4);
-  --ring: oklch(0.76 0.103 86.7);
-  --sidebar: oklch(0.21 0.013 150.2 / 0.98);
-  --sidebar-foreground: oklch(0.94 0.01 87.2);
-  --sidebar-primary: oklch(0.295 0.024 149.4);
-  --sidebar-primary-foreground: oklch(0.98 0.006 86.8);
-  --sidebar-accent: oklch(0.318 0.018 148.8 / 0.72);
-  --sidebar-accent-foreground: oklch(0.95 0.01 85.2);
-  --sidebar-border: oklch(0.4 0.013 147.4 / 0.45);
+  --border: oklch(0.34 0.02 257.3 / 0.9);
+  --input: oklch(0.34 0.02 257.3 / 0.9);
+  --ring: oklch(0.71 0.18 258.9);
+  --sidebar: oklch(0.155 0.028 260.2 / 0.995);
+  --sidebar-foreground: oklch(0.952 0.008 255.2);
+  --sidebar-primary: oklch(0.235 0.04 259.4);
+  --sidebar-primary-foreground: oklch(0.985 0.003 255.8);
+  --sidebar-accent: oklch(0.5 0.16 259.4 / 0.86);
+  --sidebar-accent-foreground: oklch(0.985 0.003 255.8);
+  --sidebar-border: oklch(0.35 0.03 258.6 / 0.44);
 }
 
 @theme inline {
@@ -109,16 +109,17 @@
     @apply min-h-screen bg-background font-sans text-foreground antialiased;
     margin: 0;
     background-image:
-      radial-gradient(circle at top left, rgba(170, 132, 67, 0.18), transparent 24%),
-      radial-gradient(circle at bottom right, rgba(84, 109, 71, 0.16), transparent 28%),
-      linear-gradient(180deg, rgba(255, 251, 242, 0.94), rgba(244, 240, 230, 0.98));
+      radial-gradient(circle at top left, rgba(33, 87, 214, 0.12), transparent 22%),
+      radial-gradient(circle at bottom right, rgba(28, 115, 210, 0.08), transparent 26%),
+      linear-gradient(180deg, rgba(246, 248, 252, 0.98), rgba(238, 242, 249, 0.98));
   }
 
   .dark body {
     background-image:
-      radial-gradient(circle at top left, rgba(180, 144, 77, 0.18), transparent 24%),
-      radial-gradient(circle at bottom right, rgba(74, 93, 67, 0.18), transparent 28%),
-      linear-gradient(180deg, rgba(18, 20, 18, 0.98), rgba(13, 15, 14, 1));
+      radial-gradient(circle at top left, rgba(78, 127, 244, 0.16), transparent 18%),
+      radial-gradient(circle at 85% 12%, rgba(33, 103, 219, 0.16), transparent 20%),
+      radial-gradient(circle at bottom right, rgba(36, 91, 206, 0.12), transparent 24%),
+      linear-gradient(180deg, rgba(11, 18, 33, 0.995), rgba(8, 13, 25, 1));
   }
 
   button,
@@ -126,6 +127,18 @@
   textarea,
   select {
     font: inherit;
+  }
+
+  body,
+  button,
+  input,
+  textarea,
+  select {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      box-shadow 180ms ease;
   }
 
   a {

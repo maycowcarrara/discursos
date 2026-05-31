@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import { type AuthError } from 'firebase/auth'
-import { LoaderCircle, LockKeyhole, LogIn, Mail, Sparkles } from 'lucide-react'
+import {
+  CalendarDays,
+  LoaderCircle,
+  LockKeyhole,
+  LogIn,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
@@ -8,8 +16,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { annualPlanningMonths } from '@/data/mock-operations'
 import { loginWithEmail, loginWithGoogle } from '@/services/auth/auth-service'
 
 const loginSchema = z.object({
@@ -102,57 +111,92 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-8 md:px-8">
-      <div className="grid w-full max-w-6xl overflow-hidden rounded-[36px] border border-border/70 bg-background/86 shadow-[0_40px_120px_-80px_rgba(33,37,28,0.8)] backdrop-blur xl:grid-cols-[1.05fr_0.95fr]">
-        <section className="relative overflow-hidden border-b border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(153,126,82,0.18),transparent_30%),linear-gradient(160deg,rgba(255,250,241,0.98),rgba(243,238,226,0.94))] p-6 md:p-10 xl:border-b-0 xl:border-r dark:bg-[radial-gradient(circle_at_top_left,rgba(196,159,93,0.18),transparent_28%),linear-gradient(160deg,rgba(19,21,18,0.98),rgba(15,17,15,0.96))]">
-          <Badge className="bg-primary/12 text-primary">
-            Fase 2 em andamento
+      <div className="grid w-full max-w-7xl gap-5 xl:grid-cols-[1.08fr_0.92fr]">
+        <section className="overflow-hidden rounded-[30px] border border-sidebar-border/80 bg-[linear-gradient(180deg,rgba(11,26,60,0.98),rgba(8,21,49,0.99))] p-6 text-white shadow-[0_30px_80px_-44px_rgba(8,18,43,0.95)] md:p-8">
+          <Badge className="border-white/10 bg-white/10 text-white">
+            Fase 2 concluida
           </Badge>
-          <h1 className="mt-5 max-w-xl font-serif text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-            Acesso protegido para a agenda anual de discursos.
+          <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
+            Acesso ao painel de discursos com a mesma identidade do mockup.
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">
-            A sessao agora e restaurada automaticamente pelo Firebase Auth, com
-            rotas protegidas e uma base pronta para as permissoes das proximas
-            fases.
+          <p className="mt-4 max-w-2xl text-base leading-7 text-white/74">
+            O login continua no escopo da Fase 2, mas agora conversa com a
+            linguagem visual do produto: painel claro, cards operacionais e foco
+            em leitura rapida.
           </p>
 
-          <div className="mt-8 grid gap-3">
-            {[
-              'Persistencia local de sessao no navegador',
-              'Redirecionamento automatico para a rota solicitada',
-              'Base pronta para regras de acesso por perfil',
-            ].map((item) => (
-              <div
-                key={item}
-                className="rounded-[24px] border border-border/70 bg-background/72 px-4 py-4 text-sm leading-6 text-foreground"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
+          <div className="mt-8 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="space-y-3">
+              {[
+                {
+                  title: 'Sessao persistente',
+                  detail: 'Firebase Auth restaura a sessao automaticamente.',
+                  icon: ShieldCheck,
+                },
+                {
+                  title: 'Base pronta para agenda',
+                  detail: 'Rotas protegidas e shell responsivo ja entregues.',
+                  icon: CalendarDays,
+                },
+                {
+                  title: 'Proxima fase obrigatoria',
+                  detail: 'Camada Firestore tipada e hooks reutilizaveis.',
+                  icon: Sparkles,
+                },
+              ].map((item) => {
+                const Icon = item.icon
 
-          <div className="mt-8 rounded-[28px] border border-dashed border-border/80 bg-card/75 p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-primary/12 p-3 text-primary">
-                <Sparkles className="size-5" />
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Pronto para a Fase 3</p>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Depois do login, podemos conectar as leituras reais do Firestore.
-                </p>
+                return (
+                  <div
+                    key={item.title}
+                    className="rounded-[22px] border border-white/8 bg-white/6 px-4 py-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 items-center justify-center rounded-2xl bg-white/10 text-white">
+                        <Icon className="size-4" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">{item.title}</p>
+                        <p className="mt-1 text-sm leading-6 text-white/68">
+                          {item.detail}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="rounded-[24px] border border-white/8 bg-white/6 p-4">
+              <p className="text-sm font-medium text-white/82">
+                Amostra do planejamento anual
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {annualPlanningMonths.slice(0, 4).map((month) => (
+                  <div
+                    key={month.month}
+                    className="rounded-[18px] border border-white/8 bg-white/6 px-3 py-3"
+                  >
+                    <p className="text-sm font-medium text-white">{month.month}</p>
+                    <div className="mt-3 space-y-2 text-sm text-white/70">
+                      {month.entries.slice(0, 2).map((entry) => (
+                        <p key={`${month.month}-${entry.day}`}>{`${entry.day} - ${entry.label}`}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </section>
 
-        <section className="p-6 md:p-10">
+        <section className="rounded-[30px] border border-border/80 bg-background/92 p-6 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.22)] md:p-8">
           <Card className="border-0 bg-transparent shadow-none">
             <CardHeader className="px-0 pt-0">
               <CardTitle className="text-3xl">Entrar</CardTitle>
-              <CardDescription className="text-base">
+              <p className="text-sm leading-6 text-muted-foreground">
                 Use e-mail e senha ou Google para acessar o painel.
-              </CardDescription>
+              </p>
             </CardHeader>
             <CardContent className="px-0 pb-0">
               <form
@@ -160,10 +204,7 @@ export function LoginPage() {
                 onSubmit={form.handleSubmit(handleEmailLogin)}
               >
                 <div className="space-y-2">
-                  <label
-                    htmlFor="email"
-                    className="text-sm font-medium text-foreground"
-                  >
+                  <label htmlFor="email" className="text-sm font-medium text-foreground">
                     E-mail
                   </label>
                   <div className="relative">
@@ -185,10 +226,7 @@ export function LoginPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label
-                    htmlFor="password"
-                    className="text-sm font-medium text-foreground"
-                  >
+                  <label htmlFor="password" className="text-sm font-medium text-foreground">
                     Senha
                   </label>
                   <div className="relative">
@@ -210,7 +248,7 @@ export function LoginPage() {
                 </div>
 
                 {authError ? (
-                  <div className="rounded-[22px] border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  <div className="rounded-[18px] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     {authError}
                   </div>
                 ) : null}

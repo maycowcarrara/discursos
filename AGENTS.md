@@ -17,6 +17,8 @@ Antes de qualquer implementacao, o agente deve ler nesta ordem:
 * Implementar por fases, sem pular escopo sem autorizacao explicita
 * Tratar `IMPLEMENTATION_PLAN.md` como fonte oficial da entrega
 * Tratar `FIRESTORE_SCHEMA.md` como fonte oficial do banco
+* Manter a documentacao atualizada sempre que uma fase avancar
+* Deixar explicito na documentacao o que ja foi entregue, a fase atual e a proxima fase obrigatoria
 * Nao criar colecoes, campos ou enums fora do schema sem atualizar a documentacao primeiro
 * Preferir componentes reutilizaveis e separacao clara entre UI, logica e servicos
 * Todo codigo novo deve ser em TypeScript estrito
@@ -30,8 +32,15 @@ Antes de qualquer implementacao, o agente deve ler nesta ordem:
 * Usar React Router para estrutura principal de navegacao
 * Usar TailwindCSS como base visual
 * Preparar base compativel com `shadcn/ui`
-* Manter layout desktop-first, mas responsivo no mobile
+* Garantir boa UX em desktop e mobile desde o inicio
 * Tema claro/escuro deve existir desde a base
+
+## Convencoes de UI e UX
+
+* Toda tela nova deve funcionar bem em desktop e mobile
+* Mobile nao deve ser tratado como ajuste final
+* Formularios, filtros, tabelas, cards e acoes principais devem considerar toque, largura reduzida e leitura confortavel
+* Antes de considerar uma fase visualmente pronta, verificar se o fluxo principal tambem esta bom no mobile
 
 ## Convencoes de alteracao
 
