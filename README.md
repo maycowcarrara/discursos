@@ -11,14 +11,15 @@ Fases concluídas:
 * `FASE 3 — Firestore`
 * `FASE 4 — Congregações`
 * `FASE 5 — Temas`
+* `FASE 6 — Oradores`
 
 Fase atual concluída:
 
-* `FASE 5 — Temas`
+* `FASE 6 — Oradores`
 
 Próxima etapa obrigatória:
 
-* `FASE 6 — Oradores`
+* `FASE 7 — Calendário Inteligente`
 
 ## O que já foi entregue
 
@@ -91,29 +92,38 @@ Próxima etapa obrigatória:
 * exclusão lógica via `isActive`
 * auditoria de create, update e delete em `auditLogs`
 
+### Fechamento da Fase 6
+
+* CRUD completo de `speakers` na UI
+* formulário validado com React Hook Form + Zod
+* múltiplos temas por orador com seleção administrativa
+* filtros locais por congregação, status e tipo
+* período de indisponibilidade com datas inicial e final
+* exclusão lógica com preservação do cadastro para histórico
+* auditoria de create, update e delete em `auditLogs`
+
 ## Próxima fase
 
-### `FASE 6 — Oradores`
+### `FASE 7 — Calendário Inteligente`
 
 Implementar:
 
-* CRUD de oradores
-* múltiplos temas por orador
-* filtro por congregação
-* filtro por status
+* geração automática de sábados
+* calendário anual
+* tipos de evento
 
 Entregue até a Fase 5:
 
 * `settings/app` com persistência real
 * CRUD completo de `congregations`
 * CRUD completo de `themes`
-* listagens reais de `speakers`
+* CRUD completo de `speakers`
 * agenda anual real com `calendarEvents`
 * leitura real de `assignments`, `notifications` e `auditLogs`
 
 Próximo subpasso obrigatório:
 
-* iniciar os CRUDs da `FASE 6 — Oradores`
+* iniciar a `FASE 7 — Calendário Inteligente`
 
 ## Diretriz de UI e UX
 

@@ -15,14 +15,15 @@
 * FASE 3 — Firestore
 * FASE 4 — Congregações
 * FASE 5 — Temas
+* FASE 6 — Oradores
 
 ## Fase atual concluída
 
-* FASE 5 — Temas
+* FASE 6 — Oradores
 
 ## Próxima etapa obrigatória
 
-* FASE 6 — Oradores
+* FASE 7 — Calendário Inteligente
 
 ## Entregas já realizadas
 
@@ -93,6 +94,16 @@
 * exclusão lógica com remoção da base ativa e preservação do histórico
 * busca rápida local por número, título e observações
 * ordenação oficial por número mantida na listagem administrativa
+* auditoria automática de create, update e delete em `auditLogs`
+
+### Oradores — fechamento da Fase 6
+
+* CRUD completo de `speakers` implementado na UI
+* cadastro e edição com validação tipada via React Hook Form + Zod
+* múltiplos temas por orador com seleção administrativa real
+* filtros locais por congregação, status e tipo sem leituras extras
+* controle operacional de status com indisponibilidade por período
+* exclusão lógica com saída da base ativa e preservação do cadastro
 * auditoria automática de create, update e delete em `auditLogs`
 
 Regra de manutenção desta documentação:
@@ -365,7 +376,7 @@ Entregas realizadas:
 
 Status atual:
 
-* Pendente
+* Concluída
 
 Implementar CRUD.
 
@@ -396,13 +407,23 @@ Critérios:
 * filtro por congregação
 * filtro por status
 
+Entregas realizadas:
+
+* formulário completo com validação estrita
+* vinculação de múltiplos temas por orador
+* controle administrativo de status ativo, férias, indisponível, transferido e inativo
+* período de indisponibilidade com datas inicial e final
+* listagem administrativa real com filtros locais por tipo, congregação e status
+* exclusão lógica com `status = inactive` e `isActive = false`
+* auditoria para create, update e delete
+
 ---
 
 ## FASE 7 — Calendário Inteligente
 
 Status atual:
 
-* Pendente
+* Próxima fase obrigatória
 
 Implementar:
 
