@@ -203,3 +203,10 @@ export type AuditLogDocument = z.infer<typeof auditLogSchema>
 
 export type SpeakerType = z.infer<typeof speakerTypeSchema>
 export type SpeakerStatus = z.infer<typeof speakerStatusSchema>
+export type CalendarEventType = z.infer<typeof calendarEventTypeSchema>
+export type AssignmentStatus = z.infer<typeof assignmentStatusSchema>
+export type NotificationType = z.infer<typeof notificationTypeSchema>
+export type NotificationStatus = z.infer<typeof notificationStatusSchema>
+export type NotificationProvider = z.infer<typeof notificationProviderSchema>
+export type AuditEntityType = z.infer<typeof auditEntityTypeSchema>
+export type AuditAction = z.infer<typeof auditActionSchema>

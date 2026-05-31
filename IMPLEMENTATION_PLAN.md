@@ -12,14 +12,15 @@
 
 * FASE 1 — Base do Projeto
 * FASE 2 — Autenticação
+* FASE 3 — Firestore
 
-## Fase atual em andamento
+## Fase atual concluída
 
 * FASE 3 — Firestore
 
 ## Próxima etapa obrigatória
 
-* Concluir a FASE 3 — Firestore na ordem oficial começando por `calendarEvents`
+* FASE 4 — Congregações
 
 ## Entregas já realizadas
 
@@ -59,6 +60,19 @@
 * hooks reutilizáveis com TanStack Query para leitura inicial
 * leitura e escrita inicial de `settings/app`
 * páginas de `congregations`, `themes` e `speakers` conectadas ao Firestore em modo leitura
+
+### Firestore — avanço da Fase 3
+
+* `calendarEvents` conectado ao app com navegação anual por ano
+* `assignments` conectado ao app com leitura de histórico recente
+* agenda anual cruza `calendarEvents` com `assignments` para indicar onde já existe designação
+* páginas de agenda, designações e histórico deixaram de depender de mocks principais
+
+### Firestore — fechamento da Fase 3
+
+* `notifications` conectado ao app com leitura real da fila operacional
+* `auditLogs` conectado ao app com leitura real da trilha de auditoria
+* tela de configurações consolidada como painel de fundação do Firestore
 
 Regra de manutenção desta documentação:
 
@@ -213,7 +227,7 @@ Critérios:
 
 Status atual:
 
-* Em andamento
+* Concluída
 
 Implementar coleções:
 
@@ -232,11 +246,15 @@ Criar:
 * tipagem TypeScript
 * hooks reutilizáveis
 
-Entregas já iniciadas nesta fase:
+Entregas desta fase:
 
 * `settings/app` com leitura e salvamento real
 * `congregations`, `themes` e `speakers` em leitura real
 * validação de documentos via tipagem estrita no frontend
+* `calendarEvents` em leitura real por ano
+* `assignments` em leitura real para agenda e histórico
+* `notifications` em leitura real por status
+* `auditLogs` em leitura real recente
 
 Ordem sugerida dentro da fase:
 

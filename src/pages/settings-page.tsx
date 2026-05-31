@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Save, Settings2 } from 'lucide-react'
+import { BellRing, Save, Settings2, ShieldCheck } from 'lucide-react'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { useAuth } from '@/components/auth/use-auth'
+import { useRecentAuditLogsQuery } from '@/hooks/use-audit-logs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,11 +17,22 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAppSettingsQuery, useSaveAppSettingsMutation } from '@/hooks/use-app-settings'
+import { useNotificationsByStatusQuery } from '@/hooks/use-notifications'
 import {
   defaultAppSettingsValues,
   toAppSettingsFormValues,
   type AppSettingsFormValues,
 } from '@/services/firestore/settings-service'
+import { formatTimestampDate } from '@/utils/calendar-events'
+import {
+  auditActionLabels,
+  auditEntityTypeLabels,
+  getAuditActionClassName,
+  getNotificationStatusClassName,
+  notificationProviderLabels,
+  notificationStatusLabels,
+  notificationTypeLabels,
+} from '@/utils/operations-display'
 
 const appSettingsFormSchema = z.object({
   organizationName: z
@@ -57,6 +69,9 @@ export function SettingsPage() {
   const { user } = useAuth()
   const appSettingsQuery = useAppSettingsQuery()
   const saveAppSettingsMutation = useSaveAppSettingsMutation()
+  const pendingNotificationsQuery = useNotificationsByStatusQuery('pending', 6)
+  const failedNotificationsQuery = useNotificationsByStatusQuery('failed', 4)
+  const auditLogsQuery = useRecentAuditLogsQuery(6)
 
   const {
     formState: { errors, isDirty },
@@ -87,6 +102,11 @@ export function SettingsPage() {
   const isSaving = saveAppSettingsMutation.isPending
   const isLoading = appSettingsQuery.isLoading
   const hasError = appSettingsQuery.isError
+  const notificationsError =
+    pendingNotificationsQuery.error ?? failedNotificationsQuery.error
+  const pendingNotifications = pendingNotificationsQuery.data ?? []
+  const failedNotifications = failedNotificationsQuery.data ?? []
+  const recentAuditLogs = auditLogsQuery.data ?? []
 
   return (
     <div className="space-y-5">
@@ -97,7 +117,7 @@ export function SettingsPage() {
               <div>
                 <CardTitle className="text-3xl">Configuracoes</CardTitle>
                 <CardDescription className="mt-2 text-base">
-                  A Fase 3 comecou pela base real de Firestore em
+                  A Fase 3 consolidou a base real de Firestore em
                   <span className="font-medium text-foreground"> settings/app</span>,
                   sem inventar campos fora do schema oficial.
                 </CardDescription>
@@ -225,8 +245,8 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-2xl">Escopo entregue</CardTitle>
               <CardDescription>
-                A Fase 3 foi aberta com base reutilizavel, sem adiantar CRUDs da
-                Fase 4.
+                A Fase 3 agora cobre todas as colecoes oficiais do Firestore em
+                modo de fundacao e leitura.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
@@ -234,11 +254,11 @@ export function SettingsPage() {
                 Tipagem oficial do Firestore para as colecoes aprovadas.
               </div>
               <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                Hooks React Query para leitura de congregacoes, temas, oradores e
-                configuracoes.
+                Hooks React Query para leitura de agenda, designacoes,
+                notificacoes, auditoria e configuracoes.
               </div>
               <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                Escrita inicial segura apenas em
+                Escrita inicial segura em
                 <span className="font-medium text-foreground"> settings/app</span>.
               </div>
             </CardContent>
@@ -251,25 +271,202 @@ export function SettingsPage() {
                   <Settings2 className="size-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Proximo passo da fase</CardTitle>
+                  <CardTitle className="text-2xl">Fase 3 concluida</CardTitle>
                   <CardDescription>
-                    Seguir a ordem oficial antes de CRUDs completos.
+                    A base do Firestore ficou pronta para abrir os CRUDs
+                    funcionais.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
-                `congregations`, `themes` e `speakers` agora ja leem do Firestore.
+                `notifications` e `auditLogs` agora tambem leem do Firestore.
               </p>
               <p>
-                O proximo subpasso obrigatorio dentro da Fase 3 e tipar e conectar
-                `calendarEvents`.
+                O proximo passo obrigatorio do plano passa a ser a Fase 4 com o
+                CRUD de congregacoes.
               </p>
               <p>
                 `settings/notifications` e `settings/calendar` seguem reservados,
                 sem campos novos inventados antes da etapa certa.
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <BellRing className="size-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl">Fila de notificacoes</CardTitle>
+                  <CardDescription>
+                    Leitura real da colecao `notifications`, sem ativar automacoes
+                    fora da Fase 11.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
+                  <p className="text-sm text-muted-foreground">Pendentes carregadas</p>
+                  <p className="mt-2 text-3xl font-semibold text-foreground">
+                    {pendingNotifications.length}
+                  </p>
+                </div>
+                <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
+                  <p className="text-sm text-muted-foreground">Falhas carregadas</p>
+                  <p className="mt-2 text-3xl font-semibold text-foreground">
+                    {failedNotifications.length}
+                  </p>
+                </div>
+              </div>
+
+              {notificationsError ? (
+                <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  {getErrorMessage(notificationsError)}
+                </div>
+              ) : null}
+
+              {pendingNotificationsQuery.isLoading || failedNotificationsQuery.isLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }, (_, index) => (
+                    <div
+                      key={index}
+                      className="h-24 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {!pendingNotificationsQuery.isLoading &&
+              !failedNotificationsQuery.isLoading &&
+              !notificationsError &&
+              pendingNotifications.length === 0 &&
+              failedNotifications.length === 0 ? (
+                <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-6 text-sm leading-6 text-muted-foreground">
+                  Nenhuma notificacao pendente ou com falha encontrada ainda.
+                </div>
+              ) : null}
+
+              {!pendingNotificationsQuery.isLoading &&
+              !failedNotificationsQuery.isLoading &&
+              !notificationsError &&
+              (pendingNotifications.length > 0 || failedNotifications.length > 0) ? (
+                <div className="space-y-3">
+                  {[...pendingNotifications, ...failedNotifications].map((notification) => (
+                    <div
+                      key={notification.id}
+                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {notificationTypeLabels[notification.type]}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {notification.recipientEmail}
+                          </p>
+                        </div>
+                        <Badge
+                          className={getNotificationStatusClassName(notification.status)}
+                        >
+                          {notificationStatusLabels[notification.status]}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>
+                          Agendado: {formatTimestampDate(notification.scheduledFor)}
+                        </span>
+                        <span>Provider: {notificationProviderLabels[notification.provider]}</span>
+                        <span>Retry: {notification.retryCount}</span>
+                      </div>
+                      {notification.errorMessage ? (
+                        <p className="mt-3 text-sm leading-6 text-rose-700 dark:text-rose-200">
+                          {notification.errorMessage}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <ShieldCheck className="size-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl">Auditoria recente</CardTitle>
+                  <CardDescription>
+                    Leitura real da colecao `auditLogs` para confirmar a trilha
+                    append-only da V1.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {auditLogsQuery.isError ? (
+                <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  {getErrorMessage(auditLogsQuery.error)}
+                </div>
+              ) : null}
+
+              {auditLogsQuery.isLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }, (_, index) => (
+                    <div
+                      key={index}
+                      className="h-24 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {!auditLogsQuery.isLoading &&
+              !auditLogsQuery.isError &&
+              recentAuditLogs.length === 0 ? (
+                <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-6 text-sm leading-6 text-muted-foreground">
+                  Nenhum registro de auditoria encontrado ainda.
+                </div>
+              ) : null}
+
+              {!auditLogsQuery.isLoading &&
+              !auditLogsQuery.isError &&
+              recentAuditLogs.length > 0 ? (
+                <div className="space-y-3">
+                  {recentAuditLogs.map((auditLog) => (
+                    <div
+                      key={auditLog.id}
+                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {auditEntityTypeLabels[auditLog.entityType]}
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {auditLog.entityId}
+                          </p>
+                        </div>
+                        <Badge className={getAuditActionClassName(auditLog.action)}>
+                          {auditActionLabels[auditLog.action]}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>Em: {formatTimestampDate(auditLog.createdAt)}</span>
+                        <span>Actor: {auditLog.actorName ?? auditLog.actorUid}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>

@@ -4,18 +4,19 @@ Aplicação web para gerenciar discursos públicos, oradores, congregações, ag
 
 ## Status Atual
 
-Fase atual concluída:
+Fases concluídas:
 
 * `FASE 1 — Base do Projeto`
 * `FASE 2 — Autenticação`
+* `FASE 3 — Firestore`
 
-Fase atual em andamento:
+Fase atual concluída:
 
 * `FASE 3 — Firestore`
 
 Próxima etapa obrigatória:
 
-* concluir a integração de `calendarEvents` dentro da `FASE 3 — Firestore`
+* `FASE 4 — Congregações`
 
 ## O que já foi entregue
 
@@ -58,26 +59,39 @@ Próxima etapa obrigatória:
 * `settings/app` conectado ao Firestore com leitura e salvamento
 * páginas de `congregations`, `themes` e `speakers` conectadas ao Firestore em modo leitura
 
+### Avanço da Fase 3
+
+* `calendarEvents` conectado ao app com leitura anual real
+* `assignments` conectado ao app para agenda e histórico recente
+* telas de agenda, designações e histórico passaram a ler a base real
+
+### Fechamento da Fase 3
+
+* `notifications` conectado ao app com leitura real por status
+* `auditLogs` conectado ao app com leitura real recente
+* tela de configurações consolidada como painel da fundação Firestore
+
 ## Próxima fase
 
-### `FASE 3 — Firestore`
+### `FASE 4 — Congregações`
 
 Implementar:
 
-* camada `services/firestore`
-* tipagens TypeScript das coleções oficiais
-* hooks reutilizáveis de leitura e escrita
-* leitura inicial de `settings`
-* primeiros serviços para `congregations`, `themes` e `speakers`
+* CRUD completo de congregações
+* cadastro, edição e exclusão
+* busca e paginação
+* aproveitamento da base já conectada ao Firestore
 
-Entregue nesta abertura da fase:
+Entregue na Fase 3:
 
 * `settings/app` com persistência real
 * listagens reais de `congregations`, `themes` e `speakers`
+* agenda anual real com `calendarEvents`
+* leitura real de `assignments`, `notifications` e `auditLogs`
 
 Próximo subpasso obrigatório:
 
-* iniciar `calendarEvents` mantendo a ordem oficial da Fase 3
+* iniciar os CRUDs da `FASE 4 — Congregações`
 
 ## Diretriz de UI e UX
 
