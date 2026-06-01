@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "test:history": "tsc -p tsconfig.history-test.json && node --test %cd%/node_modules/.tmp/history-tests/utils/assignment-history.test.js",
     "test:dashboard": "tsc -p tsconfig.dashboard-test.json && node --test %cd%/node_modules/.tmp/dashboard-tests/utils/dashboard.test.js",
+    "test:notifications": "tsc -p tsconfig.notifications-test.json && node --test %cd%/node_modules/.tmp/notifications-tests/utils/assignment-notifications.test.js",
+    "typecheck:worker": "tsc -p tsconfig.worker.json",
     "preview": "vite preview",
+    "deploy:worker": "npx wrangler deploy --config workers/email-automation/wrangler.jsonc",
     "deploy:firestore": "node scripts/bump-version.mjs && firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:hosting": "node scripts/bump-version.mjs && npm run build && firebase deploy --only hosting",
     "deploy:all": "node scripts/bump-version.mjs && npm run build && firebase deploy --only hosting,firestore:rules,firestore:indexes"

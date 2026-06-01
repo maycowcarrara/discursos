@@ -1,11 +1,11 @@
 export const currentDeliveredPhase = {
-  number: 10,
-  title: 'Historico',
+  number: 11,
+  title: 'EmailJS',
 } as const
 
 export const nextRequiredPhase = {
-  number: 11,
-  title: 'EmailJS',
+  number: 12,
+  title: 'Google Calendar',
 } as const
 
 export const currentDeliveredPhaseLabel = `FASE ${currentDeliveredPhase.number} - ${currentDeliveredPhase.title}`

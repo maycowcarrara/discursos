@@ -303,6 +303,7 @@ Observações:
 * esta coleção concentra o histórico operacional da agenda
 * salvar snapshots mínimos como `speakerName`, `themeTitle` e `originCongregationName` é permitido para preservar histórico
 * nunca depender apenas do documento relacionado para reconstruir histórico antigo
+* `confirmationToken` só deve ser resolvido por fluxo público mediado por worker, nunca por escrita pública direta no frontend
 
 ### 7. `notifications`
 
@@ -334,6 +335,7 @@ Observações:
 
 * Workers e cron devem operar sobre esta coleção
 * não expor segredos ou payloads sensíveis no frontend
+* a fila ativa pode usar IDs determinísticos por designação e tipo para evitar duplicidade de lembretes dentro da mesma operação
 
 ### 8. `auditLogs`
 

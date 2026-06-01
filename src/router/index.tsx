@@ -9,11 +9,16 @@ import { CongregationsPage } from '@/pages/congregations-page'
 import { DashboardPage } from '@/pages/dashboard-page'
 import { HistoryPage } from '@/pages/history-page'
 import { LoginPage } from '@/pages/login-page'
+import { PublicAssignmentConfirmationPage } from '@/pages/public-assignment-confirmation-page'
 import { SettingsPage } from '@/pages/settings-page'
 import { SpeakersPage } from '@/pages/speakers-page'
 import { ThemesPage } from '@/pages/themes-page'
 
 export const appRouter = createBrowserRouter([
+  {
+    path: '/confirmacao/designacao',
+    element: <PublicAssignmentConfirmationPage />,
+  },
   {
     path: '/login',
     element: <GuestRoute />,

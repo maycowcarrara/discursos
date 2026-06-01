@@ -1,0 +1,20 @@
+{
+  "name": "discursos-email-automation",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-31",
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "vars": {
+    "APP_CONFIRMATION_BASE_URL": "https://discursos-15891.web.app/confirmacao/designacao",
+    "EMAILJS_PUBLIC_KEY": "D-3Xne7W_zyrQmlu6",
+    "EMAILJS_SERVICE_ID": "service_4anf4jh",
+    "EMAILJS_TEMPLATE_ID": "template_eh3kckh",
+    "FIREBASE_PROJECT_ID": "discursos-15891",
+    "FIREBASE_WEB_API_KEY": "AIzaSyA074GrldWj0DinsNDec6LicQ4oShtDexk",
+    "NOTIFICATION_BATCH_SIZE": "10",
+    "REMINDER_SEND_HOUR_LOCAL": "9",
+    "WORKER_ACTOR_NAME": "Worker EmailJS",
+    "WORKER_ACTOR_UID": "worker-emailjs"
+  }
+}

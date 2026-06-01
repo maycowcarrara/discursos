@@ -16,14 +16,15 @@ Fases concluídas:
 * `FASE 8 — Designações`
 * `FASE 9 — Dashboard`
 * `FASE 10 — Histórico`
+* `FASE 11 — EmailJS`
 
 Fase atual concluída:
 
-* `FASE 10 — Histórico`
+* `FASE 11 — EmailJS`
 
 Próxima etapa obrigatória:
 
-* `FASE 11 — EmailJS`
+* `FASE 12 — Google Calendar`
 
 ## O que já foi entregue
 
@@ -144,18 +145,27 @@ Próxima etapa obrigatória:
 * atalho para ano atual e carregamento progressivo do histórico
 * métricas dos registros carregados, confirmados, pendentes e congregações envolvidas
 
+### Fechamento da Fase 11
+
+* fila automática de `notifications` sincronizada junto com create, update, confirmação e substituição de `assignments`
+* lembretes de 7 dias e 1 dia com agendamento tipado e cobertura por teste
+* confirmação pública por link em rota dedicada do frontend, com boa leitura em desktop e mobile
+* worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
+* confirmação por link validada no worker antes de gravar `confirmedAt`, `responseAt` e auditoria
+* scripts e arquivos base para `deploy:worker`, `typecheck:worker` e segredos locais do worker
+
 ## Próxima fase
 
-### `FASE 11 — EmailJS`
+### `FASE 12 — Google Calendar`
 
 Implementar:
 
-* envio automático
-* lembrete 7 dias
-* lembrete 1 dia
-* confirmação via link
+* criação automática
+* atualização
+* exclusão
+* sincronização
 
-Entregue até a Fase 10:
+Entregue até a Fase 11:
 
 * `settings/app` com persistência real
 * CRUD completo de `congregations`
@@ -167,10 +177,11 @@ Entregue até a Fase 10:
 * operação real de designações com confirmações, substituições e auditoria
 * dashboard operacional com próximos 8 sábados, pendências e eventos especiais
 * histórico permanente com filtros por período, tema, orador e congregação
+* fila automática de notificações com EmailJS, Cloudflare Worker, cron e confirmação pública por link
 
 Próximo subpasso obrigatório:
 
-* iniciar a `FASE 11 — EmailJS`
+* iniciar a `FASE 12 — Google Calendar`
 
 ## Diretriz de UI e UX
 
@@ -194,14 +205,27 @@ Regra do projeto:
 * `npm run dev`
 * `npm run build`
 * `npm run lint`
+* `npm run test:notifications`
+* `npm run typecheck:worker`
+* `npm run deploy:worker`
 * `npm run deploy:firestore`
 * `npm run deploy:hosting`
 * `npm run deploy:all`
+
+## Operação da Fase 11
+
+Para ativar a automação de e-mails:
+
+* configure `VITE_PUBLIC_NOTIFICATION_WORKER_URL` no frontend para a URL pública do worker
+* preencha as variáveis não sensíveis em [workers/email-automation/wrangler.jsonc](/C:/Projetos/discursos/workers/email-automation/wrangler.jsonc)
+* preencha os segredos locais em [workers/email-automation/.dev.vars.example](/C:/Projetos/discursos/workers/email-automation/.dev.vars.example)
+* a integração atual usa um único `EMAILJS_TEMPLATE_ID` para confirmação e lembretes
+* publique o worker com `npm.cmd run deploy:worker`
 
 ## Decisão atual de deploy
 
 Para manter a operação mais simples nesta V1:
 
 * o frontend web permanece em `Firebase Hosting`
-* `Cloudflare Workers` e `Cloudflare Cron Triggers` ficam reservados para automações futuras
+* `Cloudflare Workers` e `Cloudflare Cron Triggers` operam a automação de e-mails da Fase 11
 * `Cloudflare Pages` não faz parte do deploy atual

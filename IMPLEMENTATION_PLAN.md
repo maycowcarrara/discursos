@@ -20,14 +20,15 @@
 * FASE 8 — Designações
 * FASE 9 — Dashboard
 * FASE 10 — Histórico
+* FASE 11 — EmailJS
 
 ## Fase atual concluída
 
-* FASE 10 — Histórico
+* FASE 11 — EmailJS
 
 ## Próxima etapa obrigatória
 
-* FASE 11 — EmailJS
+* FASE 12 — Google Calendar
 
 ## Entregas já realizadas
 
@@ -149,6 +150,15 @@
 * linha do tempo agrupada por mês para leitura rápida em desktop e mobile
 * atalho para ano atual e carregamento progressivo do histórico permanente
 * resumo operacional dos registros carregados, confirmados, pendentes e congregações envolvidas
+
+### EmailJS — fechamento da Fase 11
+
+* fila automática de `notifications` sincronizada junto com create, update, confirmação e substituição de `assignments`
+* lembretes de 7 dias e 1 dia programados por utilitário tipado e cobertos por teste dedicado
+* confirmação pública por link em rota do frontend, com fluxo validado para desktop e mobile
+* worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
+* confirmação pública grava `confirmedAt`, `responseAt` e auditoria no Firestore após validação do token
+* scripts `test:notifications`, `typecheck:worker` e `deploy:worker` adicionados para a operação da fase
 
 Regra de manutenção desta documentação:
 
@@ -591,7 +601,7 @@ Entregas realizadas:
 
 Status atual:
 
-* Próxima fase obrigatória
+* Concluída
 
 Implementar:
 
@@ -605,6 +615,14 @@ Utilizar:
 * Cloudflare Workers
 * Cloudflare Cron
 
+Entregas realizadas:
+
+* sincronização automática da fila `notifications` a partir das mudanças em `assignments`
+* confirmação imediata, lembrete 7 dias e lembrete 1 dia com agendamento oficial
+* confirmação pública por link com validação no worker e escrita segura no Firestore
+* trigger manual e cron no worker para processar envios EmailJS
+* segredos mantidos fora do frontend, via variáveis do worker
+
 IMPORTANTE:
 
 Não expor chaves sensíveis no frontend.
@@ -615,7 +633,7 @@ Não expor chaves sensíveis no frontend.
 
 Status atual:
 
-* Pendente
+* Próxima fase obrigatória
 
 Implementar:
 

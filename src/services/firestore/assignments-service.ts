@@ -18,6 +18,7 @@ import {
 
 import { firebaseDb } from '@/lib/firebase'
 import {
+  appSettingsSchema,
   assignmentSchema,
   calendarEventSchema,
   congregationSchema,
@@ -31,6 +32,7 @@ import {
   type SpeakerDocument,
   type ThemeDocument,
 } from '@/types/firestore'
+import { buildAssignmentNotificationPlan } from '@/utils/assignment-notifications'
 import {
   isAssignmentCoveringCalendarSlot,
   toLocalDateKey,
@@ -108,8 +110,21 @@ function getAssignmentRef(id: string) {
   return doc(firebaseDb, 'assignments', id)
 }
 
+function getNotificationRef(id: string) {
+  return doc(firebaseDb, 'notifications', id)
+}
+
 function getCalendarEventRef(id: string) {
   return doc(firebaseDb, 'calendarEvents', id)
+}
+
+async function resolveOrganizationName() {
+  const appSettings = await getTypedDocument(
+    doc(firebaseDb, 'settings', 'app'),
+    appSettingsSchema,
+  )
+
+  return appSettings?.organizationName.trim() || 'Organizacao'
 }
 
 function parseDateBoundaryValue(value: string) {
@@ -262,10 +277,110 @@ function buildAssignmentPayload(
     themeTitle: entities.theme.title,
     status: values.status,
     notes: values.notes.trim(),
-    confirmationToken: existingAssignment?.confirmationToken ?? null,
+    confirmationToken: isAssignmentCoveringCalendarSlot(values.status)
+      ? existingAssignment?.confirmationToken ?? crypto.randomUUID()
+      : null,
     confirmedAt: statusFields.confirmedAt,
     responseAt: statusFields.responseAt,
   }
+}
+
+function buildNotificationDocuments(options: {
+  assignment: Pick<
+    AssignmentDocument,
+    'eventDate' | 'status' | 'speakerId' | 'createdAt'
+  > & {
+    id: string
+  }
+  organizationName: string
+  recipientEmail: string
+  speakerName: string
+  now: Timestamp
+}) {
+  const notificationPlan = buildAssignmentNotificationPlan({
+    assignmentId: options.assignment.id,
+    eventDate: options.assignment.eventDate.toDate(),
+    status: options.assignment.status,
+    recipient: {
+      email: options.recipientEmail,
+      speakerName: options.speakerName,
+    },
+    organizationName: options.organizationName,
+    now: options.now.toDate(),
+  })
+
+  return notificationPlan.map((notification) => ({
+    id: notification.documentId,
+    document: {
+      type: notification.type,
+      channel: 'email' as const,
+      assignmentId: options.assignment.id,
+      speakerId: options.assignment.speakerId,
+      recipientEmail: notification.recipientEmail,
+      subject: notification.subject,
+      status: notification.status,
+      scheduledFor: Timestamp.fromDate(notification.scheduledFor),
+      sentAt: null,
+      errorMessage: null,
+      retryCount: 0,
+      provider: 'emailjs' as const,
+      createdAt: options.assignment.createdAt,
+      updatedAt: options.now,
+    },
+  }))
+}
+
+function syncNotificationDocumentsInTransaction(
+  transaction: Transaction,
+  notificationDocuments: ReturnType<typeof buildNotificationDocuments>,
+) {
+  notificationDocuments.forEach((notification) => {
+    transaction.set(getNotificationRef(notification.id), notification.document)
+  })
+}
+
+function syncNotificationDocumentsInBatch(
+  batch: ReturnType<typeof writeBatch>,
+  notificationDocuments: ReturnType<typeof buildNotificationDocuments>,
+) {
+  notificationDocuments.forEach((notification) => {
+    batch.set(getNotificationRef(notification.id), notification.document)
+  })
+}
+
+function cancelConfirmationNotificationInTransaction(
+  transaction: Transaction,
+  assignmentId: string,
+  now: Timestamp,
+) {
+  cancelAutomatedNotificationsInTransaction(transaction, assignmentId, now, [
+    'confirmation',
+  ])
+}
+
+function cancelAutomatedNotificationsInTransaction(
+  transaction: Transaction,
+  assignmentId: string,
+  now: Timestamp,
+  types: Array<'confirmation' | 'reminder7d' | 'reminder1d'> = [
+    'confirmation',
+    'reminder7d',
+    'reminder1d',
+  ],
+) {
+  types.forEach((type) => {
+    transaction.set(
+      getNotificationRef(`${assignmentId}__${type}`),
+      {
+        status: 'cancelled',
+        scheduledFor: now,
+        updatedAt: now,
+        sentAt: null,
+        errorMessage: null,
+      },
+      { merge: true },
+    )
+  })
 }
 
 function buildExistingAssignmentStatusUpdate(
@@ -281,6 +396,9 @@ function buildExistingAssignmentStatusUpdate(
     ...stripRecordId(assignment),
     status,
     notes: notes.trim(),
+    confirmationToken: isAssignmentCoveringCalendarSlot(status)
+      ? assignment.confirmationToken ?? crypto.randomUUID()
+      : null,
     confirmedAt: statusFields.confirmedAt,
     responseAt: statusFields.responseAt,
     updatedAt: now,
@@ -320,6 +438,16 @@ async function assertSpeakerExists(id: string) {
 
   if (!speaker.isActive || speaker.status === 'inactive' || speaker.status === 'transferred') {
     throw new Error('O orador selecionado nao esta disponivel para novas designacoes.')
+  }
+
+  return speaker
+}
+
+async function getSpeakerForNotifications(id: string) {
+  const speaker = await getTypedDocument(doc(firebaseDb, 'speakers', id), speakerSchema)
+
+  if (!speaker) {
+    throw new Error('O orador vinculado a esta designacao nao foi encontrado.')
   }
 
   return speaker
@@ -625,7 +753,10 @@ export async function createAssignment({
     )
   }
 
-  const entities = await resolveAssignmentEntities(values)
+  const [entities, organizationName] = await Promise.all([
+    resolveAssignmentEntities(values),
+    resolveOrganizationName(),
+  ])
   const assignmentRef = doc(getAssignmentsCollection())
 
   await runAssignmentSlotTransaction({
@@ -641,6 +772,19 @@ export async function createAssignment({
         createdBy: actorUid,
         updatedBy: actorUid,
       }
+      const notificationDocuments = buildNotificationDocuments({
+        assignment: {
+          id: assignmentRef.id,
+          eventDate: assignmentDocument.eventDate,
+          status: assignmentDocument.status,
+          speakerId: assignmentDocument.speakerId,
+          createdAt: assignmentDocument.createdAt,
+        },
+        organizationName,
+        recipientEmail: entities.speaker.email,
+        speakerName: entities.speaker.name,
+        now,
+      })
 
       if (isAssignmentCoveringCalendarSlot(values.status)) {
         operationalAssignments.forEach((assignment) => {
@@ -654,6 +798,7 @@ export async function createAssignment({
           }
 
           transaction.set(getAssignmentRef(assignment.id), replacedAssignment)
+          cancelAutomatedNotificationsInTransaction(transaction, assignment.id, now)
           transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
             entityType: 'assignment',
             entityId: assignment.id,
@@ -672,6 +817,7 @@ export async function createAssignment({
       }
 
       transaction.set(assignmentRef, assignmentDocument)
+      syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
       transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
         entityType: 'assignment',
         entityId: assignmentRef.id,
@@ -742,6 +888,11 @@ export async function updateAssignment({
   }
 
   if (isIdentityUnchanged) {
+    const [speakerForNotifications, organizationName] = await Promise.all([
+      getSpeakerForNotifications(existingAssignment.speakerId),
+      resolveOrganizationName(),
+    ])
+
     if (isAssignmentCoveringCalendarSlot(values.status)) {
       await runAssignmentSlotTransaction({
         actorUid,
@@ -765,8 +916,22 @@ export async function updateAssignment({
             now,
             actorUid,
           )
+          const notificationDocuments = buildNotificationDocuments({
+            assignment: {
+              id,
+              eventDate: updatedAssignment.eventDate,
+              status: updatedAssignment.status,
+              speakerId: updatedAssignment.speakerId,
+              createdAt: updatedAssignment.createdAt,
+            },
+            organizationName,
+            recipientEmail: speakerForNotifications.email,
+            speakerName: updatedAssignment.speakerName,
+            now,
+          })
 
           transaction.set(assignmentRef, updatedAssignment)
+          syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
           transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
             entityType: 'assignment',
             entityId: id,
@@ -795,9 +960,23 @@ export async function updateAssignment({
       now,
       actorUid,
     )
+    const notificationDocuments = buildNotificationDocuments({
+      assignment: {
+        id,
+        eventDate: updatedAssignment.eventDate,
+        status: updatedAssignment.status,
+        speakerId: updatedAssignment.speakerId,
+        createdAt: updatedAssignment.createdAt,
+      },
+      organizationName,
+      recipientEmail: speakerForNotifications.email,
+      speakerName: updatedAssignment.speakerName,
+      now,
+    })
     const batch = writeBatch(firebaseDb)
 
     batch.set(assignmentRef, updatedAssignment)
+    syncNotificationDocumentsInBatch(batch, notificationDocuments)
     appendAuditLogToBatch(batch, {
       entityType: 'assignment',
       entityId: id,
@@ -815,7 +994,10 @@ export async function updateAssignment({
     await batch.commit()
     return
   } else {
-    const entities = await resolveAssignmentEntities(values)
+    const [entities, organizationName] = await Promise.all([
+      resolveAssignmentEntities(values),
+      resolveOrganizationName(),
+    ])
     if (isAssignmentCoveringCalendarSlot(values.status)) {
       await runAssignmentSlotTransaction({
         actorUid,
@@ -840,8 +1022,22 @@ export async function updateAssignment({
             updatedAt: now,
             updatedBy: actorUid,
           }
+          const notificationDocuments = buildNotificationDocuments({
+            assignment: {
+              id,
+              eventDate: updatedAssignment.eventDate,
+              status: updatedAssignment.status,
+              speakerId: updatedAssignment.speakerId,
+              createdAt: updatedAssignment.createdAt,
+            },
+            organizationName,
+            recipientEmail: entities.speaker.email,
+            speakerName: updatedAssignment.speakerName,
+            now,
+          })
 
           transaction.set(assignmentRef, updatedAssignment)
+          syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
           transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
             entityType: 'assignment',
             entityId: id,
@@ -873,27 +1069,41 @@ export async function updateAssignment({
       updatedAt: now,
       updatedBy: actorUid,
     }
+    const notificationDocuments = buildNotificationDocuments({
+      assignment: {
+        id,
+        eventDate: updatedAssignment.eventDate,
+        status: updatedAssignment.status,
+        speakerId: updatedAssignment.speakerId,
+        createdAt: updatedAssignment.createdAt,
+      },
+      organizationName,
+      recipientEmail: entities.speaker.email,
+      speakerName: updatedAssignment.speakerName,
+      now,
+    })
+    const batch = writeBatch(firebaseDb)
+
+    batch.set(assignmentRef, updatedAssignment)
+    syncNotificationDocumentsInBatch(batch, notificationDocuments)
+    appendAuditLogToBatch(batch, {
+      entityType: 'assignment',
+      entityId: id,
+      action:
+        existingAssignment.status !== updatedAssignment.status ? 'statusChange' : 'update',
+      actorUid,
+      actorName: actorName ?? null,
+      before: toAuditSnapshot(existingAssignment),
+      after: toAuditSnapshot(updatedAssignment),
+      metadata: {
+        source: 'assignments-phase-8',
+      },
+      createdAt: now,
+    })
+
+    await batch.commit()
+    return
   }
-  const now = Timestamp.now()
-  const batch = writeBatch(firebaseDb)
-
-  batch.set(assignmentRef, updatedAssignment)
-  appendAuditLogToBatch(batch, {
-    entityType: 'assignment',
-    entityId: id,
-    action:
-      existingAssignment.status !== updatedAssignment.status ? 'statusChange' : 'update',
-    actorUid,
-    actorName: actorName ?? null,
-    before: toAuditSnapshot(existingAssignment),
-    after: toAuditSnapshot(updatedAssignment),
-    metadata: {
-      source: 'assignments-phase-8',
-    },
-    createdAt: now,
-  })
-
-  await batch.commit()
 }
 
 export async function confirmAssignment({
@@ -936,6 +1146,7 @@ export async function confirmAssignment({
       )
 
       transaction.set(assignmentRef, confirmedAssignment)
+      cancelConfirmationNotificationInTransaction(transaction, id, now)
       transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
         entityType: 'assignment',
         entityId: id,

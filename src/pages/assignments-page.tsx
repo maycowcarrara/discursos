@@ -432,6 +432,9 @@ export function AssignmentsPage() {
   const selectedEvent =
     eligibleEvents.find((event) => event.id === watchedCalendarEventId) ?? null
   const selectedSpeaker = speakersById.get(watchedSpeakerId) ?? null
+  const selectedSpeakerMissingEmail = Boolean(
+    selectedSpeaker && selectedSpeaker.email.trim().length === 0,
+  )
   const selectedDestinationCongregation =
     congregationsById.get(watchedLocalCongregationId) ?? null
   const speakerThemeOptions = useMemo(() => {
@@ -1131,6 +1134,19 @@ export function AssignmentsPage() {
                 </div>
               ) : null}
 
+              {selectedSpeakerMissingEmail ? (
+                <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                  <p className="font-medium">
+                    Este orador ainda nao possui e-mail cadastrado.
+                  </p>
+                  <p className="mt-2">
+                    A designacao pode ser salva, mas a automacao da Fase 11 nao
+                    conseguira enviar confirmacao nem lembretes ate que o cadastro
+                    seja atualizado.
+                  </p>
+                </div>
+              ) : null}
+
               {selectedEventCoveredByOtherAssignment ? (
                 <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   <p className="font-medium">Este evento ja possui cobertura operacional.</p>
@@ -1450,9 +1466,8 @@ export function AssignmentsPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Regras aplicadas nesta fase</CardTitle>
           <CardDescription className="mt-2">
-            A Fase 8 libera a operacao principal sem antecipar EmailJS nem
-            links automaticos de confirmacao; o historico completo agora vive
-            na tela de Historico.
+            A operacao principal agora tambem agenda confirmacoes e lembretes
+            da Fase 11, preservando o historico completo em `assignments`.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

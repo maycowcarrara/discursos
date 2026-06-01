@@ -282,26 +282,27 @@ export function SettingsPage() {
                 <div>
                   <CardTitle className="text-2xl">{currentDeliveredPhaseLabel}</CardTitle>
                   <CardDescription>
-                    O historico agora consulta `assignments` por periodo e
-                    organiza a trilha permanente em linha do tempo.
+                    A automacao por EmailJS agora opera sobre `notifications`
+                    com worker, cron e confirmacao publica por link.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
-                A base da Fase 3 continua cobrindo `notifications` e `auditLogs`
-                em leitura real, enquanto a Fase 10 reaproveita `assignments`
-                como historico oficial sem criar colecoes paralelas.
+                `assignments` passou a sincronizar a fila oficial de
+                `notifications` na propria camada de servico, sem criar colecoes
+                paralelas para EmailJS.
               </p>
               <p>
                 O proximo passo obrigatorio do plano passa a ser
                 <span className="font-medium text-foreground"> {nextRequiredPhaseLabel}</span>
-                , com lembretes automaticos, cron e confirmacao por e-mail.
+                , aproveitando a base concluida de lembretes, cron e
+                confirmacao por e-mail.
               </p>
               <p>
                 `settings/notifications` e `settings/calendar` seguem reservados,
-                sem campos novos inventados antes da etapa certa.
+                enquanto os segredos permanecem fora do frontend, no worker.
               </p>
             </CardContent>
           </Card>
@@ -315,8 +316,8 @@ export function SettingsPage() {
                 <div>
                   <CardTitle className="text-2xl">Fila de notificacoes</CardTitle>
                   <CardDescription>
-                    Leitura real da colecao `notifications`, sem ativar automacoes
-                    fora da Fase 11.
+                    Leitura real da colecao `notifications`, agora abastecida pela
+                    automacao da Fase 11.
                   </CardDescription>
                 </div>
               </div>
