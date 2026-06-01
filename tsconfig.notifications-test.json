@@ -16,6 +16,8 @@
   "include": [
     "src/types/firestore.ts",
     "src/utils/assignment-notifications.ts",
-    "src/utils/assignment-notifications.test.ts"
+    "src/utils/assignment-notifications.test.ts",
+    "src/utils/notification-sync.ts",
+    "src/utils/notification-sync.test.ts"
   ]
 }

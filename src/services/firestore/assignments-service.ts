@@ -22,6 +22,7 @@ import {
   assignmentSchema,
   calendarEventSchema,
   congregationSchema,
+  notificationSchema,
   speakerSchema,
   themeSchema,
   type AssignmentDocument,
@@ -29,6 +30,7 @@ import {
   type CalendarEventDocument,
   type CongregationDocument,
   type FirestoreRecord,
+  type NotificationDocument,
   type SpeakerDocument,
   type ThemeDocument,
 } from '@/types/firestore'
@@ -37,6 +39,7 @@ import {
   isAssignmentCoveringCalendarSlot,
   toLocalDateKey,
 } from '@/utils/calendar-events'
+import { mergeNotificationDocumentForSync } from '@/utils/notification-sync'
 
 import { appendAuditLogToBatch } from './audit-logs-service'
 import { getTypedCollection, getTypedDocument } from './shared'
@@ -330,20 +333,86 @@ function buildNotificationDocuments(options: {
   }))
 }
 
-function syncNotificationDocumentsInTransaction(
+type NotificationSyncDocument = ReturnType<typeof buildNotificationDocuments>[number]
+
+function mergeNotificationSyncDocuments(
+  notificationDocuments: NotificationSyncDocument[],
+  existingNotificationsById: Map<string, NotificationDocument>,
+) {
+  return notificationDocuments.map((notification) => ({
+    ...notification,
+    document: mergeNotificationDocumentForSync(
+      existingNotificationsById.get(notification.id) ?? null,
+      notification.document,
+    ),
+  }))
+}
+
+async function loadExistingNotificationDocuments(
+  notificationIds: string[],
+): Promise<Map<string, NotificationDocument>> {
+  const existingNotifications = await Promise.all(
+    notificationIds.map(async (notificationId) => {
+      const existingNotification = await getTypedDocument(
+        getNotificationRef(notificationId),
+        notificationSchema,
+      )
+
+      return [notificationId, existingNotification] as const
+    }),
+  )
+
+  return new Map(
+    existingNotifications.flatMap(([notificationId, existingNotification]) =>
+      existingNotification ? [[notificationId, existingNotification]] : [],
+    ),
+  )
+}
+
+async function syncNotificationDocumentsInTransaction(
   transaction: Transaction,
   notificationDocuments: ReturnType<typeof buildNotificationDocuments>,
 ) {
-  notificationDocuments.forEach((notification) => {
+  const existingNotifications = await Promise.all(
+    notificationDocuments.map(async (notification) => {
+      const notificationSnapshot = await transaction.get(getNotificationRef(notification.id))
+
+      if (!notificationSnapshot.exists()) {
+        return [notification.id, null] as const
+      }
+
+      return [
+        notification.id,
+        notificationSchema.parse(notificationSnapshot.data()),
+      ] as const
+    }),
+  )
+  const existingNotificationsById = new Map(
+    existingNotifications.flatMap(([notificationId, existingNotification]) =>
+      existingNotification ? [[notificationId, existingNotification]] : [],
+    ),
+  )
+
+  mergeNotificationSyncDocuments(
+    notificationDocuments,
+    existingNotificationsById,
+  ).forEach((notification) => {
     transaction.set(getNotificationRef(notification.id), notification.document)
   })
 }
 
-function syncNotificationDocumentsInBatch(
+async function syncNotificationDocumentsInBatch(
   batch: ReturnType<typeof writeBatch>,
   notificationDocuments: ReturnType<typeof buildNotificationDocuments>,
 ) {
-  notificationDocuments.forEach((notification) => {
+  const existingNotificationsById = await loadExistingNotificationDocuments(
+    notificationDocuments.map((notification) => notification.id),
+  )
+
+  mergeNotificationSyncDocuments(
+    notificationDocuments,
+    existingNotificationsById,
+  ).forEach((notification) => {
     batch.set(getNotificationRef(notification.id), notification.document)
   })
 }
@@ -375,8 +444,6 @@ function cancelAutomatedNotificationsInTransaction(
         status: 'cancelled',
         scheduledFor: now,
         updatedAt: now,
-        sentAt: null,
-        errorMessage: null,
       },
       { merge: true },
     )
@@ -569,7 +636,7 @@ async function runAssignmentSlotTransaction(options: {
     currentAssignments: Array<FirestoreRecord<AssignmentDocument>>
     now: Timestamp
     transaction: Transaction
-  }) => void
+  }) => Promise<void> | void
 }) {
   await runTransaction(firebaseDb, async (transaction) => {
     const calendarEventRef = getCalendarEventRef(options.calendarEventId)
@@ -597,7 +664,7 @@ async function runAssignmentSlotTransaction(options: {
     )
     const now = Timestamp.now()
 
-    options.execute({
+    await options.execute({
       currentAssignments,
       now,
       transaction,
@@ -762,7 +829,7 @@ export async function createAssignment({
   await runAssignmentSlotTransaction({
     actorUid,
     calendarEventId: entities.calendarEvent.id,
-    execute: ({ currentAssignments, now, transaction }) => {
+    execute: async ({ currentAssignments, now, transaction }) => {
       const operationalAssignments = getOperationalAssignments(currentAssignments)
       const payload = buildAssignmentPayload(values, entities, now)
       const assignmentDocument: AssignmentDocument = {
@@ -817,7 +884,7 @@ export async function createAssignment({
       }
 
       transaction.set(assignmentRef, assignmentDocument)
-      syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
+      await syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
       transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
         entityType: 'assignment',
         entityId: assignmentRef.id,
@@ -897,7 +964,7 @@ export async function updateAssignment({
       await runAssignmentSlotTransaction({
         actorUid,
         calendarEventId: existingAssignment.calendarEventId,
-        execute: ({ currentAssignments, now, transaction }) => {
+        execute: async ({ currentAssignments, now, transaction }) => {
           const conflictingOperationalAssignments = getOperationalAssignments(
             currentAssignments,
             id,
@@ -931,7 +998,7 @@ export async function updateAssignment({
           })
 
           transaction.set(assignmentRef, updatedAssignment)
-          syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
+          await syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
           transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
             entityType: 'assignment',
             entityId: id,
@@ -976,7 +1043,7 @@ export async function updateAssignment({
     const batch = writeBatch(firebaseDb)
 
     batch.set(assignmentRef, updatedAssignment)
-    syncNotificationDocumentsInBatch(batch, notificationDocuments)
+    await syncNotificationDocumentsInBatch(batch, notificationDocuments)
     appendAuditLogToBatch(batch, {
       entityType: 'assignment',
       entityId: id,
@@ -1002,7 +1069,7 @@ export async function updateAssignment({
       await runAssignmentSlotTransaction({
         actorUid,
         calendarEventId: entities.calendarEvent.id,
-        execute: ({ currentAssignments, now, transaction }) => {
+        execute: async ({ currentAssignments, now, transaction }) => {
           const conflictingOperationalAssignments = getOperationalAssignments(
             currentAssignments,
             id,
@@ -1037,7 +1104,7 @@ export async function updateAssignment({
           })
 
           transaction.set(assignmentRef, updatedAssignment)
-          syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
+          await syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
           transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
             entityType: 'assignment',
             entityId: id,
@@ -1085,7 +1152,7 @@ export async function updateAssignment({
     const batch = writeBatch(firebaseDb)
 
     batch.set(assignmentRef, updatedAssignment)
-    syncNotificationDocumentsInBatch(batch, notificationDocuments)
+    await syncNotificationDocumentsInBatch(batch, notificationDocuments)
     appendAuditLogToBatch(batch, {
       entityType: 'assignment',
       entityId: id,
@@ -1125,7 +1192,7 @@ export async function confirmAssignment({
   await runAssignmentSlotTransaction({
     actorUid,
     calendarEventId: existingAssignment.calendarEventId,
-    execute: ({ currentAssignments, now, transaction }) => {
+    execute: async ({ currentAssignments, now, transaction }) => {
       const conflictingOperationalAssignments = getOperationalAssignments(
         currentAssignments,
         id,

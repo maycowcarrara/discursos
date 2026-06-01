@@ -14,9 +14,8 @@ type Env = {
   EMAILJS_SERVICE_ID: string
   EMAILJS_TEMPLATE_ID: string
   FIREBASE_PROJECT_ID: string
-  FIREBASE_SERVICE_EMAIL: string
-  FIREBASE_SERVICE_PASSWORD: string
-  FIREBASE_WEB_API_KEY: string
+  GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL: string
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: string
   INTERNAL_API_TOKEN?: string
   NOTIFICATION_BATCH_SIZE?: string
   REMINDER_SEND_HOUR_LOCAL?: string
@@ -59,6 +58,7 @@ type FirestoreRunQueryRow = {
 type FirestoreCommitWrite = {
   currentDocument?: {
     exists?: boolean
+    updateTime?: string
   }
   update: FirestoreDocument
   updateMask?: {
@@ -85,6 +85,7 @@ type NotificationType = 'confirmation' | 'reminder7d' | 'reminder1d' | 'manual'
 type AssignmentRecord = {
   calendarEventId: string
   confirmationToken: string | null
+  documentUpdateTime: string | null
   eventDate: Date
   eventType: string
   id: string
@@ -101,6 +102,7 @@ type AssignmentRecord = {
 
 type NotificationRecord = {
   assignmentId: string | null
+  documentUpdateTime: string | null
   id: string
   recipientEmail: string
   retryCount: number
@@ -131,19 +133,21 @@ type PublicConfirmationResponse = {
   state: 'pending' | 'confirmed' | 'inactive' | 'invalid' | 'conflict'
 }
 
-type NotificationProcessResult = 'cancelled' | 'failed' | 'requeued' | 'sent'
+type NotificationProcessResult = 'cancelled' | 'failed' | 'requeued' | 'sent' | 'skipped'
 
-type FirebaseSession = {
+type GoogleAccessTokenSession = {
+  accessToken: string
   expiresAt: number
-  idToken: string
 }
 
 const firestoreDatabaseId = '(default)'
 const firestoreBaseUrl = 'https://firestore.googleapis.com/v1'
-const firebaseAuthBaseUrl = 'https://identitytoolkit.googleapis.com/v1'
 const emailJsSendUrl = 'https://api.emailjs.com/api/v1.0/email/send'
+const googleOauthTokenUrl = 'https://oauth2.googleapis.com/token'
+const googleDatastoreScope = 'https://www.googleapis.com/auth/datastore'
 const defaultBatchSize = 10
 const maxRetryCount = 3
+const processingLeaseMinutes = 5
 const retryDelayMinutes = 30
 const notificationTypeLabels: Record<NotificationType, string> = {
   confirmation: 'Confirmacao',
@@ -166,7 +170,7 @@ const eventTypeLabels: Record<string, string> = {
   special: 'Especial',
 }
 
-let firebaseSession: FirebaseSession | null = null
+let googleAccessTokenSession: GoogleAccessTokenSession | null = null
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
@@ -278,9 +282,22 @@ async function handlePublicAssignmentConfirmation(request: Request, env: Env) {
     return jsonResponse(preview, statusCode)
   }
 
-  const assignment = await getAssignmentById(env, assignmentId)
+  const assignmentDocument = await getDocument(env, `assignments/${assignmentId}`)
 
-  if (!assignment || assignment.confirmationToken !== token) {
+  if (!assignmentDocument) {
+    return jsonResponse(
+      buildPublicConfirmationResponse({
+        assignment: null,
+        message: 'Este link nao corresponde mais a uma designacao ativa.',
+        state: 'invalid',
+      }),
+      400,
+    )
+  }
+
+  const assignment = parseAssignmentDocument(assignmentDocument)
+
+  if (assignment.confirmationToken !== token) {
     return jsonResponse(
       buildPublicConfirmationResponse({
         assignment: null,
@@ -309,35 +326,94 @@ async function handlePublicAssignmentConfirmation(request: Request, env: Env) {
   }
 
   const now = new Date()
-  await commitWrites(env, [
-    buildUpdateWrite(`assignments/${assignment.id}`, {
-      confirmedAt: toTimestampValue(now),
-      responseAt: toTimestampValue(now),
-      status: toStringValue('confirmed'),
-      updatedAt: toTimestampValue(now),
-      updatedBy: toStringValue(resolveWorkerActorUid(env)),
-    }, undefined, true, env),
-    buildUpdateWrite(`auditLogs/${crypto.randomUUID()}`, {
-      action: toStringValue('statusChange'),
-      actorName: toStringValue(resolveWorkerActorName(env)),
-      actorUid: toStringValue(resolveWorkerActorUid(env)),
-      after: toJsonValue({
-        confirmedAt: now.toISOString(),
-        responseAt: now.toISOString(),
-        status: 'confirmed',
-      }),
-      before: toJsonValue({
-        status: assignment.status,
-      }),
-      createdAt: toTimestampValue(now),
-      entityId: toStringValue(assignment.id),
-      entityType: toStringValue('assignment'),
-      metadata: toJsonValue({
-        source: 'phase-11-worker',
-        trigger: 'public-confirmation-link',
-      }),
-    }, undefined, false, env),
-  ])
+  const writes: FirestoreCommitWrite[] = [
+    buildUpdateWrite(
+      `assignments/${assignment.id}`,
+      {
+        confirmedAt: toTimestampValue(now),
+        responseAt: toTimestampValue(now),
+        status: toStringValue('confirmed'),
+        updatedAt: toTimestampValue(now),
+        updatedBy: toStringValue(resolveWorkerActorUid(env)),
+      },
+      undefined,
+      assignment.documentUpdateTime
+        ? {
+            exists: true,
+            updateTime: assignment.documentUpdateTime,
+          }
+        : true,
+      env,
+    ),
+  ]
+  const confirmationNotificationDocument = await getDocument(
+    env,
+    `notifications/${assignment.id}__confirmation`,
+  )
+
+  if (confirmationNotificationDocument) {
+    writes.push(
+      buildUpdateWrite(
+        `notifications/${assignment.id}__confirmation`,
+        {
+          errorMessage: toNullValue(),
+          status: toStringValue('cancelled'),
+          updatedAt: toTimestampValue(now),
+        },
+        ['errorMessage', 'status', 'updatedAt'],
+        confirmationNotificationDocument.updateTime
+          ? {
+              exists: true,
+              updateTime: confirmationNotificationDocument.updateTime,
+            }
+          : true,
+        env,
+      ),
+    )
+  }
+
+  writes.push(
+    buildUpdateWrite(
+      `auditLogs/${crypto.randomUUID()}`,
+      {
+        action: toStringValue('statusChange'),
+        actorName: toStringValue(resolveWorkerActorName(env)),
+        actorUid: toStringValue(resolveWorkerActorUid(env)),
+        after: toJsonValue({
+          confirmedAt: now.toISOString(),
+          responseAt: now.toISOString(),
+          status: 'confirmed',
+        }),
+        before: toJsonValue({
+          status: assignment.status,
+        }),
+        createdAt: toTimestampValue(now),
+        entityId: toStringValue(assignment.id),
+        entityType: toStringValue('assignment'),
+        metadata: toJsonValue({
+          source: 'phase-11-worker',
+          trigger: 'public-confirmation-link',
+        }),
+      },
+      undefined,
+      false,
+      env,
+    ),
+  )
+
+  try {
+    await commitWrites(env, writes)
+  } catch (error) {
+    if (isFirestorePreconditionError(error)) {
+      const updatedPreview = await buildAssignmentPreview(env, assignmentId, token)
+      const statusCode =
+        updatedPreview.state === 'invalid' ? 400 : updatedPreview.state === 'conflict' ? 409 : 200
+
+      return jsonResponse(updatedPreview, statusCode)
+    }
+
+    throw error
+  }
 
   return jsonResponse(
     buildPublicConfirmationResponse({
@@ -431,6 +507,8 @@ async function processDueNotifications(env: Env) {
       summary.failed += 1
     } else if (result === 'requeued') {
       summary.requeued += 1
+    } else if (result === 'skipped') {
+      summary.processed -= 1
     } else {
       summary.cancelled += 1
     }
@@ -448,6 +526,12 @@ async function processSingleNotification(
   settings: SettingsRecord,
   notification: NotificationRecord,
 ): Promise<NotificationProcessResult> {
+  const wasClaimed = await claimNotificationForProcessing(env, notification)
+
+  if (!wasClaimed) {
+    return 'skipped'
+  }
+
   if (!notification.assignmentId) {
     await markNotificationCancelled(env, notification, 'Notificacao sem assignmentId ativo.')
     return 'cancelled'
@@ -540,10 +624,12 @@ async function sendEmail(
         notification_type_label: notificationTypeLabels[notification.type],
         organization_name: settings.organizationName,
         origin_congregation_name: assignment.originCongregationName,
+        reply_to: '',
         speaker_name: assignment.speakerName,
         status_label: assignmentStatusLabels[assignment.status],
         theme_number: String(assignment.themeNumber),
         theme_title: assignment.themeTitle,
+        to_email: notification.recipientEmail,
       },
       user_id: env.EMAILJS_PUBLIC_KEY,
     }),
@@ -560,6 +646,39 @@ async function sendEmail(
   return {
     errorMessage: responseText || 'Falha ao enviar e-mail pelo EmailJS.',
     ok: false as const,
+  }
+}
+
+async function claimNotificationForProcessing(env: Env, notification: NotificationRecord) {
+  const now = new Date()
+  const leaseUntil = new Date(now.getTime() + processingLeaseMinutes * 60_000)
+
+  try {
+    await commitWrites(env, [
+      buildUpdateWrite(
+        `notifications/${notification.id}`,
+        {
+          scheduledFor: toTimestampValue(leaseUntil),
+          updatedAt: toTimestampValue(now),
+        },
+        undefined,
+        notification.documentUpdateTime
+          ? {
+              exists: true,
+              updateTime: notification.documentUpdateTime,
+            }
+          : true,
+        env,
+      ),
+    ])
+
+    return true
+  } catch (error) {
+    if (isFirestorePreconditionError(error)) {
+      return false
+    }
+
+    throw error
   }
 }
 
@@ -798,6 +917,7 @@ function parseAssignmentDocument(document: FirestoreDocument): AssignmentRecord 
   return {
     calendarEventId: getRequiredStringField(document, 'calendarEventId'),
     confirmationToken: getNullableStringField(document, 'confirmationToken'),
+    documentUpdateTime: document.updateTime ?? null,
     eventDate: getRequiredTimestampField(document, 'eventDate'),
     eventType: getRequiredStringField(document, 'eventType'),
     id: getDocumentId(document.name),
@@ -816,6 +936,7 @@ function parseAssignmentDocument(document: FirestoreDocument): AssignmentRecord 
 function parseNotificationDocument(document: FirestoreDocument): NotificationRecord {
   return {
     assignmentId: getNullableStringField(document, 'assignmentId'),
+    documentUpdateTime: document.updateTime ?? null,
     id: getDocumentId(document.name),
     recipientEmail: getStringField(document, 'recipientEmail') ?? '',
     retryCount: getRequiredIntegerField(document, 'retryCount'),
@@ -888,21 +1009,30 @@ async function commitWrites(env: Env, writes: FirestoreCommitWrite[]) {
   }
 }
 
+function isFirestorePreconditionError(error: unknown) {
+  return error instanceof Error && error.message.includes('FAILED_PRECONDITION')
+}
+
 function buildUpdateWrite(
   path: string,
   fields: Record<string, FirestoreValue>,
   fieldPaths = Object.keys(fields),
-  mustExist = true,
+  currentDocument: { exists?: boolean; updateTime?: string } | boolean = true,
   env?: Env,
 ): FirestoreCommitWrite {
   if (!env) {
     throw new Error('Env ausente ao montar write do Firestore.')
   }
 
+  const normalizedCurrentDocument =
+    typeof currentDocument === 'boolean'
+      ? {
+          exists: currentDocument,
+        }
+      : currentDocument
+
   return {
-    currentDocument: {
-      exists: mustExist,
-    },
+    currentDocument: normalizedCurrentDocument,
     update: {
       fields,
       name: buildDocumentName(env, path),
@@ -920,10 +1050,10 @@ function buildDocumentName(env: Env, path: string) {
 }
 
 async function buildFirestoreHeaders(env: Env) {
-  const idToken = await getFirebaseIdToken(env)
+  const accessToken = await getGoogleAccessToken(env)
 
   return {
-    Authorization: `Bearer ${idToken}`,
+    Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
   }
 }
@@ -932,46 +1062,130 @@ function buildFirestoreUrl(env: Env, suffix: string) {
   return `${firestoreBaseUrl}/projects/${env.FIREBASE_PROJECT_ID}/databases/${firestoreDatabaseId}${suffix}`
 }
 
-async function getFirebaseIdToken(env: Env) {
+async function getGoogleAccessToken(env: Env) {
   const now = Date.now()
 
-  if (firebaseSession && firebaseSession.expiresAt - 60_000 > now) {
-    return firebaseSession.idToken
+  if (googleAccessTokenSession && googleAccessTokenSession.expiresAt - 60_000 > now) {
+    return googleAccessTokenSession.accessToken
   }
 
-  const response = await fetch(
-    `${firebaseAuthBaseUrl}/accounts:signInWithPassword?key=${encodeURIComponent(env.FIREBASE_WEB_API_KEY)}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: env.FIREBASE_SERVICE_EMAIL,
-        password: env.FIREBASE_SERVICE_PASSWORD,
-        returnSecureToken: true,
-      }),
+  const jwtAssertion = await buildServiceAccountJwtAssertion(env)
+  const response = await fetch(googleOauthTokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-  )
+    body: new URLSearchParams({
+      assertion: jwtAssertion,
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    }).toString(),
+  })
 
   if (!response.ok) {
     const errorText = await response.text()
 
-    throw new Error(`Falha ao autenticar o worker no Firebase: ${errorText}`)
+    throw new Error(`Falha ao autenticar o worker com service account: ${errorText}`)
   }
 
   const payload = (await response.json()) as {
-    expiresIn: string
-    idToken: string
+    access_token: string
+    expires_in: number
+    token_type?: string
   }
-  const expiresInSeconds = Number.parseInt(payload.expiresIn, 10)
+  const expiresInSeconds = payload.expires_in
 
-  firebaseSession = {
+  googleAccessTokenSession = {
+    accessToken: payload.access_token,
     expiresAt: now + expiresInSeconds * 1000,
-    idToken: payload.idToken,
   }
 
-  return payload.idToken
+  return payload.access_token
+}
+
+async function buildServiceAccountJwtAssertion(env: Env) {
+  const nowInSeconds = Math.floor(Date.now() / 1000)
+  const jwtHeader = {
+    alg: 'RS256',
+    typ: 'JWT',
+  }
+  const jwtPayload = {
+    aud: googleOauthTokenUrl,
+    exp: nowInSeconds + 3600,
+    iat: nowInSeconds,
+    iss: env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL,
+    scope: googleDatastoreScope,
+  }
+  const encodedHeader = base64UrlEncodeJson(jwtHeader)
+  const encodedPayload = base64UrlEncodeJson(jwtPayload)
+  const signingInput = `${encodedHeader}.${encodedPayload}`
+  const signature = await signJwtWithServiceAccountKey(
+    env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+    signingInput,
+  )
+
+  return `${signingInput}.${signature}`
+}
+
+async function signJwtWithServiceAccountKey(
+  privateKeyPem: string,
+  signingInput: string,
+) {
+  const normalizedPrivateKey = privateKeyPem.replace(/\\n/g, '\n').trim()
+  const pkcs8Der = pemToArrayBuffer(normalizedPrivateKey)
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    pkcs8Der,
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: 'SHA-256',
+    },
+    false,
+    ['sign'],
+  )
+  const signatureBuffer = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    new TextEncoder().encode(signingInput),
+  )
+
+  return base64UrlEncodeBuffer(signatureBuffer)
+}
+
+function pemToArrayBuffer(pemValue: string) {
+  const base64Body = pemValue
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '')
+  const binaryString = atob(base64Body)
+  const bytes = Uint8Array.from(binaryString, (character) => character.charCodeAt(0))
+
+  return bytes.buffer
+}
+
+function base64UrlEncodeJson(value: JsonObject) {
+  return base64UrlEncodeText(JSON.stringify(value))
+}
+
+function base64UrlEncodeText(value: string) {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte)
+  })
+
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+function base64UrlEncodeBuffer(value: ArrayBuffer) {
+  const bytes = new Uint8Array(value)
+  let binary = ''
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte)
+  })
+
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
 function buildConfirmationUrl(env: Env, assignment: AssignmentRecord) {

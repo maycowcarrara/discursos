@@ -158,7 +158,9 @@
 * confirmação pública por link em rota do frontend, com fluxo validado para desktop e mobile
 * worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
 * confirmação pública grava `confirmedAt`, `responseAt` e auditoria no Firestore após validação do token
-* scripts `test:notifications`, `typecheck:worker` e `deploy:worker` adicionados para a operação da fase
+* autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
+* template único do EmailJS reaproveitado para confirmação e lembretes com parâmetros padronizados
+* scripts `test:notifications`, `typecheck:worker`, `deploy:worker` e `worker:deploy` adicionados para a operação da fase
 
 Regra de manutenção desta documentação:
 
@@ -621,7 +623,8 @@ Entregas realizadas:
 * confirmação imediata, lembrete 7 dias e lembrete 1 dia com agendamento oficial
 * confirmação pública por link com validação no worker e escrita segura no Firestore
 * trigger manual e cron no worker para processar envios EmailJS
-* segredos mantidos fora do frontend, via variáveis do worker
+* segredos mantidos fora do frontend, via variáveis do worker e service account do Firebase
+* template único do EmailJS alimentado por `email_subject`, `to_email`, `reply_to`, `notification_type_label`, `organization_name`, `speaker_name`, `event_date`, `event_type_label`, `local_congregation_name`, `origin_congregation_name`, `theme_number`, `theme_title`, `status_label`, `notes` e `confirmation_url`
 
 IMPORTANTE:
 
@@ -742,7 +745,7 @@ Objetivos:
 Para manter a operação simples nesta V1:
 
 * o frontend permanece em `Firebase Hosting`
-* `Cloudflare Workers` e `Cloudflare Cron Triggers` ficam reservados para automações e rotinas agendadas
+* `Cloudflare Workers` e `Cloudflare Cron Triggers` operam a automação de e-mails da Fase 11 e seguem disponíveis para novas rotinas agendadas
 * não há adoção de `Cloudflare Pages` no escopo atual
 
 ---

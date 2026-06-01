@@ -33,6 +33,21 @@ type ConfirmationRequestInput = {
 
 const confirmationEndpointPath = '/api/public/assignment-confirmation'
 
+function isStructuredConfirmationResponse(
+  payload: unknown,
+): payload is PublicAssignmentConfirmationResponse {
+  if (!payload || typeof payload !== 'object') {
+    return false
+  }
+
+  return (
+    'message' in payload &&
+    typeof payload.message === 'string' &&
+    'state' in payload &&
+    typeof payload.state === 'string'
+  )
+}
+
 function getWorkerBaseUrl() {
   const workerBaseUrl = env.VITE_PUBLIC_NOTIFICATION_WORKER_URL?.trim()
 
@@ -58,9 +73,13 @@ function buildEndpointUrl(input: ConfirmationRequestInput) {
 }
 
 async function parseResponse(response: Response) {
-  const payload = (await response.json()) as PublicAssignmentConfirmationResponse
+  const payload = (await response.json()) as unknown
 
-  if (!response.ok) {
+  if (!isStructuredConfirmationResponse(payload)) {
+    throw new Error('Resposta invalida do worker de confirmacao publica.')
+  }
+
+  if (!response.ok && payload.state !== 'invalid' && payload.state !== 'conflict') {
     throw new Error(payload.message)
   }
 

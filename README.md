@@ -152,7 +152,9 @@ Próxima etapa obrigatória:
 * confirmação pública por link em rota dedicada do frontend, com boa leitura em desktop e mobile
 * worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
 * confirmação por link validada no worker antes de gravar `confirmedAt`, `responseAt` e auditoria
-* scripts e arquivos base para `deploy:worker`, `typecheck:worker` e segredos locais do worker
+* autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
+* template único do EmailJS reutilizado para confirmação e lembretes, com parâmetros padronizados
+* scripts e arquivos base para `deploy:worker`, `worker:deploy`, `typecheck:worker` e segredos locais do worker
 
 ## Próxima fase
 
@@ -218,9 +220,31 @@ Para ativar a automação de e-mails:
 
 * configure `VITE_PUBLIC_NOTIFICATION_WORKER_URL` no frontend para a URL pública do worker
 * preencha as variáveis não sensíveis em [workers/email-automation/wrangler.jsonc](/C:/Projetos/discursos/workers/email-automation/wrangler.jsonc)
-* preencha os segredos locais em [workers/email-automation/.dev.vars.example](/C:/Projetos/discursos/workers/email-automation/.dev.vars.example)
+* preencha os segredos locais em [workers/email-automation/.dev.vars.example](/C:/Projetos/discursos/workers/email-automation/.dev.vars.example), usando `EMAILJS_PRIVATE_KEY` e a service account do Firebase
 * a integração atual usa um único `EMAILJS_TEMPLATE_ID` para confirmação e lembretes
-* publique o worker com `npm.cmd run deploy:worker`
+* publique o worker com `npm.cmd run worker:deploy`
+
+URL pública atual do worker:
+
+* [https://discursos-email-automation.palmascg1.workers.dev](https://discursos-email-automation.palmascg1.workers.dev)
+
+Parâmetros atuais do template único do EmailJS:
+
+* `email_subject`
+* `to_email`
+* `reply_to`
+* `notification_type_label`
+* `organization_name`
+* `speaker_name`
+* `event_date`
+* `event_type_label`
+* `local_congregation_name`
+* `origin_congregation_name`
+* `theme_number`
+* `theme_title`
+* `status_label`
+* `notes`
+* `confirmation_url`
 
 ## Decisão atual de deploy
 
