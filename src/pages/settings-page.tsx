@@ -16,6 +16,10 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  currentDeliveredPhaseLabel,
+  nextRequiredPhaseLabel,
+} from '@/config/project-status'
 import { useAppSettingsQuery, useSaveAppSettingsMutation } from '@/hooks/use-app-settings'
 import { useNotificationsByStatusQuery } from '@/hooks/use-notifications'
 import {
@@ -276,10 +280,10 @@ export function SettingsPage() {
                   <Settings2 className="size-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Fase 4 concluida</CardTitle>
+                  <CardTitle className="text-2xl">{currentDeliveredPhaseLabel}</CardTitle>
                   <CardDescription>
-                    Congregacoes agora ja operam com CRUD completo sobre o
-                    Firestore oficial.
+                    O dashboard agora usa leituras reais de agenda e designacoes
+                    para destacar a janela operacional imediata.
                   </CardDescription>
                 </div>
               </div>
@@ -287,11 +291,13 @@ export function SettingsPage() {
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
                 A base da Fase 3 continua cobrindo `notifications` e `auditLogs`
-                em leitura real.
+                em leitura real, enquanto a Fase 9 passa a resumir os proximos
+                sabados, pendencias e eventos especiais.
               </p>
               <p>
-                O proximo passo obrigatorio do plano passa a ser a Fase 5 com o
-                CRUD de temas.
+                O proximo passo obrigatorio do plano passa a ser
+                <span className="font-medium text-foreground"> {nextRequiredPhaseLabel}</span>
+                , com filtros e linha do tempo do historico permanente.
               </p>
               <p>
                 `settings/notifications` e `settings/calendar` seguem reservados,

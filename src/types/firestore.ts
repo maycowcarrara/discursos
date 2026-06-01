@@ -125,6 +125,11 @@ export const themeSchema = managedDocumentSchema.extend({
   notes: z.string(),
 })
 
+export const themeNumberReservationSchema = baseDocumentSchema.extend({
+  number: z.number().int(),
+  themeId: z.string(),
+})
+
 export const calendarEventSchema = managedDocumentSchema.extend({
   year: z.number().int(),
   date: timestampSchema,
@@ -196,6 +201,9 @@ export type AppSettingsDocument = z.infer<typeof appSettingsSchema>
 export type CongregationDocument = z.infer<typeof congregationSchema>
 export type SpeakerDocument = z.infer<typeof speakerSchema>
 export type ThemeDocument = z.infer<typeof themeSchema>
+export type ThemeNumberReservationDocument = z.infer<
+  typeof themeNumberReservationSchema
+>
 export type CalendarEventDocument = z.infer<typeof calendarEventSchema>
 export type AssignmentDocument = z.infer<typeof assignmentSchema>
 export type NotificationDocument = z.infer<typeof notificationSchema>

@@ -13,14 +13,16 @@ Fases concluídas:
 * `FASE 5 — Temas`
 * `FASE 6 — Oradores`
 * `FASE 7 — Calendário Inteligente`
+* `FASE 8 — Designações`
+* `FASE 9 — Dashboard`
 
 Fase atual concluída:
 
-* `FASE 7 — Calendário Inteligente`
+* `FASE 9 — Dashboard`
 
 Próxima etapa obrigatória:
 
-* `FASE 8 — Designações`
+* `FASE 10 — Histórico`
 
 ## O que já foi entregue
 
@@ -92,6 +94,8 @@ Próxima etapa obrigatória:
 * ordenação oficial por número na listagem
 * exclusão lógica via `isActive`
 * auditoria de create, update e delete em `auditLogs`
+* unicidade de número protegida por reserva transacional em `themeNumbers`
+* bloqueio de retirada da base ativa enquanto houver oradores operacionais vinculados
 
 ### Fechamento da Fase 6
 
@@ -112,19 +116,39 @@ Próxima etapa obrigatória:
 * visão anual por mês com destaque para eventos já designados
 * arquivamento lógico e auditoria de create, update e delete
 
+### Fechamento da Fase 8
+
+* operação real de `assignments` na UI
+* entrada de visitantes, saída de locais e designação local no mesmo fluxo
+* confirmação manual com preservação de histórico
+* substituição automática da cobertura operacional anterior no mesmo evento
+* edição de status, observações, orador, tema e destino com auditoria
+* bloqueios das regras oficiais de tema, evento bloqueado e indisponibilidade
+* alerta de uso recente de tema no fluxo operacional
+
+### Fechamento da Fase 9
+
+* dashboard principal ligado a leituras reais de `calendarEvents`, `assignments`, `congregations` e `settings/app`
+* janela com os próximos 8 sábados sem depender dos mocks iniciais
+* métricas operacionais de pendências, sem designação, aguardando resposta e próximos eventos especiais
+* destaque do próximo sábado com status atual, tipo de evento, orador, congregação e tema quando houver cobertura
+* painel de pendências priorizando lacunas de designação e confirmações abertas
+* listagem dos próximos eventos especiais, congressos, assembleias e visitas futuras
+
 ## Próxima fase
 
-### `FASE 8 — Designações`
+### `FASE 10 — Histórico`
 
 Implementar:
 
-* entrada de visitantes
-* saída de locais
-* status
-* observações
-* confirmação
+* filtros por tema
+* filtros por orador
+* filtros por congregação
+* filtros por período
+* linha do tempo
+* histórico permanente
 
-Entregue até a Fase 7:
+Entregue até a Fase 9:
 
 * `settings/app` com persistência real
 * CRUD completo de `congregations`
@@ -133,10 +157,12 @@ Entregue até a Fase 7:
 * calendário inteligente com geração automática de sábados
 * gestão anual real de `calendarEvents`
 * leitura real de `assignments`, `notifications` e `auditLogs`
+* operação real de designações com confirmações, substituições e auditoria
+* dashboard operacional com próximos 8 sábados, pendências e eventos especiais
 
 Próximo subpasso obrigatório:
 
-* iniciar a `FASE 8 — Designações`
+* iniciar a `FASE 10 — Histórico`
 
 ## Diretriz de UI e UX
 

@@ -3,6 +3,10 @@ import { NavLink } from 'react-router-dom'
 
 import { AvatarBadge } from '@/components/app/avatar-badge'
 import { useAuth } from '@/components/auth/use-auth'
+import {
+  currentDeliveredPhaseLabel,
+  nextRequiredPhaseLabel,
+} from '@/config/project-status'
 import { navigationItems } from '@/config/navigation'
 import { cn } from '@/lib/utils'
 
@@ -82,8 +86,8 @@ export function AppSidebar({ mobile = false, onNavigate }: AppSidebarProps) {
           <p className="text-sm font-medium">Fase atual entregue</p>
         </div>
         <p className="mt-2 text-sm leading-6 text-sidebar-foreground/72">
-          Fase 2 concluida com autenticacao ativa. Proxima etapa obrigatoria:
-          Firestore.
+          {currentDeliveredPhaseLabel} concluida. Proxima etapa obrigatoria:{' '}
+          {nextRequiredPhaseLabel}.
         </p>
       </div>
 

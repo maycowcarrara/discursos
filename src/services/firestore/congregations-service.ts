@@ -151,6 +151,14 @@ export async function listCongregations(): Promise<
   return getTypedCollection(congregationsQuery, congregationSchema)
 }
 
+export async function listCongregationsForManagement(): Promise<
+  Array<FirestoreRecord<CongregationDocument>>
+> {
+  const congregationsQuery = query(getCongregationsCollection(), orderBy('name', 'asc'))
+
+  return getTypedCollection(congregationsQuery, congregationSchema)
+}
+
 export async function createCongregation({
   actorName,
   actorUid,

@@ -33,7 +33,7 @@ export const navigationItems: NavigationItem[] = [
   {
     href: '/designacoes',
     label: 'Designacoes',
-    description: 'Confirmacoes e novas saidas',
+    description: 'Entradas, saidas e confirmacoes',
     icon: Speech,
   },
   {

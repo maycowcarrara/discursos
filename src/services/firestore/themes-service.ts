@@ -6,18 +6,21 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   where,
-  writeBatch,
 } from 'firebase/firestore'
 
 import { firebaseDb } from '@/lib/firebase'
 import {
+  speakerSchema,
+  themeNumberReservationSchema,
   themeSchema,
   type ThemeDocument,
   type FirestoreRecord,
+  type ThemeNumberReservationDocument,
 } from '@/types/firestore'
 
-import { appendAuditLogToBatch } from './audit-logs-service'
+import { appendAuditLogToTransaction } from './audit-logs-service'
 import { getTypedCollection, getTypedDocument } from './shared'
 
 export type ThemeFormValues = {
@@ -57,6 +60,10 @@ function getThemeRef(id: string) {
   return doc(firebaseDb, 'themes', id)
 }
 
+function getThemeNumberReservationRef(number: number) {
+  return doc(firebaseDb, 'themeNumbers', String(number))
+}
+
 function buildThemePayload(
   values: ThemeFormValues,
 ): Omit<ThemeDocument, 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'> {
@@ -85,19 +92,50 @@ function toAuditSnapshot(
   return { ...theme }
 }
 
-async function assertThemeNumberIsUnique(number: number, excludeId?: string) {
-  const conflictingThemesQuery = query(
-    getThemesCollection(),
-    where('number', '==', number),
-    limit(5),
+async function assertNoLegacyThemeConflict(number: number, excludeId?: string) {
+  const conflictingThemesSnapshot = await getDocs(
+    query(getThemesCollection(), where('number', '==', number), limit(5)),
   )
-  const conflictingThemesSnapshot = await getDocs(conflictingThemesQuery)
   const conflictingTheme = conflictingThemesSnapshot.docs.find(
     (documentSnapshot) => documentSnapshot.id !== excludeId,
   )
 
   if (conflictingTheme) {
     throw new Error(`O tema ${number} ja existe na base e precisa ser reutilizado.`)
+  }
+}
+
+function buildThemeNumberReservation(
+  number: number,
+  themeId: string,
+  now: Timestamp,
+  createdAt?: Timestamp,
+): ThemeNumberReservationDocument {
+  return {
+    number,
+    themeId,
+    createdAt: createdAt ?? now,
+    updatedAt: now,
+  }
+}
+
+async function assertThemeHasNoActiveSpeakers(themeId: string) {
+  const linkedSpeakersSnapshot = await getDocs(
+    query(
+      collection(firebaseDb, 'speakers'),
+      where('themeIds', 'array-contains', themeId),
+    ),
+  )
+  const hasActiveLinkedSpeaker = linkedSpeakersSnapshot.docs.some((documentSnapshot) => {
+    const speaker = speakerSchema.parse(documentSnapshot.data())
+
+    return speaker.isActive
+  })
+
+  if (hasActiveLinkedSpeaker) {
+    throw new Error(
+      'Nao e possivel retirar este tema da base ativa enquanto houver oradores ativos vinculados a ele.',
+    )
   }
 }
 
@@ -139,37 +177,50 @@ export async function createTheme({
   actorUid,
   ...values
 }: CreateThemeInput) {
-  const now = Timestamp.now()
   const themeRef = doc(getThemesCollection())
   const payload = buildThemePayload(values)
+  const reservationRef = getThemeNumberReservationRef(payload.number)
 
-  await assertThemeNumberIsUnique(payload.number)
+  await assertNoLegacyThemeConflict(payload.number)
 
-  const themeDocument: ThemeDocument = {
-    ...payload,
-    createdAt: now,
-    updatedAt: now,
-    createdBy: actorUid,
-    updatedBy: actorUid,
-  }
-  const batch = writeBatch(firebaseDb)
+  await runTransaction(firebaseDb, async (transaction) => {
+    const now = Timestamp.now()
+    const reservationSnapshot = await transaction.get(reservationRef)
 
-  batch.set(themeRef, themeDocument)
-  appendAuditLogToBatch(batch, {
-    entityType: 'theme',
-    entityId: themeRef.id,
-    action: 'create',
-    actorUid,
-    actorName: actorName ?? null,
-    before: null,
-    after: toAuditSnapshot(themeDocument),
-    metadata: {
-      source: 'themes-phase-5',
-    },
-    createdAt: now,
+    if (reservationSnapshot.exists()) {
+      throw new Error(
+        `O tema ${payload.number} ja existe na base e precisa ser reutilizado.`,
+      )
+    }
+
+    const themeDocument: ThemeDocument = {
+      ...payload,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: actorUid,
+      updatedBy: actorUid,
+    }
+
+    transaction.set(themeRef, themeDocument)
+    transaction.set(
+      reservationRef,
+      buildThemeNumberReservation(payload.number, themeRef.id, now),
+    )
+    appendAuditLogToTransaction(transaction, {
+      entityType: 'theme',
+      entityId: themeRef.id,
+      action: 'create',
+      actorUid,
+      actorName: actorName ?? null,
+      before: null,
+      after: toAuditSnapshot(themeDocument),
+      metadata: {
+        source: 'themes-phase-5',
+        reservationNumber: payload.number,
+      },
+      createdAt: now,
+    })
   })
-
-  await batch.commit()
 }
 
 export async function updateTheme({
@@ -185,36 +236,87 @@ export async function updateTheme({
     throw new Error('O tema selecionado nao foi encontrado.')
   }
 
-  const now = Timestamp.now()
   const payload = buildThemePayload(values)
 
-  await assertThemeNumberIsUnique(payload.number, id)
-
-  const existingDocument = stripRecordId(existingTheme)
-  const updatedTheme: ThemeDocument = {
-    ...existingDocument,
-    ...payload,
-    updatedAt: now,
-    updatedBy: actorUid,
+  if (existingTheme.isActive && !payload.isActive) {
+    await assertThemeHasNoActiveSpeakers(id)
   }
-  const batch = writeBatch(firebaseDb)
 
-  batch.set(themeRef, updatedTheme)
-  appendAuditLogToBatch(batch, {
-    entityType: 'theme',
-    entityId: id,
-    action: 'update',
-    actorUid,
-    actorName: actorName ?? null,
-    before: toAuditSnapshot(existingTheme),
-    after: toAuditSnapshot(updatedTheme),
-    metadata: {
-      source: 'themes-phase-5',
-    },
-    createdAt: now,
+  await assertNoLegacyThemeConflict(payload.number, id)
+
+  await runTransaction(firebaseDb, async (transaction) => {
+    const now = Timestamp.now()
+    const currentThemeSnapshot = await transaction.get(themeRef)
+
+    if (!currentThemeSnapshot.exists()) {
+      throw new Error('O tema selecionado nao foi encontrado.')
+    }
+
+    const currentTheme = {
+      id: currentThemeSnapshot.id,
+      ...themeSchema.parse(currentThemeSnapshot.data()),
+    }
+    const currentReservationRef = getThemeNumberReservationRef(currentTheme.number)
+    const nextReservationRef = getThemeNumberReservationRef(payload.number)
+    const currentReservationSnapshot = await transaction.get(currentReservationRef)
+    const nextReservationSnapshot =
+      payload.number === currentTheme.number
+        ? currentReservationSnapshot
+        : await transaction.get(nextReservationRef)
+    const currentReservation = currentReservationSnapshot.exists()
+      ? themeNumberReservationSchema.parse(currentReservationSnapshot.data())
+      : null
+    const nextReservation = nextReservationSnapshot.exists()
+      ? themeNumberReservationSchema.parse(nextReservationSnapshot.data())
+      : null
+
+    if (nextReservation && nextReservation.themeId !== id) {
+      throw new Error(
+        `O tema ${payload.number} ja existe na base e precisa ser reutilizado.`,
+      )
+    }
+
+    const updatedTheme: ThemeDocument = {
+      ...stripRecordId(currentTheme),
+      ...payload,
+      updatedAt: now,
+      updatedBy: actorUid,
+    }
+
+    transaction.set(themeRef, updatedTheme)
+    transaction.set(
+      nextReservationRef,
+      buildThemeNumberReservation(
+        payload.number,
+        id,
+        now,
+        nextReservation
+          ? nextReservation.createdAt
+          : currentReservation
+            ? currentReservation.createdAt
+            : now,
+      ),
+    )
+
+    if (payload.number !== currentTheme.number && currentReservationSnapshot.exists()) {
+      transaction.delete(currentReservationRef)
+    }
+
+    appendAuditLogToTransaction(transaction, {
+      entityType: 'theme',
+      entityId: id,
+      action: 'update',
+      actorUid,
+      actorName: actorName ?? null,
+      before: toAuditSnapshot(currentTheme),
+      after: toAuditSnapshot(updatedTheme),
+      metadata: {
+        source: 'themes-phase-5',
+        reservationNumber: payload.number,
+      },
+      createdAt: now,
+    })
   })
-
-  await batch.commit()
 }
 
 export async function deleteTheme({
@@ -229,30 +331,47 @@ export async function deleteTheme({
     throw new Error('O tema selecionado nao esta mais ativo na base.')
   }
 
-  const now = Timestamp.now()
-  const archivedTheme: ThemeDocument = {
-    ...stripRecordId(existingTheme),
-    isActive: false,
-    updatedAt: now,
-    updatedBy: actorUid,
-  }
-  const batch = writeBatch(firebaseDb)
+  await assertThemeHasNoActiveSpeakers(id)
 
-  batch.set(themeRef, archivedTheme)
-  appendAuditLogToBatch(batch, {
-    entityType: 'theme',
-    entityId: id,
-    action: 'delete',
-    actorUid,
-    actorName: actorName ?? null,
-    before: toAuditSnapshot(existingTheme),
-    after: toAuditSnapshot(archivedTheme),
-    metadata: {
-      source: 'themes-phase-5',
-      strategy: 'soft-delete',
-    },
-    createdAt: now,
+  await runTransaction(firebaseDb, async (transaction) => {
+    const now = Timestamp.now()
+    const currentThemeSnapshot = await transaction.get(themeRef)
+
+    if (!currentThemeSnapshot.exists()) {
+      throw new Error('O tema selecionado nao esta mais ativo na base.')
+    }
+
+    const currentTheme = {
+      id: currentThemeSnapshot.id,
+      ...themeSchema.parse(currentThemeSnapshot.data()),
+    }
+
+    if (!currentTheme.isActive) {
+      throw new Error('O tema selecionado nao esta mais ativo na base.')
+    }
+
+    const archivedTheme: ThemeDocument = {
+      ...stripRecordId(currentTheme),
+      isActive: false,
+      updatedAt: now,
+      updatedBy: actorUid,
+    }
+
+    transaction.set(themeRef, archivedTheme)
+    appendAuditLogToTransaction(transaction, {
+      entityType: 'theme',
+      entityId: id,
+      action: 'delete',
+      actorUid,
+      actorName: actorName ?? null,
+      before: toAuditSnapshot(currentTheme),
+      after: toAuditSnapshot(archivedTheme),
+      metadata: {
+        source: 'themes-phase-5',
+        strategy: 'soft-delete',
+        reservationNumber: currentTheme.number,
+      },
+      createdAt: now,
+    })
   })
-
-  await batch.commit()
 }

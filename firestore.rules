@@ -28,6 +28,10 @@ service cloud.firestore {
       allow read, create, update, delete: if isSignedIn();
     }
 
+    match /themeNumbers/{documentId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
     match /calendarEvents/{documentId} {
       allow read, create, update, delete: if isSignedIn();
     }

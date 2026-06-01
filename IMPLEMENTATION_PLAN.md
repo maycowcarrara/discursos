@@ -17,14 +17,16 @@
 * FASE 5 — Temas
 * FASE 6 — Oradores
 * FASE 7 — Calendário Inteligente
+* FASE 8 — Designações
+* FASE 9 — Dashboard
 
 ## Fase atual concluída
 
-* FASE 7 — Calendário Inteligente
+* FASE 9 — Dashboard
 
 ## Próxima etapa obrigatória
 
-* FASE 8 — Designações
+* FASE 10 — Histórico
 
 ## Entregas já realizadas
 
@@ -96,6 +98,8 @@
 * busca rápida local por número, título e observações
 * ordenação oficial por número mantida na listagem administrativa
 * auditoria automática de create, update e delete em `auditLogs`
+* unicidade de número protegida por reserva transacional em `themeNumbers`
+* bloqueio de retirada da base ativa enquanto houver oradores operacionais vinculados
 
 ### Oradores — fechamento da Fase 6
 
@@ -116,6 +120,26 @@
 * visão anual por mês com cruzamento leve entre `calendarEvents` e `assignments`
 * arquivamento lógico com reativação por edição e auditoria para create, update e delete
 * bloqueios de integridade para não mover ou arquivar eventos já vinculados a designações
+
+### Designações — fechamento da Fase 8
+
+* operação real de `assignments` implementada na UI
+* cadastro de entrada de visitantes, saída de locais e designação local sem coleção paralela
+* confirmação manual com atualização de `confirmedAt` e `responseAt`
+* troca operacional com substituição automática da designação anterior e preservação do histórico
+* edição de status, observações, congregação de destino, orador e tema com auditoria
+* bloqueios de RN001, RN002, RN003 e RN006 aplicados na camada de serviço
+* alerta de uso recente de tema na própria tela para apoiar a RN007
+* cancelamento via mudança de status, sem exclusão de documentos em `assignments`
+
+### Dashboard — fechamento da Fase 9
+
+* dashboard principal conectado a leituras reais de `calendarEvents`, `assignments`, `congregations` e `settings/app`
+* janela operacional com os próximos 8 sábados, sem depender dos mocks iniciais
+* métricas de pendências, sem designação, aguardando resposta e próximos eventos especiais
+* destaque do próximo sábado com status, tipo de evento, orador, congregação e tema quando houver cobertura
+* painel de pendências priorizando lacunas de designação e confirmações ainda em aberto
+* listagem dos próximos eventos especiais, congressos, assembleias e visitas futuras
 
 Regra de manutenção desta documentação:
 
@@ -380,6 +404,8 @@ Entregas realizadas:
 * exclusão lógica via `isActive`
 * busca local rápida por número, título e observações
 * auditoria para create, update e delete
+* reserva transacional de número para evitar duplicidade concorrente
+* bloqueio de inativação ou exclusão quando houver oradores ativos vinculados
 
 ---
 
@@ -471,7 +497,7 @@ Entregas realizadas:
 
 Status atual:
 
-* Próxima fase obrigatória
+* Concluída
 
 Implementar:
 
@@ -489,13 +515,23 @@ Status:
 * cancelado
 * substituído
 
+Entregas realizadas:
+
+* CRUD operacional real de `assignments` na UI, sem apagar histórico
+* suporte a entrada de visitantes, saída de locais e designação local com snapshots oficiais
+* confirmação manual com atualização de timestamps de resposta e confirmação
+* substituição automática da cobertura operacional anterior ao cadastrar nova designação no mesmo evento
+* edição de status e observações com preservação da trilha em `auditLogs`
+* alerta de uso recente de tema direto no fluxo de designação
+* bloqueios oficiais para tema fora do orador, evento bloqueado e indisponibilidade do orador
+
 ---
 
 ## FASE 9 — Dashboard
 
 Status atual:
 
-* Pendente
+* Concluída
 
 Implementar:
 
@@ -505,13 +541,21 @@ Implementar:
 * aguardando resposta
 * próximos eventos especiais
 
+Entregas realizadas:
+
+* dashboard operacional com leituras reais do Firestore
+* próximos 8 sábados calculados a partir da agenda ativa
+* contagem de pendências, sem designação e aguardando resposta na janela imediata
+* destaque do próximo sábado com cobertura atual ou alerta de lacuna
+* listagem dos próximos eventos especiais com contexto operacional
+
 ---
 
 ## FASE 10 — Histórico
 
 Status atual:
 
-* Pendente
+* Próxima fase obrigatória
 
 Implementar filtros:
 

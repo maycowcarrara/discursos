@@ -4,6 +4,7 @@ import {
   createCongregation,
   deleteCongregation,
   listCongregations,
+  listCongregationsForManagement,
   updateCongregation,
   type CreateCongregationInput,
   type DeleteCongregationInput,
@@ -11,11 +12,23 @@ import {
 } from '@/services/firestore/congregations-service'
 
 const congregationsQueryKey = ['firestore', 'congregations', 'active-list'] as const
+const congregationsManagementQueryKey = [
+  'firestore',
+  'congregations',
+  'management-list',
+] as const
 
 export function useCongregationsQuery() {
   return useQuery({
     queryKey: congregationsQueryKey,
     queryFn: listCongregations,
+  })
+}
+
+export function useCongregationsManagementQuery() {
+  return useQuery({
+    queryKey: congregationsManagementQueryKey,
+    queryFn: listCongregationsForManagement,
   })
 }
 

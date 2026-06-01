@@ -8,7 +8,7 @@ import {
   Search,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
@@ -32,7 +32,7 @@ import {
   useSpeakersManagementQuery,
   useUpdateSpeakerMutation,
 } from '@/hooks/use-speakers'
-import { useThemesManagementQuery } from '@/hooks/use-themes'
+import { useThemesManagementQuery, useThemesQuery } from '@/hooks/use-themes'
 import {
   defaultSpeakerFormValues,
   toSpeakerFormValues,
@@ -235,7 +235,8 @@ export function SpeakersPage() {
 
   const speakersQuery = useSpeakersManagementQuery()
   const congregationsQuery = useCongregationsQuery()
-  const themesQuery = useThemesManagementQuery()
+  const activeThemesQuery = useThemesQuery()
+  const themesManagementQuery = useThemesManagementQuery()
   const createSpeakerMutation = useCreateSpeakerMutation()
   const updateSpeakerMutation = useUpdateSpeakerMutation()
   const deleteSpeakerMutation = useDeleteSpeakerMutation()
@@ -269,8 +270,26 @@ export function SpeakersPage() {
       control,
       name: 'themeIds',
     }) ?? []
+  const selectedCongregationId =
+    useWatch({
+      control,
+      name: 'congregationId',
+    }) ?? ''
 
-  const themesById = new Map((themesQuery.data ?? []).map((theme) => [theme.id, theme]))
+  const availableCongregationOptions = (congregationsQuery.data ?? []).filter(
+    (congregation) =>
+      selectedType === 'local' ? congregation.isLocal : !congregation.isLocal,
+  )
+  const activeThemes = activeThemesQuery.data ?? []
+  const themesById = new Map(
+    (themesManagementQuery.data ?? []).map((theme) => [theme.id, theme]),
+  )
+  const inactiveSelectedThemes = selectedThemeIds
+    .map((themeId) => themesById.get(themeId) ?? null)
+    .filter((theme) => theme !== null && !theme.isActive)
+  const missingSelectedThemeIds = selectedThemeIds.filter(
+    (themeId) => !themesById.has(themeId),
+  )
   const filteredSpeakers = (speakersQuery.data ?? []).filter((speaker) => {
     const matchesType = typeFilter === 'all' || speaker.type === typeFilter
     const matchesCongregation =
@@ -299,8 +318,8 @@ export function SpeakersPage() {
     ).length ?? 0
   const visitorsCount =
     speakersQuery.data?.filter((item) => item.type === 'visitor').length ?? 0
-  const hasCongregationOptions = (congregationsQuery.data?.length ?? 0) > 0
-  const hasThemeOptions = (themesQuery.data?.length ?? 0) > 0
+  const hasCongregationOptions = availableCongregationOptions.length > 0
+  const hasThemeOptions = activeThemes.length > 0
   const isSubmitting =
     createSpeakerMutation.isPending ||
     updateSpeakerMutation.isPending ||
@@ -309,6 +328,8 @@ export function SpeakersPage() {
   const actorName = user?.displayName ?? user?.email ?? null
   const needsUnavailableWindow =
     selectedStatus === 'vacation' || selectedStatus === 'unavailable'
+  const hasInvalidSelectedThemes =
+    inactiveSelectedThemes.length > 0 || missingSelectedThemeIds.length > 0
 
   const submitHandler = handleSubmit(async (values) => {
     if (!user) {
@@ -357,6 +378,23 @@ export function SpeakersPage() {
     }
   })
 
+  useEffect(() => {
+    if (selectedCongregationId.length === 0) {
+      return
+    }
+
+    const selectedCongregationStillAllowed = availableCongregationOptions.some(
+      (congregation) => congregation.id === selectedCongregationId,
+    )
+
+    if (!selectedCongregationStillAllowed) {
+      setValue('congregationId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    }
+  }, [availableCongregationOptions, selectedCongregationId, setValue])
+
   function handleToggleTheme(themeId: string) {
     const nextThemeIds = selectedThemeIds.includes(themeId)
       ? selectedThemeIds.filter((item) => item !== themeId)
@@ -366,6 +404,17 @@ export function SpeakersPage() {
       shouldDirty: true,
       shouldValidate: true,
     })
+  }
+
+  function handleRemoveTheme(themeId: string) {
+    setValue(
+      'themeIds',
+      selectedThemeIds.filter((item) => item !== themeId),
+      {
+        shouldDirty: true,
+        shouldValidate: true,
+      },
+    )
   }
 
   async function handleDelete(id: string, name: string) {
@@ -529,12 +578,17 @@ export function SpeakersPage() {
                   </span>
                   <select className={selectClassName} {...register('congregationId')}>
                     <option value="">Selecione a congregacao</option>
-                    {(congregationsQuery.data ?? []).map((congregation) => (
+                    {availableCongregationOptions.map((congregation) => (
                       <option key={congregation.id} value={congregation.id}>
                         {congregation.name}
                       </option>
                     ))}
                   </select>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {selectedType === 'local'
+                      ? 'Oradores locais so podem ser vinculados a congregacoes locais.'
+                      : 'Oradores visitantes so podem ser vinculados a congregacoes parceiras ou externas.'}
+                  </p>
                   {errors.congregationId ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
                       {errors.congregationId.message}
@@ -642,12 +696,43 @@ export function SpeakersPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm font-medium text-foreground">Temas</span>
                     <span className="text-xs text-muted-foreground">
-                      Selecione um ou mais temas oficiais
+                      Somente temas ativos entram em novas designacoes
                     </span>
                   </div>
 
+                  {hasInvalidSelectedThemes ? (
+                    <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                      <p className="font-medium">Temas fora da base ativa</p>
+                      <p className="mt-2 leading-6">
+                        Remova os temas inativos ou ausentes antes de salvar este orador.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {inactiveSelectedThemes.map((theme) => (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            className="inline-flex items-center rounded-full border border-amber-300 bg-background px-3 py-1.5 text-xs font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-background dark:text-amber-100"
+                            onClick={() => handleRemoveTheme(theme.id)}
+                          >
+                            Remover tema {theme.number} inativo
+                          </button>
+                        ))}
+                        {missingSelectedThemeIds.map((themeId) => (
+                          <button
+                            key={themeId}
+                            type="button"
+                            className="inline-flex items-center rounded-full border border-amber-300 bg-background px-3 py-1.5 text-xs font-medium text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-background dark:text-amber-100"
+                            onClick={() => handleRemoveTheme(themeId)}
+                          >
+                            Remover tema ausente
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {(themesQuery.data ?? []).map((theme) => {
+                    {activeThemes.map((theme) => {
                       const isSelected = selectedThemeIds.includes(theme.id)
 
                       return (
@@ -703,8 +788,16 @@ export function SpeakersPage() {
               {!hasCongregationOptions || !hasThemeOptions ? (
                 <div className={getFeedbackContainerClassName('error')}>
                   {!hasCongregationOptions
-                    ? 'Cadastre ao menos uma congregacao ativa antes de salvar oradores.'
-                    : 'Cadastre ao menos um tema antes de salvar oradores.'}
+                    ? selectedType === 'local'
+                      ? 'Cadastre ao menos uma congregacao local ativa antes de salvar oradores locais.'
+                      : 'Cadastre ao menos uma congregacao parceira ativa antes de salvar oradores visitantes.'
+                    : 'Cadastre ao menos um tema ativo antes de salvar oradores.'}
+                </div>
+              ) : null}
+
+              {hasInvalidSelectedThemes ? (
+                <div className={getFeedbackContainerClassName('error')}>
+                  O formulario ainda contem temas fora da base ativa. Remova esses vinculos antes de salvar.
                 </div>
               ) : null}
 
@@ -726,9 +819,15 @@ export function SpeakersPage() {
                 </div>
               ) : null}
 
-              {themesQuery.isError ? (
+              {activeThemesQuery.isError ? (
                 <div className={getFeedbackContainerClassName('error')}>
-                  {getErrorMessage(themesQuery.error)}
+                  {getErrorMessage(activeThemesQuery.error)}
+                </div>
+              ) : null}
+
+              {themesManagementQuery.isError ? (
+                <div className={getFeedbackContainerClassName('error')}>
+                  {getErrorMessage(themesManagementQuery.error)}
                 </div>
               ) : null}
 
@@ -752,7 +851,10 @@ export function SpeakersPage() {
                   <Button
                     type="submit"
                     disabled={
-                      isSubmitting || !hasCongregationOptions || !hasThemeOptions
+                      isSubmitting ||
+                      !hasCongregationOptions ||
+                      !hasThemeOptions ||
+                      hasInvalidSelectedThemes
                     }
                   >
                     <Plus className="size-4" />
@@ -869,10 +971,12 @@ export function SpeakersPage() {
                       const theme = themesById.get(themeId)
 
                       if (!theme) {
-                        return null
+                        return 'Tema removido da base'
                       }
 
-                      return `Tema ${theme.number}`
+                      return theme.isActive
+                        ? `Tema ${theme.number}`
+                        : `Tema ${theme.number} (inativo)`
                     })
                     .filter((value): value is string => value !== null)
                   const hasUnavailableWindow =

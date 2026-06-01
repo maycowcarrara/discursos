@@ -208,6 +208,30 @@ Observações:
 
 * `number` deve ser único no contexto da base
 * usar `title`, nunca `name` para tema
+* create e update de `themes.number` devem reservar o número em `themeNumbers/{number}` antes de concluir a gravação
+
+### 4A. `themeNumbers`
+
+Finalidade:
+Reserva transacional dos números oficiais de tema para impedir duplicidade concorrente.
+
+Campos:
+
+```ts
+{
+  number: number
+  themeId: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+```
+
+Observações:
+
+* o ID do documento deve ser o próprio número em formato string
+* esta coleção é de suporte interno e não substitui `themes`
+* `themeId` aponta para o documento oficial em `themes/{id}`
+* não apagar a reserva ao inativar um tema, porque a unicidade continua válida na base
 
 ### 5. `calendarEvents`
 
@@ -351,6 +375,12 @@ Observações:
 
 * `speakers.themeIds[]` referencia `themes/{id}`
 * não usar subcoleção de temas por orador na V1
+* novos vínculos só podem usar temas ativos
+
+### `themeNumbers` -> `themes`
+
+* `themeNumbers.themeId` referencia `themes/{id}`
+* esta reserva deve ser mantida em transação junto com create/update de `themes.number`
 
 ### `assignments` -> `calendarEvents`
 

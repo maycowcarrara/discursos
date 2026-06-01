@@ -19,6 +19,7 @@ import {
   type SpeakerDocument,
   type SpeakerStatus,
   type SpeakerType,
+  themeSchema,
 } from '@/types/firestore'
 
 import { appendAuditLogToBatch } from './audit-logs-service'
@@ -123,6 +124,23 @@ function resolveSpeakerActivity(status: SpeakerStatus) {
   return status !== 'inactive' && status !== 'transferred'
 }
 
+function assertSpeakerTypeMatchesCongregation(
+  speakerType: SpeakerType,
+  congregation: FirestoreRecord<CongregationDocument>,
+) {
+  if (speakerType === 'local' && !congregation.isLocal) {
+    throw new Error(
+      'Oradores locais precisam ficar vinculados a uma congregacao local da propria agenda.',
+    )
+  }
+
+  if (speakerType === 'visitor' && congregation.isLocal) {
+    throw new Error(
+      'Oradores visitantes precisam ficar vinculados a uma congregacao parceira ou externa.',
+    )
+  }
+}
+
 function buildSpeakerPayload(
   values: SpeakerFormValues,
   congregation: FirestoreRecord<CongregationDocument>,
@@ -169,7 +187,7 @@ async function assertCongregationExists(id: string) {
   return congregation
 }
 
-async function assertThemesExist(themeIds: string[]) {
+async function assertActiveThemesExist(themeIds: string[]) {
   const normalizedThemeIds = normalizeThemeIds(themeIds)
 
   if (normalizedThemeIds.length === 0) {
@@ -177,6 +195,7 @@ async function assertThemesExist(themeIds: string[]) {
   }
 
   const foundThemeIds = new Set<string>()
+  const inactiveThemeIds = new Set<string>()
 
   for (let index = 0; index < normalizedThemeIds.length; index += 10) {
     const currentChunk = normalizedThemeIds.slice(index, index + 10)
@@ -188,8 +207,21 @@ async function assertThemesExist(themeIds: string[]) {
     )
 
     themesSnapshot.docs.forEach((documentSnapshot) => {
-      foundThemeIds.add(documentSnapshot.id)
+      const parsedTheme = themeSchema.parse(documentSnapshot.data())
+
+      if (parsedTheme.isActive) {
+        foundThemeIds.add(documentSnapshot.id)
+        return
+      }
+
+      inactiveThemeIds.add(documentSnapshot.id)
     })
+  }
+
+  if (inactiveThemeIds.size > 0) {
+    throw new Error(
+      'Remova os temas inativos do cadastro do orador antes de salvar as alteracoes.',
+    )
   }
 
   const missingThemeIds = normalizedThemeIds.filter(
@@ -257,7 +289,9 @@ export async function createSpeaker({
   const speakerRef = doc(getSpeakersCollection())
   const congregation = await assertCongregationExists(values.congregationId)
 
-  await assertThemesExist(values.themeIds)
+  assertSpeakerTypeMatchesCongregation(values.type, congregation)
+
+  await assertActiveThemesExist(values.themeIds)
 
   const payload = buildSpeakerPayload(values, congregation)
   const speakerDocument: SpeakerDocument = {
@@ -302,7 +336,9 @@ export async function updateSpeaker({
 
   const congregation = await assertCongregationExists(values.congregationId)
 
-  await assertThemesExist(values.themeIds)
+  assertSpeakerTypeMatchesCongregation(values.type, congregation)
+
+  await assertActiveThemesExist(values.themeIds)
 
   const now = Timestamp.now()
   const payload = buildSpeakerPayload(values, congregation)

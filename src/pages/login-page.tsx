@@ -18,6 +18,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  currentDeliveredPhaseLabel,
+  nextRequiredPhaseLabel,
+} from '@/config/project-status'
 import { annualPlanningMonths } from '@/data/mock-operations'
 import { loginWithEmail, loginWithGoogle } from '@/services/auth/auth-service'
 
@@ -114,15 +118,15 @@ export function LoginPage() {
       <div className="grid w-full max-w-7xl gap-5 xl:grid-cols-[1.08fr_0.92fr]">
         <section className="overflow-hidden rounded-[30px] border border-sidebar-border/80 bg-[linear-gradient(180deg,rgba(11,26,60,0.98),rgba(8,21,49,0.99))] p-6 text-white shadow-[0_30px_80px_-44px_rgba(8,18,43,0.95)] md:p-8">
           <Badge className="border-white/10 bg-white/10 text-white">
-            Fase 2 concluida
+            {currentDeliveredPhaseLabel} concluida
           </Badge>
           <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
-            Acesso ao painel de discursos com a mesma identidade do mockup.
+            Acesso ao painel operacional de discursos com agenda real e leitura rapida.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-white/74">
-            O login continua no escopo da Fase 2, mas agora conversa com a
-            linguagem visual do produto: painel claro, cards operacionais e foco
-            em leitura rapida.
+            O login continua sustentando a sessao do app, enquanto a base ja
+            entrega calendario, designacoes e dashboard operacional com foco em
+            uso frequente no desktop e no mobile.
           </p>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
@@ -134,13 +138,13 @@ export function LoginPage() {
                   icon: ShieldCheck,
                 },
                 {
-                  title: 'Base pronta para agenda',
-                  detail: 'Rotas protegidas e shell responsivo ja entregues.',
+                  title: 'Dashboard operacional',
+                  detail: 'Proximos 8 sabados, pendencias e eventos especiais em leitura real.',
                   icon: CalendarDays,
                 },
                 {
                   title: 'Proxima fase obrigatoria',
-                  detail: 'Camada Firestore tipada e hooks reutilizaveis.',
+                  detail: `${nextRequiredPhaseLabel} com filtros e linha do tempo permanente.`,
                   icon: Sparkles,
                 },
               ].map((item) => {
