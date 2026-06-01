@@ -11,7 +11,7 @@
     "EMAILJS_SERVICE_ID": "service_4anf4jh",
     "EMAILJS_TEMPLATE_ID": "template_eh3kckh",
     "FIREBASE_PROJECT_ID": "discursos-15891",
-    "FIREBASE_WEB_API_KEY": "AIzaSyA074GrldWj0DinsNDec6LicQ4oShtDexk",
+    "FIREBASE_WEB_API_KEY": "",
     "NOTIFICATION_BATCH_SIZE": "10",
     "REMINDER_SEND_HOUR_LOCAL": "9",
     "WORKER_ACTOR_NAME": "Worker EmailJS",
