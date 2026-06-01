@@ -99,7 +99,7 @@ function getMovementClassName(movementLabel: string) {
     return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-500/20 dark:bg-slate-500/10 dark:text-slate-200'
   }
 
-  if (movementLabel === 'Entrada de visitante') {
+  if (movementLabel === 'Orador visitante') {
     return 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-200'
   }
 

@@ -74,7 +74,7 @@ function makeAssignment(
   }
 }
 
-test('classifica entrada de visitante quando destino e congregacao local', () => {
+test('classifica orador visitante quando destino e congregacao local', () => {
   const congregationsById = new Map([
     ['local', makeCongregation('local', true)],
     ['origin-1', makeCongregation('origin-1', false)],
@@ -87,10 +87,10 @@ test('classifica entrada de visitante quando destino e congregacao local', () =>
   const movementType = inferAssignmentMovementType(assignment, congregationsById)
 
   assert.equal(movementType, 'incoming')
-  assert.equal(getAssignmentMovementLabel(movementType), 'Entrada de visitante')
+  assert.equal(getAssignmentMovementLabel(movementType), 'Orador visitante')
 })
 
-test('classifica saida local quando orador local fala em congregacao parceira', () => {
+test('classifica discurso fora quando orador local fala em congregacao parceira', () => {
   const congregationsById = new Map([
     ['partner', makeCongregation('partner', false)],
     ['origin-1', makeCongregation('origin-1', true)],
@@ -103,7 +103,7 @@ test('classifica saida local quando orador local fala em congregacao parceira', 
   const movementType = inferAssignmentMovementType(assignment, congregationsById)
 
   assert.equal(movementType, 'outgoing')
-  assert.equal(getAssignmentMovementLabel(movementType), 'Saida local')
+  assert.equal(getAssignmentMovementLabel(movementType), 'Discurso fora')
 })
 
 test('mantem designacao local como fallback seguro quando o destino nao esta carregado', () => {

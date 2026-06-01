@@ -9,6 +9,7 @@ type ScheduledController = {
 
 type Env = {
   APP_CONFIRMATION_BASE_URL: string
+  CALENDAR_SYNC_BATCH_SIZE?: string
   EMAILJS_PRIVATE_KEY: string
   EMAILJS_PUBLIC_KEY: string
   EMAILJS_SERVICE_ID: string
@@ -78,9 +79,12 @@ type AssignmentStatus =
   | 'declined'
   | 'cancelled'
   | 'replaced'
+type SpeakerType = 'local' | 'visitor'
 
 type NotificationStatus = 'pending' | 'sent' | 'failed' | 'cancelled'
 type NotificationType = 'confirmation' | 'reminder7d' | 'reminder1d' | 'manual'
+type GoogleCalendarSyncStatus = 'pending' | 'synced' | 'error'
+type CalendarSyncRunStatus = 'idle' | 'running' | 'success' | 'error'
 
 type AssignmentRecord = {
   calendarEventId: string
@@ -89,11 +93,14 @@ type AssignmentRecord = {
   eventDate: Date
   eventType: string
   id: string
+  localCongregationId: string
   localCongregationName: string
   notes: string
+  originCongregationId: string
   originCongregationName: string
   speakerId: string
   speakerName: string
+  speakerType: SpeakerType
   status: AssignmentStatus
   themeNumber: number
   themeTitle: string
@@ -118,6 +125,65 @@ type SettingsRecord = {
   timezone: string
 }
 
+type CalendarSettingsRecord = {
+  calendarId: string
+  configurationUpdatedAt: Date | null
+  defaultDurationMinutes: number
+  defaultStartTime: string
+  enabled: boolean
+  exists: boolean
+  lastSyncMessage: string | null
+  lastSyncStatus: CalendarSyncRunStatus
+}
+
+type CalendarEventRecord = {
+  congregationId: string | null
+  congregationName: string | null
+  date: Date
+  description: string | null
+  documentUpdateTime: string | null
+  googleCalendarCalendarId: string | null
+  googleCalendarEventId: string | null
+  googleCalendarManualSyncRequestedAt: Date | null
+  googleCalendarSyncError: string | null
+  googleCalendarSyncStatus: GoogleCalendarSyncStatus
+  id: string
+  isActive: boolean
+  title: string
+  type: string
+  updatedAt: Date
+}
+
+type CongregationRecord = {
+  address: string
+  city: string
+  id: string
+  isLocal: boolean
+  meetingTime: string
+  name: string
+  state: string
+}
+
+type SpeakerRecord = {
+  email: string
+  id: string
+  name: string
+}
+
+type CalendarSyncEntryKind = 'incomingVisitor' | 'outgoingTalk' | 'specialEvent'
+
+type CalendarSyncEntry = {
+  assignment: AssignmentRecord | null
+  attendeeEmail: string | null
+  congregation: CongregationRecord | null
+  kind: CalendarSyncEntryKind
+}
+
+type CalendarEventAssignmentContext = {
+  latestAssignment: AssignmentRecord | null
+  operationalAssignment: AssignmentRecord | null
+}
+
 type PublicConfirmationResponse = {
   assignment: {
     assignmentId: string
@@ -134,6 +200,12 @@ type PublicConfirmationResponse = {
 }
 
 type NotificationProcessResult = 'cancelled' | 'failed' | 'requeued' | 'sent' | 'skipped'
+type CalendarSyncProcessResult =
+  | 'created'
+  | 'deleted'
+  | 'failed'
+  | 'skipped'
+  | 'updated'
 
 type GoogleAccessTokenSession = {
   accessToken: string
@@ -143,9 +215,13 @@ type GoogleAccessTokenSession = {
 const firestoreDatabaseId = '(default)'
 const firestoreBaseUrl = 'https://firestore.googleapis.com/v1'
 const emailJsSendUrl = 'https://api.emailjs.com/api/v1.0/email/send'
+const googleCalendarBaseUrl = 'https://www.googleapis.com/calendar/v3'
 const googleOauthTokenUrl = 'https://oauth2.googleapis.com/token'
 const googleDatastoreScope = 'https://www.googleapis.com/auth/datastore'
+const googleCalendarScope = 'https://www.googleapis.com/auth/calendar'
+const googleWorkerScopes = `${googleDatastoreScope} ${googleCalendarScope}`
 const defaultBatchSize = 10
+const defaultCalendarSyncBatchSize = 10
 const maxRetryCount = 3
 const processingLeaseMinutes = 5
 const retryDelayMinutes = 30
@@ -167,7 +243,7 @@ const eventTypeLabels: Record<string, string> = {
   congress: 'Congresso',
   assembly: 'Assembleia',
   visit: 'Visita',
-  special: 'Especial',
+  special: 'Evento especial',
 }
 
 let googleAccessTokenSession: GoogleAccessTokenSession | null = null
@@ -212,6 +288,26 @@ export default {
       return jsonResponse(summary)
     }
 
+    if (requestUrl.pathname === '/api/internal/process-calendar-sync') {
+      if (!isInternalRequestAuthorized(request, env)) {
+        return jsonResponse(
+          {
+            error: 'unauthorized',
+            message: 'Token interno ausente ou invalido.',
+          },
+          401,
+        )
+      }
+
+      const processingPromise = processPendingCalendarSync(env)
+
+      ctx.waitUntil(processingPromise)
+
+      const summary = await processingPromise
+
+      return jsonResponse(summary)
+    }
+
     if (requestUrl.pathname === '/health') {
       return jsonResponse({
         ok: true,
@@ -230,6 +326,7 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(processDueNotifications(env))
+    ctx.waitUntil(processPendingCalendarSync(env))
   },
 }
 
@@ -521,6 +618,295 @@ async function processDueNotifications(env: Env) {
   return summary
 }
 
+async function processPendingCalendarSync(env: Env) {
+  const calendarSettings = await getCalendarSettingsRecord(env)
+  const summary = {
+    created: 0,
+    deleted: 0,
+    failed: 0,
+    processed: 0,
+    updated: 0,
+  }
+
+  if (!calendarSettings.exists || !calendarSettings.enabled) {
+    return summary
+  }
+
+  if (!calendarSettings.calendarId) {
+    await writeCalendarSyncRunState(
+      env,
+      'error',
+      'Calendar ID ausente. Revise settings/calendar antes de sincronizar.',
+    )
+
+    summary.failed = 1
+
+    return summary
+  }
+
+  await writeCalendarSyncRunState(
+    env,
+    'running',
+    'Processando eventos pendentes do Google Calendar.',
+  )
+
+  const [settings, pendingCalendarEvents] = await Promise.all([
+    getSettingsRecord(env),
+    listPendingCalendarEvents(env),
+  ])
+  const congregationCache = new Map<string, CongregationRecord | null>()
+  const speakerCache = new Map<string, SpeakerRecord | null>()
+
+  for (let index = 0; index < pendingCalendarEvents.length; index += 1) {
+    const calendarEvent = pendingCalendarEvents[index]
+
+    if (!calendarEvent) {
+      continue
+    }
+
+    summary.processed += 1
+
+    const result = await processSingleCalendarEventSync(
+      env,
+      settings,
+      calendarSettings,
+      calendarEvent,
+      congregationCache,
+      speakerCache,
+    )
+
+    if (result === 'created') {
+      summary.created += 1
+    } else if (result === 'updated') {
+      summary.updated += 1
+    } else if (result === 'deleted') {
+      summary.deleted += 1
+    } else if (result === 'failed') {
+      summary.failed += 1
+    } else {
+      summary.processed -= 1
+    }
+
+    if (index < pendingCalendarEvents.length - 1) {
+      await sleep(350)
+    }
+  }
+
+  const message =
+    summary.processed === 0
+      ? 'Nenhum evento pendente para sincronizar com o Google Calendar.'
+      : `Google Calendar: ${summary.created} criados, ${summary.updated} atualizados, ${summary.deleted} removidos e ${summary.failed} falhas.`
+
+  await writeCalendarSyncRunState(
+    env,
+    summary.failed > 0 ? 'error' : 'success',
+    message,
+  )
+
+  return summary
+}
+
+async function processSingleCalendarEventSync(
+  env: Env,
+  settings: SettingsRecord,
+  calendarSettings: CalendarSettingsRecord,
+  calendarEvent: CalendarEventRecord,
+  congregationCache: Map<string, CongregationRecord | null>,
+  speakerCache: Map<string, SpeakerRecord | null>,
+): Promise<CalendarSyncProcessResult> {
+  try {
+    const assignments = await listAssignmentsForCalendarEvent(
+      env,
+      calendarEvent.id,
+    )
+    const assignmentContext = buildCalendarEventAssignmentContext(assignments)
+    const syncEntry = await resolveCalendarSyncEntry(
+      env,
+      calendarSettings,
+      calendarEvent,
+      assignmentContext.operationalAssignment,
+      congregationCache,
+      speakerCache,
+    )
+
+    if (!calendarEvent.isActive) {
+      if (
+        calendarEvent.googleCalendarEventId &&
+        calendarEvent.googleCalendarCalendarId
+      ) {
+        await deleteGoogleCalendarEvent(
+          env,
+          calendarEvent.googleCalendarCalendarId,
+          calendarEvent.googleCalendarEventId,
+        )
+
+        await markCalendarEventSyncSuccess(
+          env,
+          calendarEvent,
+          {
+            calendarId: null,
+            eventId: null,
+            result: 'deleted',
+          },
+        )
+
+        return 'deleted'
+      }
+
+      await markCalendarEventSyncSuccess(
+        env,
+        calendarEvent,
+        {
+          calendarId: null,
+          eventId: null,
+          result: 'skipped',
+        },
+      )
+
+      return 'skipped'
+    }
+
+    if (
+      calendarEvent.type === 'publicTalk' &&
+      !shouldProcessOperationalCalendarSync(
+        calendarSettings,
+        calendarEvent,
+        assignmentContext,
+        syncEntry,
+      )
+    ) {
+      await markCalendarEventSyncSuccess(
+        env,
+        calendarEvent,
+        {
+          calendarId: calendarEvent.googleCalendarCalendarId,
+          eventId: calendarEvent.googleCalendarEventId,
+          result: 'skipped',
+        },
+      )
+
+      return 'skipped'
+    }
+
+    if (!syncEntry) {
+      if (
+        calendarEvent.googleCalendarEventId &&
+        calendarEvent.googleCalendarCalendarId
+      ) {
+        await deleteGoogleCalendarEvent(
+          env,
+          calendarEvent.googleCalendarCalendarId,
+          calendarEvent.googleCalendarEventId,
+        )
+
+        await markCalendarEventSyncSuccess(
+          env,
+          calendarEvent,
+          {
+            calendarId: null,
+            eventId: null,
+            result: 'deleted',
+          },
+        )
+
+        return 'deleted'
+      }
+
+      await markCalendarEventSyncSuccess(
+        env,
+        calendarEvent,
+        {
+          calendarId: null,
+          eventId: null,
+          result: 'skipped',
+        },
+      )
+
+      return 'skipped'
+    }
+
+    const eventPayload = buildGoogleCalendarEventPayload(
+      settings,
+      calendarSettings,
+      calendarEvent,
+      syncEntry,
+    )
+
+    if (
+      calendarEvent.googleCalendarEventId &&
+      calendarEvent.googleCalendarCalendarId &&
+      calendarEvent.googleCalendarCalendarId !== calendarSettings.calendarId
+    ) {
+      await deleteGoogleCalendarEvent(
+        env,
+        calendarEvent.googleCalendarCalendarId,
+        calendarEvent.googleCalendarEventId,
+      )
+
+      const createdEventId = await createGoogleCalendarEvent(
+        env,
+        calendarSettings.calendarId,
+        eventPayload,
+      )
+
+      await markCalendarEventSyncSuccess(
+        env,
+        calendarEvent,
+        {
+          calendarId: calendarSettings.calendarId,
+          eventId: createdEventId,
+          result: 'created',
+        },
+      )
+
+      return 'created'
+    }
+
+    if (calendarEvent.googleCalendarEventId) {
+      await updateGoogleCalendarEvent(
+        env,
+        calendarSettings.calendarId,
+        calendarEvent.googleCalendarEventId,
+        eventPayload,
+      )
+
+      await markCalendarEventSyncSuccess(
+        env,
+        calendarEvent,
+        {
+          calendarId: calendarSettings.calendarId,
+          eventId: calendarEvent.googleCalendarEventId,
+          result: 'updated',
+        },
+      )
+
+      return 'updated'
+    }
+
+    const createdEventId = await createGoogleCalendarEvent(
+      env,
+      calendarSettings.calendarId,
+      eventPayload,
+    )
+
+    await markCalendarEventSyncSuccess(
+      env,
+      calendarEvent,
+      {
+        calendarId: calendarSettings.calendarId,
+        eventId: createdEventId,
+        result: 'created',
+      },
+    )
+
+    return 'created'
+  } catch (error) {
+    await markCalendarEventSyncFailure(env, calendarEvent, getErrorMessage(error))
+
+    return 'failed'
+  }
+}
+
 async function processSingleNotification(
   env: Env,
   settings: SettingsRecord,
@@ -592,6 +978,374 @@ async function processSingleNotification(
 
   await requeueNotification(env, notification, emailResponse.errorMessage)
   return 'requeued'
+}
+
+async function resolveCalendarSyncEntry(
+  env: Env,
+  calendarSettings: CalendarSettingsRecord,
+  calendarEvent: CalendarEventRecord,
+  assignment: AssignmentRecord | null,
+  congregationCache: Map<string, CongregationRecord | null>,
+  speakerCache: Map<string, SpeakerRecord | null>,
+): Promise<CalendarSyncEntry | null> {
+  if (calendarEvent.type !== 'publicTalk') {
+    const congregation = await resolveCalendarSyncCongregation(
+      env,
+      calendarEvent.congregationId,
+      calendarEvent.congregationName,
+      congregationCache,
+    )
+
+    return {
+      assignment: null,
+      attendeeEmail: null,
+      congregation,
+      kind: 'specialEvent',
+    }
+  }
+
+  if (!assignment) {
+    return null
+  }
+
+  const speaker = await getSpeakerById(env, assignment.speakerId, speakerCache)
+  const attendeeEmail = normalizeEmailValue(speaker?.email ?? null)
+
+  const destinationCongregation = await resolveCalendarSyncCongregation(
+    env,
+    assignment.localCongregationId,
+    assignment.localCongregationName,
+    congregationCache,
+  )
+
+  if (assignment.speakerType === 'visitor' && destinationCongregation?.isLocal) {
+    return {
+      assignment,
+      attendeeEmail,
+      congregation: destinationCongregation,
+      kind: 'incomingVisitor',
+    }
+  }
+
+  if (assignment.speakerType === 'local' && destinationCongregation && !destinationCongregation.isLocal) {
+    return {
+      assignment,
+      attendeeEmail,
+      congregation: destinationCongregation,
+      kind: 'outgoingTalk',
+    }
+  }
+
+  return null
+}
+
+function resolveManualSyncRelevantAssignment(
+  syncEntry: CalendarSyncEntry | null,
+  assignmentContext: CalendarEventAssignmentContext,
+) {
+  if (syncEntry?.assignment) {
+    return syncEntry.assignment
+  }
+
+  return assignmentContext.latestAssignment
+}
+
+function getLatestOperationalSyncRelevantChangeAt(
+  calendarSettings: CalendarSettingsRecord,
+  calendarEvent: CalendarEventRecord,
+  assignment: AssignmentRecord | null,
+) {
+  const timestamps = [
+    calendarSettings.configurationUpdatedAt?.getTime() ?? 0,
+    calendarEvent.updatedAt.getTime(),
+    assignment?.updatedAt.getTime() ?? 0,
+  ]
+
+  return Math.max(...timestamps)
+}
+
+function shouldProcessOperationalCalendarSync(
+  calendarSettings: CalendarSettingsRecord,
+  calendarEvent: CalendarEventRecord,
+  assignmentContext: CalendarEventAssignmentContext,
+  syncEntry: CalendarSyncEntry | null,
+) {
+  const hasRemoteEvent = Boolean(
+    calendarEvent.googleCalendarEventId && calendarEvent.googleCalendarCalendarId,
+  )
+  const relevantAssignment = resolveManualSyncRelevantAssignment(syncEntry, assignmentContext)
+
+  if (!syncEntry && !hasRemoteEvent) {
+    return false
+  }
+
+  const requestedAt = calendarEvent.googleCalendarManualSyncRequestedAt?.getTime() ?? 0
+  const lastRelevantChangeAt = getLatestOperationalSyncRelevantChangeAt(
+    calendarSettings,
+    calendarEvent,
+    relevantAssignment,
+  )
+
+  return requestedAt >= lastRelevantChangeAt
+}
+
+function buildGoogleCalendarEventPayload(
+  settings: SettingsRecord,
+  calendarSettings: CalendarSettingsRecord,
+  calendarEvent: CalendarEventRecord,
+  syncEntry: CalendarSyncEntry,
+) {
+  const meetingTime = syncEntry.congregation?.meetingTime.trim() || calendarSettings.defaultStartTime
+  const dateRange = buildCalendarDateRange(
+    calendarEvent.date,
+    meetingTime,
+    calendarSettings.defaultDurationMinutes,
+  )
+  const location = buildGoogleCalendarLocation(syncEntry.congregation)
+
+  return {
+    attendees: buildGoogleCalendarAttendees(syncEntry),
+    description: buildGoogleCalendarDescription(
+      settings,
+      calendarSettings,
+      calendarEvent,
+      syncEntry,
+    ),
+    end: {
+      dateTime: dateRange.endDateTime,
+      timeZone: settings.timezone,
+    },
+    location,
+    summary: buildGoogleCalendarSummary(calendarEvent, syncEntry),
+    start: {
+      dateTime: dateRange.startDateTime,
+      timeZone: settings.timezone,
+    },
+  }
+}
+
+function buildGoogleCalendarAttendees(syncEntry: CalendarSyncEntry) {
+  if (!syncEntry.attendeeEmail) {
+    return []
+  }
+
+  const attendee: JsonObject = {
+    email: syncEntry.attendeeEmail,
+  }
+
+  if (syncEntry.assignment?.speakerName.trim()) {
+    attendee.displayName = syncEntry.assignment.speakerName.trim()
+  }
+
+  return [attendee]
+}
+
+function buildGoogleCalendarSummary(
+  calendarEvent: CalendarEventRecord,
+  syncEntry: CalendarSyncEntry,
+) {
+  if (syncEntry.kind === 'incomingVisitor' && syncEntry.assignment) {
+    return `Orador visitante - Tema ${syncEntry.assignment.themeNumber} - ${syncEntry.assignment.speakerName}`
+  }
+
+  if (syncEntry.kind === 'outgoingTalk' && syncEntry.assignment) {
+    return `Discurso fora - Tema ${syncEntry.assignment.themeNumber} - ${syncEntry.assignment.speakerName}`
+  }
+
+  return `Evento especial - ${calendarEvent.title}`
+}
+
+function buildGoogleCalendarDescription(
+  settings: SettingsRecord,
+  calendarSettings: CalendarSettingsRecord,
+  calendarEvent: CalendarEventRecord,
+  syncEntry: CalendarSyncEntry,
+) {
+  const meetingTime = syncEntry.congregation?.meetingTime.trim() || calendarSettings.defaultStartTime
+  const locationName = syncEntry.congregation?.name?.trim() || calendarEvent.congregationName?.trim() || settings.organizationName
+  const lines = [
+    `Organizacao: ${settings.organizationName}`,
+    `Tipo: ${getCalendarSyncKindLabel(syncEntry.kind)}`,
+    `Local: ${locationName}`,
+    `Hora da reuniao: ${meetingTime}`,
+  ]
+
+  if (syncEntry.congregation) {
+    lines.push(`Endereco: ${buildGoogleCalendarLocation(syncEntry.congregation)}`)
+  }
+
+  if (syncEntry.assignment) {
+    lines.push(`Status: ${assignmentStatusLabels[syncEntry.assignment.status]}`)
+    lines.push(`Orador: ${syncEntry.assignment.speakerName}`)
+    lines.push(`Tema: ${syncEntry.assignment.themeNumber} - ${syncEntry.assignment.themeTitle}`)
+    lines.push(`Congregacao de origem: ${syncEntry.assignment.originCongregationName}`)
+    lines.push(`Congregacao de destino: ${syncEntry.assignment.localCongregationName}`)
+
+    if (syncEntry.assignment.notes.trim()) {
+      lines.push(`Observacoes: ${syncEntry.assignment.notes.trim()}`)
+    }
+  }
+
+  if (calendarEvent.description?.trim()) {
+    lines.push(`Agenda: ${calendarEvent.description.trim()}`)
+  }
+
+  return lines.join('\n')
+}
+
+function buildGoogleCalendarLocation(
+  congregation: CongregationRecord | null,
+) {
+  if (!congregation) {
+    return null
+  }
+
+  const addressParts = [
+    congregation.name.trim(),
+    congregation.address.trim(),
+    `${congregation.city.trim()}/${congregation.state.trim()}`.trim(),
+  ].filter(Boolean)
+
+  return addressParts.join(' - ') || congregation.name
+}
+
+function getCalendarSyncKindLabel(kind: CalendarSyncEntryKind) {
+  if (kind === 'incomingVisitor') {
+    return 'Orador visitante'
+  }
+
+  if (kind === 'outgoingTalk') {
+    return 'Discurso fora'
+  }
+
+  return 'Evento especial'
+}
+
+function buildCalendarDateRange(
+  eventDate: Date,
+  startTime: string,
+  durationMinutes: number,
+) {
+  const [hourValue, minuteValue] = startTime.split(':')
+  const hours = Number.parseInt(hourValue ?? '', 10)
+  const minutes = Number.parseInt(minuteValue ?? '', 10)
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    throw new Error('Horario padrao invalido em settings/calendar.')
+  }
+
+  const totalStartMinutes = hours * 60 + minutes
+  const totalEndMinutes = totalStartMinutes + durationMinutes
+
+  return {
+    endDateTime: buildLocalDateTimeString(eventDate, totalEndMinutes),
+    startDateTime: buildLocalDateTimeString(eventDate, totalStartMinutes),
+  }
+}
+
+function buildLocalDateTimeString(date: Date, totalMinutes: number) {
+  const extraDays = Math.floor(totalMinutes / (24 * 60))
+  const normalizedMinutes = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60)
+  const targetDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() + extraDays,
+    12,
+    0,
+    0,
+    0,
+  )
+  const hours = Math.floor(normalizedMinutes / 60)
+  const minutes = normalizedMinutes % 60
+  const datePart = [
+    String(targetDate.getFullYear()),
+    String(targetDate.getMonth() + 1).padStart(2, '0'),
+    String(targetDate.getDate()).padStart(2, '0'),
+  ].join('-')
+
+  return `${datePart}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`
+}
+
+async function createGoogleCalendarEvent(
+  env: Env,
+  calendarId: string,
+  payload: JsonObject,
+) {
+  const response = await fetch(
+    `${googleCalendarBaseUrl}/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=all`,
+    {
+      method: 'POST',
+      headers: await buildGoogleApiHeaders(env),
+      body: JSON.stringify(payload),
+    },
+  )
+
+  if (!response.ok) {
+    const errorText = await response.text()
+
+    throw new Error(`Falha ao criar evento no Google Calendar: ${errorText}`)
+  }
+
+  const responsePayload = (await response.json()) as Partial<{ id: string }>
+
+  if (!responsePayload.id) {
+    throw new Error('Google Calendar nao retornou o id do evento criado.')
+  }
+
+  return responsePayload.id
+}
+
+async function updateGoogleCalendarEvent(
+  env: Env,
+  calendarId: string,
+  eventId: string,
+  payload: JsonObject,
+) {
+  const response = await fetch(
+    `${googleCalendarBaseUrl}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
+    {
+      method: 'PATCH',
+      headers: await buildGoogleApiHeaders(env),
+      body: JSON.stringify(payload),
+    },
+  )
+
+  if (!response.ok) {
+    const errorText = await response.text()
+
+    throw new Error(`Falha ao atualizar evento no Google Calendar: ${errorText}`)
+  }
+}
+
+async function deleteGoogleCalendarEvent(
+  env: Env,
+  calendarId: string,
+  eventId: string,
+) {
+  const response = await fetch(
+    `${googleCalendarBaseUrl}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
+    {
+      method: 'DELETE',
+      headers: await buildGoogleApiHeaders(env),
+    },
+  )
+
+  if (response.status === 404) {
+    return
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text()
+
+    throw new Error(`Falha ao excluir evento no Google Calendar: ${errorText}`)
+  }
 }
 
 async function sendEmail(
@@ -716,6 +1470,35 @@ async function listDueNotifications(env: Env) {
     .map(parseNotificationDocument)
 }
 
+async function listPendingCalendarEvents(env: Env) {
+  const rows = await runQuery(env, {
+    from: [
+      {
+        collectionId: 'calendarEvents',
+      },
+    ],
+    limit: resolveCalendarSyncBatchSize(env),
+    orderBy: [
+      {
+        direction: 'ASCENDING',
+        field: {
+          fieldPath: 'date',
+        },
+      },
+    ],
+    where: buildFieldFilter(
+      'googleCalendarSyncStatus',
+      'EQUAL',
+      toStringValue('pending'),
+    ),
+  })
+
+  return rows
+    .map((row) => row.document)
+    .filter((document): document is FirestoreDocument => Boolean(document))
+    .map(parseCalendarEventDocument)
+}
+
 async function findConflictingOperationalAssignment(
   env: Env,
   calendarEventId: string,
@@ -741,6 +1524,50 @@ async function findConflictingOperationalAssignment(
     ) ?? null
 }
 
+async function listAssignmentsForCalendarEvent(
+  env: Env,
+  calendarEventId: string,
+) {
+  const rows = await runQuery(env, {
+    from: [
+      {
+        collectionId: 'assignments',
+      },
+    ],
+    limit: 50,
+    where: buildFieldFilter(
+      'calendarEventId',
+      'EQUAL',
+      toStringValue(calendarEventId),
+    ),
+  })
+
+  return rows
+    .map((row) => row.document)
+    .filter((document): document is FirestoreDocument => Boolean(document))
+    .map(parseAssignmentDocument)
+}
+
+function sortAssignmentsByMostRecent(
+  assignments: AssignmentRecord[],
+) {
+  return [...assignments].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+}
+
+function buildCalendarEventAssignmentContext(
+  assignments: AssignmentRecord[],
+): CalendarEventAssignmentContext {
+  const sortedAssignments = sortAssignmentsByMostRecent(assignments)
+  const operationalAssignment =
+    sortedAssignments.find((assignment) => isOperationalAssignmentStatus(assignment.status)) ??
+    null
+
+  return {
+    latestAssignment: sortedAssignments[0] ?? null,
+    operationalAssignment,
+  }
+}
+
 async function getAssignmentById(env: Env, assignmentId: string) {
   const document = await getDocument(env, `assignments/${assignmentId}`)
 
@@ -749,6 +1576,53 @@ async function getAssignmentById(env: Env, assignmentId: string) {
   }
 
   return parseAssignmentDocument(document)
+}
+
+async function getCongregationById(
+  env: Env,
+  congregationId: string,
+) {
+  const document = await getDocument(env, `congregations/${congregationId}`)
+
+  if (!document) {
+    return null
+  }
+
+  return parseCongregationDocument(document)
+}
+
+async function resolveCalendarSyncCongregation(
+  env: Env,
+  congregationId: string | null,
+  congregationName: string | null,
+  congregationCache: Map<string, CongregationRecord | null>,
+) {
+  const normalizedCongregationId = congregationId?.trim() ?? ''
+
+  if (normalizedCongregationId) {
+    if (congregationCache.has(normalizedCongregationId)) {
+      return congregationCache.get(normalizedCongregationId) ?? null
+    }
+
+    const congregation = await getCongregationById(env, normalizedCongregationId)
+    congregationCache.set(normalizedCongregationId, congregation)
+
+    return congregation
+  }
+
+  if (!congregationName?.trim()) {
+    return null
+  }
+
+  return {
+    address: '',
+    city: '',
+    id: '',
+    isLocal: true,
+    meetingTime: '',
+    name: congregationName.trim(),
+    state: '',
+  }
 }
 
 async function getSettingsRecord(env: Env): Promise<SettingsRecord> {
@@ -767,6 +1641,175 @@ async function getSettingsRecord(env: Env): Promise<SettingsRecord> {
     organizationName: getStringField(document, 'organizationName') ?? 'Organizacao',
     timezone: getStringField(document, 'timezone') ?? 'America/Sao_Paulo',
   }
+}
+
+async function getCalendarSettingsRecord(
+  env: Env,
+): Promise<CalendarSettingsRecord> {
+  const document = await getDocument(env, 'settings/calendar')
+
+  if (!document) {
+    return {
+      calendarId: '',
+      configurationUpdatedAt: null,
+      defaultDurationMinutes: 90,
+      defaultStartTime: '19:30',
+      enabled: false,
+      exists: false,
+      lastSyncMessage: null,
+      lastSyncStatus: 'idle',
+    }
+  }
+
+  return {
+    calendarId: getStringField(document, 'calendarId') ?? '',
+    configurationUpdatedAt:
+      getTimestampField(document, 'configurationUpdatedAt') ??
+      getTimestampField(document, 'updatedAt'),
+    defaultDurationMinutes:
+      getIntegerField(document, 'defaultDurationMinutes') ?? 90,
+    defaultStartTime: getStringField(document, 'defaultStartTime') ?? '19:30',
+    enabled: getBooleanField(document, 'enabled') ?? false,
+    exists: true,
+    lastSyncMessage: getNullableStringField(document, 'lastSyncMessage'),
+    lastSyncStatus:
+      (getStringField(document, 'lastSyncStatus') as CalendarSyncRunStatus | null) ??
+      'idle',
+  }
+}
+
+async function writeCalendarSyncRunState(
+  env: Env,
+  status: CalendarSyncRunStatus,
+  message: string,
+) {
+  const now = new Date()
+
+  await commitWrites(env, [
+    buildUpdateWrite(
+      'settings/calendar',
+      {
+        lastSyncAt: toTimestampValue(now),
+        lastSyncMessage: toStringValue(message),
+        lastSyncStatus: toStringValue(status),
+        updatedAt: toTimestampValue(now),
+        updatedBy: toStringValue(resolveWorkerActorUid(env)),
+      },
+      undefined,
+      {},
+      env,
+    ),
+  ])
+}
+
+async function markCalendarEventSyncSuccess(
+  env: Env,
+  calendarEvent: CalendarEventRecord,
+  result: {
+    calendarId: string | null
+    eventId: string | null
+    result: 'created' | 'deleted' | 'skipped' | 'updated'
+  },
+) {
+  const now = new Date()
+
+  await commitWrites(env, [
+    buildUpdateWrite(
+      `calendarEvents/${calendarEvent.id}`,
+      {
+        googleCalendarCalendarId: result.calendarId
+          ? toStringValue(result.calendarId)
+          : toNullValue(),
+        googleCalendarEventId: result.eventId
+          ? toStringValue(result.eventId)
+          : toNullValue(),
+        googleCalendarSyncError: toNullValue(),
+        googleCalendarSyncStatus: toStringValue('synced'),
+        googleCalendarSyncUpdatedAt: toTimestampValue(now),
+        updatedAt: toTimestampValue(now),
+        updatedBy: toStringValue(resolveWorkerActorUid(env)),
+      },
+      undefined,
+      calendarEvent.documentUpdateTime
+        ? {
+            exists: true,
+            updateTime: calendarEvent.documentUpdateTime,
+          }
+        : true,
+      env,
+    ),
+    buildCalendarEventSyncAuditWrite(env, calendarEvent.id, result.result, now, {
+      googleCalendarCalendarId: result.calendarId,
+      googleCalendarEventId: result.eventId,
+      previousGoogleCalendarCalendarId: calendarEvent.googleCalendarCalendarId,
+      previousGoogleCalendarEventId: calendarEvent.googleCalendarEventId,
+    }),
+  ])
+}
+
+async function markCalendarEventSyncFailure(
+  env: Env,
+  calendarEvent: CalendarEventRecord,
+  reason: string,
+) {
+  const now = new Date()
+
+  await commitWrites(env, [
+    buildUpdateWrite(
+      `calendarEvents/${calendarEvent.id}`,
+      {
+        googleCalendarSyncError: toStringValue(reason),
+        googleCalendarSyncStatus: toStringValue('error'),
+        googleCalendarSyncUpdatedAt: toTimestampValue(now),
+        updatedAt: toTimestampValue(now),
+        updatedBy: toStringValue(resolveWorkerActorUid(env)),
+      },
+      undefined,
+      calendarEvent.documentUpdateTime
+        ? {
+            exists: true,
+            updateTime: calendarEvent.documentUpdateTime,
+          }
+        : true,
+      env,
+    ),
+    buildCalendarEventSyncAuditWrite(env, calendarEvent.id, 'failed', now, {
+      reason,
+      googleCalendarCalendarId: calendarEvent.googleCalendarCalendarId,
+      googleCalendarEventId: calendarEvent.googleCalendarEventId,
+    }),
+  ])
+}
+
+function buildCalendarEventSyncAuditWrite(
+  env: Env,
+  calendarEventId: string,
+  result: string,
+  now: Date,
+  metadata: JsonObject,
+) {
+  return buildUpdateWrite(
+    `auditLogs/${crypto.randomUUID()}`,
+    {
+      action: toStringValue('sync'),
+      actorName: toStringValue(resolveWorkerActorName(env)),
+      actorUid: toStringValue(resolveWorkerActorUid(env)),
+      after: toJsonValue({
+        result,
+      }),
+      before: toNullValue(),
+      createdAt: toTimestampValue(now),
+      entityId: toStringValue(calendarEventId),
+      entityType: toStringValue('calendarEvent'),
+      metadata: toJsonValue({
+        source: 'phase-12-worker',
+        ...metadata,
+      }),
+    },
+    undefined,
+    false,
+    env,
+  )
 }
 
 async function markNotificationSent(env: Env, notification: NotificationRecord) {
@@ -921,11 +1964,14 @@ function parseAssignmentDocument(document: FirestoreDocument): AssignmentRecord 
     eventDate: getRequiredTimestampField(document, 'eventDate'),
     eventType: getRequiredStringField(document, 'eventType'),
     id: getDocumentId(document.name),
+    localCongregationId: getRequiredStringField(document, 'localCongregationId'),
     localCongregationName: getRequiredStringField(document, 'localCongregationName'),
     notes: getStringField(document, 'notes') ?? '',
+    originCongregationId: getRequiredStringField(document, 'originCongregationId'),
     originCongregationName: getRequiredStringField(document, 'originCongregationName'),
     speakerId: getRequiredStringField(document, 'speakerId'),
     speakerName: getRequiredStringField(document, 'speakerName'),
+    speakerType: getRequiredStringField(document, 'speakerType') as SpeakerType,
     status: getRequiredStringField(document, 'status') as AssignmentStatus,
     themeNumber: getRequiredIntegerField(document, 'themeNumber'),
     themeTitle: getRequiredStringField(document, 'themeTitle'),
@@ -945,6 +1991,80 @@ function parseNotificationDocument(document: FirestoreDocument): NotificationRec
     subject: getStringField(document, 'subject') ?? '',
     type: getRequiredStringField(document, 'type') as NotificationType,
   }
+}
+
+function parseCalendarEventDocument(document: FirestoreDocument): CalendarEventRecord {
+  return {
+    congregationId: getNullableStringField(document, 'congregationId'),
+    congregationName: getNullableStringField(document, 'congregationName'),
+    date: getRequiredTimestampField(document, 'date'),
+    description: getNullableStringField(document, 'description'),
+    documentUpdateTime: document.updateTime ?? null,
+    googleCalendarCalendarId: getNullableStringField(
+      document,
+      'googleCalendarCalendarId',
+    ),
+    googleCalendarEventId: getNullableStringField(document, 'googleCalendarEventId'),
+    googleCalendarManualSyncRequestedAt: getTimestampField(
+      document,
+      'googleCalendarManualSyncRequestedAt',
+    ),
+    googleCalendarSyncError: getNullableStringField(
+      document,
+      'googleCalendarSyncError',
+    ),
+    googleCalendarSyncStatus:
+      (getStringField(document, 'googleCalendarSyncStatus') as GoogleCalendarSyncStatus | null) ??
+      'pending',
+    id: getDocumentId(document.name),
+    isActive: getRequiredBooleanField(document, 'isActive'),
+    title: getRequiredStringField(document, 'title'),
+    type: getRequiredStringField(document, 'type'),
+    updatedAt: getRequiredTimestampField(document, 'updatedAt'),
+  }
+}
+
+function parseCongregationDocument(document: FirestoreDocument): CongregationRecord {
+  return {
+    address: getStringField(document, 'address') ?? '',
+    city: getStringField(document, 'city') ?? '',
+    id: getDocumentId(document.name),
+    isLocal: getRequiredBooleanField(document, 'isLocal'),
+    meetingTime: getStringField(document, 'meetingTime') ?? '',
+    name: getRequiredStringField(document, 'name'),
+    state: getStringField(document, 'state') ?? '',
+  }
+}
+
+function parseSpeakerDocument(document: FirestoreDocument): SpeakerRecord {
+  return {
+    email: getStringField(document, 'email') ?? '',
+    id: getDocumentId(document.name),
+    name: getRequiredStringField(document, 'name'),
+  }
+}
+
+async function getSpeakerById(
+  env: Env,
+  speakerId: string,
+  speakerCache: Map<string, SpeakerRecord | null>,
+) {
+  if (speakerCache.has(speakerId)) {
+    return speakerCache.get(speakerId) ?? null
+  }
+
+  const speakerDocument = await getDocument(env, `speakers/${speakerId}`)
+  const speaker = speakerDocument ? parseSpeakerDocument(speakerDocument) : null
+
+  speakerCache.set(speakerId, speaker)
+
+  return speaker
+}
+
+function normalizeEmailValue(email: string | null) {
+  const normalizedEmail = email?.trim().toLowerCase() ?? ''
+
+  return normalizedEmail ? normalizedEmail : null
 }
 
 async function getDocument(env: Env, path: string) {
@@ -1058,6 +2178,15 @@ async function buildFirestoreHeaders(env: Env) {
   }
 }
 
+async function buildGoogleApiHeaders(env: Env) {
+  const accessToken = await getGoogleAccessToken(env)
+
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+  }
+}
+
 function buildFirestoreUrl(env: Env, suffix: string) {
   return `${firestoreBaseUrl}/projects/${env.FIREBASE_PROJECT_ID}/databases/${firestoreDatabaseId}${suffix}`
 }
@@ -1113,7 +2242,7 @@ async function buildServiceAccountJwtAssertion(env: Env) {
     exp: nowInSeconds + 3600,
     iat: nowInSeconds,
     iss: env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL,
-    scope: googleDatastoreScope,
+    scope: googleWorkerScopes,
   }
   const encodedHeader = base64UrlEncodeJson(jwtHeader)
   const encodedPayload = base64UrlEncodeJson(jwtPayload)
@@ -1202,6 +2331,16 @@ function resolveNotificationBatchSize(env: Env) {
 
   if (!Number.isInteger(parsed) || parsed <= 0) {
     return defaultBatchSize
+  }
+
+  return Math.min(parsed, 20)
+}
+
+function resolveCalendarSyncBatchSize(env: Env) {
+  const parsed = Number.parseInt(env.CALENDAR_SYNC_BATCH_SIZE ?? '', 10)
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return defaultCalendarSyncBatchSize
   }
 
   return Math.min(parsed, 20)
@@ -1348,6 +2487,26 @@ function getStringField(document: FirestoreDocument, fieldName: string) {
   return null
 }
 
+function getIntegerField(document: FirestoreDocument, fieldName: string) {
+  const field = getField(document, fieldName)
+
+  if (!field || !('integerValue' in field)) {
+    return null
+  }
+
+  return Number.parseInt(field.integerValue, 10)
+}
+
+function getBooleanField(document: FirestoreDocument, fieldName: string) {
+  const field = getField(document, fieldName)
+
+  if (!field || !('booleanValue' in field)) {
+    return null
+  }
+
+  return field.booleanValue
+}
+
 function getNullableStringField(document: FirestoreDocument, fieldName: string) {
   const field = getField(document, fieldName)
 
@@ -1377,13 +2536,23 @@ function getRequiredStringField(document: FirestoreDocument, fieldName: string) 
 }
 
 function getRequiredIntegerField(document: FirestoreDocument, fieldName: string) {
-  const field = getField(document, fieldName)
+  const value = getIntegerField(document, fieldName)
 
-  if (!field || !('integerValue' in field)) {
+  if (value === null) {
     throw new Error(`Campo ${fieldName} ausente em ${document.name}.`)
   }
 
-  return Number.parseInt(field.integerValue, 10)
+  return value
+}
+
+function getRequiredBooleanField(document: FirestoreDocument, fieldName: string) {
+  const value = getBooleanField(document, fieldName)
+
+  if (value === null) {
+    throw new Error(`Campo ${fieldName} ausente em ${document.name}.`)
+  }
+
+  return value
 }
 
 function getRequiredTimestampField(document: FirestoreDocument, fieldName: string) {
@@ -1391,6 +2560,16 @@ function getRequiredTimestampField(document: FirestoreDocument, fieldName: strin
 
   if (!field || !('timestampValue' in field)) {
     throw new Error(`Campo ${fieldName} ausente em ${document.name}.`)
+  }
+
+  return new Date(field.timestampValue)
+}
+
+function getTimestampField(document: FirestoreDocument, fieldName: string) {
+  const field = getField(document, fieldName)
+
+  if (!field || !('timestampValue' in field)) {
+    return null
   }
 
   return new Date(field.timestampValue)
@@ -1415,4 +2594,12 @@ function sleep(milliseconds: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, milliseconds)
   })
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return 'Falha desconhecida na integracao com Google Calendar.'
 }

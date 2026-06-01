@@ -66,6 +66,17 @@ export const notificationStatusSchema = z.enum([
   'cancelled',
 ])
 export const notificationProviderSchema = z.enum(['emailjs', 'worker'])
+export const googleCalendarSyncStatusSchema = z.enum([
+  'pending',
+  'synced',
+  'error',
+])
+export const calendarSyncRunStatusSchema = z.enum([
+  'idle',
+  'running',
+  'success',
+  'error',
+])
 
 export const auditEntityTypeSchema = z.enum([
   'congregation',
@@ -91,6 +102,19 @@ export const appSettingsSchema = baseDocumentSchema.extend({
   locale: z.string(),
   timezone: z.string(),
 })
+
+export const calendarSettingsSchema = baseDocumentSchema
+  .merge(authoredDocumentSchema)
+  .extend({
+    enabled: z.boolean(),
+    calendarId: z.string(),
+    defaultStartTime: z.string(),
+    defaultDurationMinutes: z.number().int(),
+    configurationUpdatedAt: timestampSchema.nullable().optional(),
+    lastSyncAt: timestampSchema.nullable().optional(),
+    lastSyncStatus: calendarSyncRunStatusSchema.optional(),
+    lastSyncMessage: z.string().nullable().optional(),
+  })
 
 export const congregationSchema = managedDocumentSchema.extend({
   name: z.string(),
@@ -139,6 +163,12 @@ export const calendarEventSchema = managedDocumentSchema.extend({
   congregationId: z.string().nullable().optional(),
   congregationName: z.string().nullable().optional(),
   blocksAssignments: z.boolean(),
+  googleCalendarEventId: z.string().nullable().optional(),
+  googleCalendarCalendarId: z.string().nullable().optional(),
+  googleCalendarSyncStatus: googleCalendarSyncStatusSchema.optional(),
+  googleCalendarSyncError: z.string().nullable().optional(),
+  googleCalendarManualSyncRequestedAt: timestampSchema.nullable().optional(),
+  googleCalendarSyncUpdatedAt: timestampSchema.nullable().optional(),
 })
 
 export const assignmentSchema = baseDocumentSchema
@@ -198,6 +228,7 @@ export type FirestoreRecord<T> = T & {
 }
 
 export type AppSettingsDocument = z.infer<typeof appSettingsSchema>
+export type CalendarSettingsDocument = z.infer<typeof calendarSettingsSchema>
 export type CongregationDocument = z.infer<typeof congregationSchema>
 export type SpeakerDocument = z.infer<typeof speakerSchema>
 export type ThemeDocument = z.infer<typeof themeSchema>
@@ -216,5 +247,9 @@ export type AssignmentStatus = z.infer<typeof assignmentStatusSchema>
 export type NotificationType = z.infer<typeof notificationTypeSchema>
 export type NotificationStatus = z.infer<typeof notificationStatusSchema>
 export type NotificationProvider = z.infer<typeof notificationProviderSchema>
+export type GoogleCalendarSyncStatus = z.infer<
+  typeof googleCalendarSyncStatusSchema
+>
+export type CalendarSyncRunStatus = z.infer<typeof calendarSyncRunStatusSchema>
 export type AuditEntityType = z.infer<typeof auditEntityTypeSchema>
 export type AuditAction = z.infer<typeof auditActionSchema>

@@ -29,6 +29,10 @@ import {
 } from '@/utils/calendar-events'
 
 import { appendAuditLogToBatch } from './audit-logs-service'
+import {
+  buildPendingGoogleCalendarSyncFields,
+  buildSyncedGoogleCalendarSyncFields,
+} from './google-calendar-sync-service'
 import { getTypedCollection, getTypedDocument } from './shared'
 
 export type CalendarEventFormValues = {
@@ -101,23 +105,17 @@ function buildAuditLogDocument(
   }
 }
 
-function stripRecordId(
-  calendarEvent: FirestoreRecord<CalendarEventDocument>,
-): CalendarEventDocument {
+function toAuditSnapshot(
+  calendarEvent: FirestoreRecord<CalendarEventDocument> | CalendarEventDocument,
+): Record<string, unknown> {
+  if (!('id' in calendarEvent)) {
+    return { ...calendarEvent }
+  }
+
   const { id, ...documentData } = calendarEvent
   void id
 
   return documentData
-}
-
-function toAuditSnapshot(
-  calendarEvent: FirestoreRecord<CalendarEventDocument> | CalendarEventDocument,
-): Record<string, unknown> {
-  if ('id' in calendarEvent) {
-    return stripRecordId(calendarEvent)
-  }
-
-  return { ...calendarEvent }
 }
 
 async function resolveCongregationSnapshot(congregationId: string) {
@@ -221,6 +219,22 @@ function buildCalendarEventPayload(
   return payload
 }
 
+function buildCalendarEventGoogleSyncFields(isActive: boolean, now: Timestamp) {
+  if (isActive) {
+    return {
+      googleCalendarEventId: null,
+      googleCalendarCalendarId: null,
+      ...buildPendingGoogleCalendarSyncFields(now),
+    }
+  }
+
+  return {
+    googleCalendarEventId: null,
+    googleCalendarCalendarId: null,
+    ...buildSyncedGoogleCalendarSyncFields(now),
+  }
+}
+
 export function toCalendarEventFormValues(
   calendarEvent: FirestoreRecord<CalendarEventDocument> | null | undefined,
 ): CalendarEventFormValues {
@@ -274,6 +288,7 @@ export async function createCalendarEvent({
     : doc(getCalendarEventsCollection())
   const calendarEventDocument: CalendarEventDocument = {
     ...payload,
+    ...buildCalendarEventGoogleSyncFields(payload.isActive, now),
     createdAt: now,
     updatedAt: now,
     createdBy: actorUid,
@@ -394,6 +409,7 @@ export async function updateCalendarEvent({
   const updatedCalendarEvent: CalendarEventDocument = {
     ...stripRecordId(existingCalendarEvent),
     ...payload,
+    ...buildPendingGoogleCalendarSyncFields(now),
     updatedAt: now,
     updatedBy: actorUid,
   }
@@ -484,6 +500,7 @@ export async function deleteCalendarEvent({
   const archivedCalendarEvent: CalendarEventDocument = {
     ...stripRecordId(existingCalendarEvent),
     isActive: false,
+    ...buildPendingGoogleCalendarSyncFields(now),
     updatedAt: now,
     updatedBy: actorUid,
   }
@@ -549,6 +566,9 @@ export async function generateCalendarYear({
         congregationName: null,
         blocksAssignments: false,
         isActive: true,
+        googleCalendarEventId: null,
+        googleCalendarCalendarId: null,
+        ...buildPendingGoogleCalendarSyncFields(now),
         createdAt: now,
         updatedAt: now,
         createdBy: actorUid,

@@ -27,11 +27,11 @@ export function getAssignmentMovementLabel(
   movementType: AssignmentMovementType,
 ) {
   if (movementType === 'incoming') {
-    return 'Entrada de visitante'
+    return 'Orador visitante'
   }
 
   if (movementType === 'outgoing') {
-    return 'Saida local'
+    return 'Discurso fora'
   }
 
   return 'Designacao local'

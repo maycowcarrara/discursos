@@ -208,15 +208,6 @@ function toAuditSnapshot(
   return { ...assignment }
 }
 
-function stripCalendarEventRecord(
-  calendarEvent: FirestoreRecord<CalendarEventDocument>,
-): CalendarEventDocument {
-  const { id, ...documentData } = calendarEvent
-  void id
-
-  return documentData
-}
-
 function getUnavailableWindowLabel(
   unavailableStart: Timestamp | null | undefined,
   unavailableEnd: Timestamp | null | undefined,
@@ -670,8 +661,15 @@ async function runAssignmentSlotTransaction(options: {
       transaction,
     })
 
-    // Touch the event document with its current payload so concurrent slot mutations retry.
-    transaction.set(calendarEventRef, stripCalendarEventRecord(lockedCalendarEvent))
+    // Touch the event document with a merge-only write so concurrent slot mutations retry
+    // without overwriting sync fields that may have been queued in this transaction.
+    transaction.set(
+      calendarEventRef,
+      {
+        updatedAt: lockedCalendarEvent.updatedAt,
+      },
+      { merge: true },
+    )
   })
 }
 

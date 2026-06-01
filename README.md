@@ -18,13 +18,17 @@ Fases concluídas:
 * `FASE 10 — Histórico`
 * `FASE 11 — EmailJS`
 
-Fase atual concluída:
+Última fase concluída:
 
 * `FASE 11 — EmailJS`
 
-Próxima etapa obrigatória:
+Fase atual em andamento:
 
 * `FASE 12 — Google Calendar`
+
+Próxima etapa obrigatória:
+
+* concluir a `FASE 12 — Google Calendar`
 
 ## O que já foi entregue
 
@@ -152,22 +156,40 @@ Próxima etapa obrigatória:
 * confirmação pública por link em rota dedicada do frontend, com boa leitura em desktop e mobile
 * worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
 * confirmação por link validada no worker antes de gravar `confirmedAt`, `responseAt` e auditoria
+* confirmação pública protegida com precondition do Firestore para não reativar designação já alterada em paralelo
 * autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
 * template único do EmailJS reutilizado para confirmação e lembretes, com parâmetros padronizados
+* ressincronização da fila preservando notificações já enviadas, falhadas ou canceladas quando a identidade de entrega continua a mesma
 * scripts e arquivos base para `deploy:worker`, `worker:deploy`, `typecheck:worker` e segredos locais do worker
+
+### Início da Fase 12
+
+* `settings/calendar` passa a ser documento real do Firestore para ativação da integração, `calendarId`, horário padrão e duração padrão
+* `calendarEvents` passa a guardar o vínculo remoto do Google Calendar e o estado oficial de sincronização
+* alterações em `calendarEvents` seguem controlando a fila técnica, enquanto designações operacionais passam a usar o botão `Sincronizar com agenda`
+* a aprovação manual passa a ficar persistida em `calendarEvents.googleCalendarManualSyncRequestedAt`, evitando republicação operacional sem novo clique
+* `settings/calendar.configurationUpdatedAt` passa a separar mudança real de configuração dos ciclos rotineiros do worker
+* o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account da Fase 11
+* a tela de configurações passa a exibir a configuração e o último estado global de sincronização
+* o Google Calendar passa a publicar apenas `orador visitante`, `discurso fora` e `evento especial`, sem espelhar slots vazios
+* quando `speakers.email` existir, `orador visitante` e `discurso fora` passam a incluir o orador como convidado, com convite, atualização e cancelamento enviados pelo Google Calendar
 
 ## Próxima fase
 
 ### `FASE 12 — Google Calendar`
 
+Status atual:
+
+* em andamento
+
 Implementar:
 
-* criação automática
-* atualização
-* exclusão
-* sincronização
+* publicação manual por botão `Sincronizar com agenda`
+* atualização manual com processamento por fila do worker
+* remoção manual com processamento por fila do worker
+* sincronização segura via cron e trigger interno
 
-Entregue até a Fase 11:
+Entregue até o início da Fase 12:
 
 * `settings/app` com persistência real
 * CRUD completo de `congregations`
@@ -183,7 +205,7 @@ Entregue até a Fase 11:
 
 Próximo subpasso obrigatório:
 
-* iniciar a `FASE 12 — Google Calendar`
+* concluir a `FASE 12 — Google Calendar`
 
 ## Diretriz de UI e UX
 
@@ -245,6 +267,24 @@ Parâmetros atuais do template único do EmailJS:
 * `status_label`
 * `notes`
 * `confirmation_url`
+
+Fluxo operacional atual da fila:
+
+* `pending`: agenda `confirmation`, `reminder7d` e `reminder1d` quando a designação cobre o slot, a data ainda não passou e o orador tem e-mail válido
+* `confirmed`: cancela a automação de confirmação e mantém os lembretes futuros ativos
+* `declined`, `cancelled` e `replaced`: cancelam as automações da designação, preservando o histórico do documento
+* mudanças administrativas que não alteram a identidade de entrega preservam `sentAt`, `retryCount`, `errorMessage` e o status já processado da notificação
+* mudanças que alteram a entrega de fato, como destinatário, assunto, orador vinculado ou horário agendado, reabrem a notificação com novo ciclo
+* confirmações manuais e confirmações públicas cancelam a notificação `confirmation` correspondente
+
+Fluxo operacional do worker:
+
+* o worker busca notificações `pending` vencidas por `scheduledFor`
+* antes do envio, ele faz um `claim` temporário no documento para reduzir duplicidade em execuções concorrentes
+* se o EmailJS responder com sucesso, a notificação vira `sent`
+* se houver falha transitória, a notificação volta para `pending` com retentativa em 30 minutos
+* se atingir o limite de tentativas, a notificação vira `failed`
+* se a designação deixar de ser operacional ou a data do evento já tiver passado, a notificação vira `cancelled`
 
 ## Decisão atual de deploy
 

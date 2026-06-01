@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
+  requestManualGoogleCalendarSync,
+  type RequestManualGoogleCalendarSyncInput,
+} from '@/services/firestore/google-calendar-sync-service'
+import {
   createCalendarEvent,
   deleteCalendarEvent,
   generateCalendarYear,
@@ -80,6 +84,18 @@ export function useGenerateCalendarYearMutation() {
 
   return useMutation({
     mutationFn: (input: GenerateCalendarYearInput) => generateCalendarYear(input),
+    onSuccess: async () => {
+      await invalidateCalendarQueries(queryClient)
+    },
+  })
+}
+
+export function useRequestManualGoogleCalendarSyncMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: RequestManualGoogleCalendarSyncInput) =>
+      requestManualGoogleCalendarSync(input),
     onSuccess: async () => {
       await invalidateCalendarQueries(queryClient)
     },

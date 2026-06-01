@@ -31,7 +31,7 @@ export const calendarEventTypeLabels: Record<CalendarEventType, string> = {
   congress: 'Congresso',
   assembly: 'Assembleia',
   visit: 'Visita',
-  special: 'Especial',
+  special: 'Evento especial',
 }
 
 export const calendarEventDefaultTitles: Record<CalendarEventType, string> = {

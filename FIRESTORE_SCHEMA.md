@@ -117,6 +117,32 @@ Exemplo de `settings/app`:
 }
 ```
 
+Exemplo de `settings/calendar`:
+
+```ts
+{
+  enabled: boolean
+  calendarId: string
+  defaultStartTime: string // formato HH:mm
+  defaultDurationMinutes: number
+  configurationUpdatedAt?: Timestamp | null
+  lastSyncAt?: Timestamp | null
+  lastSyncStatus?: "idle" | "running" | "success" | "error"
+  lastSyncMessage?: string | null
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  createdBy?: string
+  updatedBy?: string
+}
+```
+
+Observações:
+
+* `settings/calendar` concentra apenas configuração operacional e status global da integração
+* `configurationUpdatedAt` registra apenas a última mudança feita na configuração, sem ser sobrescrito pelos ciclos do worker
+* segredos continuam fora do frontend e do Firestore, no worker
+* a troca de `calendarId` deve preservar rastreabilidade pelo vínculo remoto salvo em `calendarEvents`
+
 ### 2. `congregations`
 
 Finalidade:
@@ -251,6 +277,12 @@ Campos:
   congregationName?: string | null
   blocksAssignments: boolean
   isActive: boolean
+  googleCalendarEventId?: string | null
+  googleCalendarCalendarId?: string | null
+  googleCalendarSyncStatus?: "pending" | "synced" | "error"
+  googleCalendarSyncError?: string | null
+  googleCalendarManualSyncRequestedAt?: Timestamp | null
+  googleCalendarSyncUpdatedAt?: Timestamp | null
   createdAt: Timestamp
   updatedAt: Timestamp
   createdBy?: string
@@ -262,6 +294,13 @@ Observações:
 
 * para congressos e assembleias, `blocksAssignments` deve ser `true`
 * sábados comuns também vivem nesta coleção
+* o vínculo remoto do Google Calendar deve ficar neste documento, nunca em coleção paralela
+* `googleCalendarEventId` identifica o evento remoto atual
+* `googleCalendarCalendarId` registra em qual calendário remoto o vínculo foi criado, permitindo migração segura de `calendarId`
+* `googleCalendarSyncStatus` controla a fila leve da Fase 12 sem criar nova coleção, inclusive quando a solicitação parte do botão manual `Sincronizar com agenda`
+* `googleCalendarManualSyncRequestedAt` registra a última aprovação manual para publicar, atualizar ou remover o item operacional no Google Calendar
+* slots vazios de `publicTalk` podem existir no Firestore para planejamento anual sem precisarem existir no Google Calendar
+* quando houver publicação de `orador visitante` ou `discurso fora`, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e adicionar o orador como convidado no Google Calendar
 * não criar coleção paralela como `events`, `schedules` ou `annualCalendar`
 
 ### 6. `assignments`
@@ -436,6 +475,7 @@ Os índices abaixo devem ser tratados como base inicial da V1.
 * `year ASC, date ASC`
 * `type ASC, date ASC`
 * `blocksAssignments ASC, date ASC`
+* `googleCalendarSyncStatus ASC, date ASC`
 
 ### `assignments`
 

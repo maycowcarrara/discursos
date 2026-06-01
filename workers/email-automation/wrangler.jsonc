@@ -7,6 +7,7 @@
   },
   "vars": {
     "APP_CONFIRMATION_BASE_URL": "https://discursos-15891.web.app/confirmacao/designacao",
+    "CALENDAR_SYNC_BATCH_SIZE": "10",
     "EMAILJS_PUBLIC_KEY": "D-3Xne7W_zyrQmlu6",
     "EMAILJS_SERVICE_ID": "service_4anf4jh",
     "EMAILJS_TEMPLATE_ID": "template_eh3kckh",

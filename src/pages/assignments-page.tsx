@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { useAppSettingsQuery } from '@/hooks/use-app-settings'
+import { useAppSettingsQuery, useCalendarSettingsQuery } from '@/hooks/use-app-settings'
 import {
   useAssignmentsByYearQuery,
   useConfirmAssignmentMutation,
@@ -38,7 +38,10 @@ import {
   useRecentAssignmentsQuery,
   useUpdateAssignmentMutation,
 } from '@/hooks/use-assignments'
-import { useCalendarEventsQuery } from '@/hooks/use-calendar-events'
+import {
+  useCalendarEventsQuery,
+  useRequestManualGoogleCalendarSyncMutation,
+} from '@/hooks/use-calendar-events'
 import { useCongregationsManagementQuery } from '@/hooks/use-congregations'
 import { useSpeakersManagementQuery } from '@/hooks/use-speakers'
 import { useThemesManagementQuery } from '@/hooks/use-themes'
@@ -48,10 +51,10 @@ import {
   type AssignmentFormValues,
 } from '@/services/firestore/assignments-service'
 import type {
-  AssignmentStatus,
   FirestoreRecord,
   AssignmentDocument,
-  CongregationDocument,
+  AssignmentStatus,
+  CalendarEventDocument,
   SpeakerType,
 } from '@/types/firestore'
 import {
@@ -92,6 +95,15 @@ type FeedbackState =
   | null
 
 type MovementType = AssignmentMovementType
+type GoogleCalendarSyncTone = 'error' | 'neutral' | 'success' | 'warning'
+
+type GoogleCalendarSyncState = {
+  canRequestSync: boolean
+  canShowAction: boolean
+  description: string
+  label: string
+  tone: GoogleCalendarSyncTone
+}
 
 const movementOptions: Array<{
   value: MovementType
@@ -100,13 +112,13 @@ const movementOptions: Array<{
 }> = [
   {
     value: 'incoming',
-    title: 'Entrada de visitante',
-    description: 'Visitante vem falar em uma congregacao local da sua agenda.',
+    title: 'Orador visitante',
+    description: 'Orador visitante designado para falar em uma congregacao local da sua agenda.',
   },
   {
     value: 'outgoing',
-    title: 'Saida local',
-    description: 'Um orador local vai atender uma congregacao parceira.',
+    title: 'Discurso fora',
+    description: 'Um orador local designado para atender uma congregacao parceira.',
   },
   {
     value: 'local',
@@ -209,15 +221,6 @@ function getSpeakerTypeForMovement(movementType: MovementType): SpeakerType {
   return movementType === 'incoming' ? 'visitor' : 'local'
 }
 
-function getMovementLabel(
-  assignment: FirestoreRecord<AssignmentDocument>,
-  congregationsById: Map<string, FirestoreRecord<CongregationDocument>>,
-) {
-  return getAssignmentMovementLabel(
-    inferAssignmentMovementType(assignment, congregationsById),
-  )
-}
-
 function buildCreateFormValues(
   movementType: MovementType,
   destinationId: string,
@@ -227,6 +230,197 @@ function buildCreateFormValues(
     localCongregationId: destinationId,
     status: movementType === 'local' ? 'confirmed' : 'pending',
   }
+}
+
+function isGoogleCalendarCandidateMovement(movementType: MovementType) {
+  return movementType === 'incoming' || movementType === 'outgoing'
+}
+
+function buildGoogleCalendarActionOwnerMapByCalendarEventId(
+  assignments: Array<FirestoreRecord<AssignmentDocument>>,
+) {
+  const sortedAssignments = [...assignments]
+    .sort((left, right) => {
+      const updatedAtDifference = right.updatedAt.toMillis() - left.updatedAt.toMillis()
+
+      if (updatedAtDifference !== 0) {
+        return updatedAtDifference
+      }
+
+      return right.createdAt.toMillis() - left.createdAt.toMillis()
+    })
+
+  return sortedAssignments.reduce((assignmentMap, assignment) => {
+    const existingAssignment = assignmentMap.get(assignment.calendarEventId)
+
+    if (!existingAssignment) {
+      assignmentMap.set(assignment.calendarEventId, assignment)
+      return assignmentMap
+    }
+
+    if (
+      !isAssignmentCoveringCalendarSlot(existingAssignment.status) &&
+      isAssignmentCoveringCalendarSlot(assignment.status)
+    ) {
+      assignmentMap.set(assignment.calendarEventId, assignment)
+    }
+
+    return assignmentMap
+  }, new Map<string, FirestoreRecord<AssignmentDocument>>())
+}
+
+function getGoogleCalendarSyncBadgeClassName(tone: GoogleCalendarSyncTone) {
+  if (tone === 'success') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+  }
+
+  if (tone === 'warning') {
+    return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200'
+  }
+
+  if (tone === 'error') {
+    return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  }
+
+  return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200'
+}
+
+function buildAssignmentSaveFeedbackMessage(baseMessage: string, movementType: MovementType) {
+  if (!isGoogleCalendarCandidateMovement(movementType)) {
+    return baseMessage
+  }
+
+  return `${baseMessage} Use "Sincronizar com agenda" quando quiser refletir isso no Google Calendar.`
+}
+
+function GoogleCalendarButtonMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M21 12.23c0-.72-.06-1.25-.19-1.8H12v3.4h5.18c-.1.85-.66 2.14-1.9 3l-.02.11 2.72 2.11.19.02c1.79-1.65 2.83-4.07 2.83-6.84Z" fill="#4285F4" />
+      <path d="M12 21c2.53 0 4.65-.84 6.2-2.28l-2.96-2.3c-.79.55-1.85.94-3.24.94-2.48 0-4.58-1.64-5.33-3.92l-.1.01-2.83 2.19-.04.1C5.24 18.82 8.37 21 12 21Z" fill="#34A853" />
+      <path d="M6.67 13.44A5.4 5.4 0 0 1 6.36 12c0-.5.09-.99.24-1.44l-.01-.12-2.87-2.23-.09.04A9 9 0 0 0 3 12c0 1.45.34 2.81.94 4.02l2.73-2.58Z" fill="#FBBC05" />
+      <path d="M12 6.64c1.76 0 2.95.76 3.62 1.39l2.64-2.58C16.64 3.95 14.53 3 12 3 8.37 3 5.24 5.18 3.84 8.26l2.97 2.3c.76-2.28 2.86-3.92 5.19-3.92Z" fill="#EA4335" />
+    </svg>
+  )
+}
+
+function getAssignmentGoogleCalendarSyncState(options: {
+  assignment: FirestoreRecord<AssignmentDocument>
+  calendarEvent: FirestoreRecord<CalendarEventDocument> | null
+  calendarSettingsEnabled: boolean
+  calendarSettingsUpdatedAt: Date | null
+  isLatestAssignmentForEvent: boolean
+  movementType: MovementType
+}): GoogleCalendarSyncState | null {
+  if (
+    !isGoogleCalendarCandidateMovement(options.movementType) ||
+    !options.isLatestAssignmentForEvent
+  ) {
+    return null
+  }
+
+  if (!options.calendarSettingsEnabled) {
+    return {
+      canRequestSync: false,
+      canShowAction: true,
+      description: 'Ative a integracao em Configuracoes antes de publicar este item no Google Calendar.',
+      label: 'Integracao desligada',
+      tone: 'warning',
+    }
+  }
+
+  if (!options.calendarEvent) {
+    return {
+      canRequestSync: false,
+      canShowAction: false,
+      description: 'O evento da agenda nao foi encontrado para esta designacao.',
+      label: 'Evento indisponivel',
+      tone: 'error',
+    }
+  }
+
+  const syncStatus = options.calendarEvent.googleCalendarSyncStatus ?? 'synced'
+  const hasRemoteEvent = Boolean(
+    options.calendarEvent.googleCalendarEventId &&
+      options.calendarEvent.googleCalendarCalendarId,
+  )
+  const manualRequestAt =
+    options.calendarEvent.googleCalendarManualSyncRequestedAt?.toMillis() ?? 0
+  const lastSyncAt = options.calendarEvent.googleCalendarSyncUpdatedAt?.toMillis() ?? 0
+  const lastRelevantChangeAt = Math.max(
+    options.calendarSettingsUpdatedAt?.getTime() ?? 0,
+    options.assignment.updatedAt.toMillis(),
+    options.calendarEvent.updatedAt.toMillis(),
+  )
+  const hasFreshManualRequest = manualRequestAt >= lastRelevantChangeAt
+  const isOperational = isAssignmentCoveringCalendarSlot(options.assignment.status)
+  const hasUnsyncedLocalChanges = !hasFreshManualRequest || lastRelevantChangeAt > lastSyncAt
+  const needsManualPublish = isOperational && (!hasRemoteEvent || hasUnsyncedLocalChanges)
+  const needsManualRemoval = !isOperational && hasRemoteEvent && hasUnsyncedLocalChanges
+
+  if (hasFreshManualRequest && syncStatus === 'pending') {
+    return {
+      canRequestSync: false,
+      canShowAction: true,
+      description: 'Este item ja entrou na fila manual e sera processado no proximo ciclo do worker.',
+      label: 'Na fila do Google Calendar',
+      tone: 'warning',
+    }
+  }
+
+  if (hasFreshManualRequest && syncStatus === 'error') {
+    return {
+      canRequestSync: true,
+      canShowAction: true,
+      description:
+        options.calendarEvent.googleCalendarSyncError?.trim() ||
+        'A ultima tentativa falhou. Revise e tente sincronizar novamente.',
+      label: 'Erro de sincronizacao',
+      tone: 'error',
+    }
+  }
+
+  if (needsManualRemoval) {
+    return {
+      canRequestSync: true,
+      canShowAction: true,
+      description: 'A agenda remota ainda precisa remover a publicacao anterior deste evento.',
+      label: 'Remocao pronta para sincronizar',
+      tone: 'warning',
+    }
+  }
+
+  if (needsManualPublish) {
+    return {
+      canRequestSync: true,
+      canShowAction: true,
+      description: hasRemoteEvent
+        ? 'O Google Calendar ainda nao recebeu esta atualizacao mais recente.'
+        : 'Esta designacao esta pronta para ser publicada manualmente na agenda.',
+      label: hasRemoteEvent
+        ? 'Atualizacao pronta para sincronizar'
+        : 'Pronto para sincronizar',
+      tone: 'neutral',
+    }
+  }
+
+  if (hasFreshManualRequest && hasRemoteEvent && syncStatus === 'synced') {
+    return {
+      canRequestSync: true,
+      canShowAction: true,
+      description: 'O Google Calendar ja esta alinhado com a versao atual deste item.',
+      label: 'Sincronizado com a agenda',
+      tone: 'success',
+    }
+  }
+
+  return null
 }
 
 export function AssignmentsPage() {
@@ -242,6 +436,7 @@ export function AssignmentsPage() {
   )
 
   const appSettingsQuery = useAppSettingsQuery()
+  const calendarSettingsQuery = useCalendarSettingsQuery()
   const activeYear = appSettingsQuery.data?.defaultYear ?? currentYear
   const assignmentsQuery = useAssignmentsByYearQuery(activeYear)
   const recentAssignmentsQuery = useRecentAssignmentsQuery(24)
@@ -252,6 +447,7 @@ export function AssignmentsPage() {
   const createAssignmentMutation = useCreateAssignmentMutation()
   const updateAssignmentMutation = useUpdateAssignmentMutation()
   const confirmAssignmentMutation = useConfirmAssignmentMutation()
+  const requestManualGoogleCalendarSyncMutation = useRequestManualGoogleCalendarSyncMutation()
 
   const assignments = useMemo(
     () =>
@@ -288,6 +484,10 @@ export function AssignmentsPage() {
     () => new Map((congregationsQuery.data ?? []).map((item) => [item.id, item])),
     [congregationsQuery.data],
   )
+  const calendarEventsById = useMemo(
+    () => new Map((calendarEventsQuery.data ?? []).map((item) => [item.id, item])),
+    [calendarEventsQuery.data],
+  )
   const speakersById = useMemo(
     () => new Map((speakersQuery.data ?? []).map((item) => [item.id, item])),
     [speakersQuery.data],
@@ -298,6 +498,10 @@ export function AssignmentsPage() {
   )
   const operationalAssignmentMap = useMemo(
     () => buildOperationalAssignmentMapByCalendarEventId(assignments),
+    [assignments],
+  )
+  const googleCalendarActionOwnerByCalendarEventId = useMemo(
+    () => buildGoogleCalendarActionOwnerMapByCalendarEventId(assignments),
     [assignments],
   )
   const localCongregations = useMemo(
@@ -527,12 +731,14 @@ export function AssignmentsPage() {
   const isSubmitting =
     createAssignmentMutation.isPending ||
     updateAssignmentMutation.isPending ||
-    confirmAssignmentMutation.isPending
+    confirmAssignmentMutation.isPending ||
+    requestManualGoogleCalendarSyncMutation.isPending
 
   const totalQueryErrors = [
     assignmentsQuery.error,
     recentAssignmentsQuery.error,
     calendarEventsQuery.error,
+    calendarSettingsQuery.error,
     congregationsQuery.error,
     speakersQuery.error,
     themesQuery.error,
@@ -727,10 +933,12 @@ export function AssignmentsPage() {
 
         setFeedback({
           tone: 'success',
-          message:
+          message: buildAssignmentSaveFeedbackMessage(
             values.status === 'confirmed'
               ? 'Designacao atualizada e confirmada com sucesso.'
               : 'Designacao atualizada com sucesso.',
+            movementType,
+          ),
         })
       } else {
         await createAssignmentMutation.mutateAsync({
@@ -741,11 +949,14 @@ export function AssignmentsPage() {
 
         setFeedback({
           tone: 'success',
-          message: willReplaceCurrentAssignment
-            ? 'Nova designacao criada e a anterior foi marcada como substituida.'
-            : values.status === 'confirmed'
-              ? 'Designacao criada ja como confirmada.'
-              : 'Designacao criada com sucesso.',
+          message: buildAssignmentSaveFeedbackMessage(
+            willReplaceCurrentAssignment
+              ? 'Nova designacao criada e a anterior foi marcada como substituida.'
+              : values.status === 'confirmed'
+                ? 'Designacao criada ja como confirmada.'
+                : 'Designacao criada com sucesso.',
+            movementType,
+          ),
         })
       }
 
@@ -776,6 +987,8 @@ export function AssignmentsPage() {
     setFeedback(null)
 
     try {
+      const assignmentToConfirm = assignments.find((assignment) => assignment.id === id)
+
       await confirmAssignmentMutation.mutateAsync({
         id,
         actorUid: user.uid,
@@ -794,7 +1007,12 @@ export function AssignmentsPage() {
 
       setFeedback({
         tone: 'success',
-        message: 'Designacao confirmada com sucesso.',
+        message: buildAssignmentSaveFeedbackMessage(
+          'Designacao confirmada com sucesso.',
+          assignmentToConfirm
+            ? inferAssignmentMovementType(assignmentToConfirm, congregationsById)
+            : 'local',
+        ),
       })
     } catch (error) {
       setFeedback({
@@ -846,7 +1064,50 @@ export function AssignmentsPage() {
 
       setFeedback({
         tone: 'success',
-        message: 'Designacao cancelada com sucesso.',
+        message: buildAssignmentSaveFeedbackMessage(
+          'Designacao cancelada com sucesso.',
+          inferAssignmentMovementType(assignment, congregationsById),
+        ),
+      })
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: getErrorMessage(error),
+      })
+    }
+  }
+
+  async function handleRequestManualGoogleCalendarSync(
+    assignment: FirestoreRecord<AssignmentDocument>,
+  ) {
+    if (!user) {
+      setFeedback({
+        tone: 'error',
+        message: 'Sua sessao expirou. Entre novamente para continuar.',
+      })
+      return
+    }
+
+    if (!calendarSettingsQuery.data?.enabled) {
+      setFeedback({
+        tone: 'error',
+        message: 'Ative a integracao do Google Calendar em Configuracoes antes de sincronizar.',
+      })
+      return
+    }
+
+    setFeedback(null)
+
+    try {
+      await requestManualGoogleCalendarSyncMutation.mutateAsync({
+        actorUid: user.uid,
+        actorName,
+        calendarEventId: assignment.calendarEventId,
+      })
+
+      setFeedback({
+        tone: 'success',
+        message: 'Evento enviado para a fila manual do Google Calendar. O worker vai processar no proximo ciclo.',
       })
     } catch (error) {
       setFeedback({
@@ -865,8 +1126,8 @@ export function AssignmentsPage() {
               <CardTitle className="text-3xl">Designacoes</CardTitle>
               <CardDescription className="mt-2 text-base">
                 A Fase 8 libera operacao real em `assignments` para entrada de
-                visitantes, saida de locais, status, observacoes e confirmacao
-                manual.
+                oradores visitantes, discursos fora, status, observacoes,
+                confirmacao manual e envio controlado para o Google Calendar.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -924,7 +1185,7 @@ export function AssignmentsPage() {
                 <CardDescription>
                   {editingAssignment
                     ? 'Atualize status, observacoes, destino, tema e confirmacoes mantendo o historico oficial.'
-                    : 'Monte uma nova entrada de visitante ou saida local sem sair do schema oficial.'}
+                    : 'Monte um novo orador visitante ou discurso fora sem sair do schema oficial. A publicacao na agenda externa fica manual pelo botao da lista.'}
                 </CardDescription>
               </div>
               {editingAssignment ? (
@@ -1114,7 +1375,7 @@ export function AssignmentsPage() {
                         : 'Cadastre ao menos uma congregacao local ativa para registrar entradas ou designacoes locais.'
                       : !hasSpeakerOptions
                         ? movementType === 'incoming'
-                          ? 'Cadastre ao menos um orador visitante ativo para registrar entradas.'
+                          ? 'Cadastre ao menos um orador visitante ativo para registrar esse tipo de designacao.'
                           : 'Cadastre ao menos um orador local ativo para registrar esta operacao.'
                         : 'Selecione um orador com temas ativos para concluir a designacao.'}
                 </div>
@@ -1141,8 +1402,9 @@ export function AssignmentsPage() {
                   </p>
                   <p className="mt-2">
                     A designacao pode ser salva, mas a automacao da Fase 11 nao
-                    conseguira enviar confirmacao nem lembretes ate que o cadastro
-                    seja atualizado.
+                    conseguira enviar confirmacao nem lembretes, e a Fase 12 nao
+                    conseguira adicionar o orador como convidado no Google Calendar
+                    ate que o cadastro seja atualizado.
                   </p>
                 </div>
               ) : null}
@@ -1265,8 +1527,8 @@ export function AssignmentsPage() {
                 }
               >
                 <option value="all">Todos os movimentos</option>
-                <option value="incoming">Entradas de visitante</option>
-                <option value="outgoing">Saidas locais</option>
+                <option value="incoming">Oradores visitantes</option>
+                <option value="outgoing">Discursos fora</option>
                 <option value="local">Designacoes locais</option>
               </select>
               <select
@@ -1313,11 +1575,31 @@ export function AssignmentsPage() {
             filteredAssignments.length > 0 ? (
               <div className="space-y-3">
                 {filteredAssignments.map((assignment) => {
-                  const movementLabel = getMovementLabel(assignment, congregationsById)
+                  const movementTypeForAssignment = inferAssignmentMovementType(
+                    assignment,
+                    congregationsById,
+                  )
+                  const movementLabel = getAssignmentMovementLabel(
+                    movementTypeForAssignment,
+                  )
                   const theme = themesById.get(assignment.themeId)
                   const hasQuickConfirm = assignment.status === 'pending'
                   const canQuickCancel =
                     assignment.status === 'pending' || assignment.status === 'confirmed'
+                  const linkedCalendarEvent =
+                    calendarEventsById.get(assignment.calendarEventId) ?? null
+                  const isLatestAssignmentForEvent =
+                    googleCalendarActionOwnerByCalendarEventId.get(assignment.calendarEventId)?.id ===
+                    assignment.id
+                  const googleCalendarSyncState = getAssignmentGoogleCalendarSyncState({
+                    assignment,
+                    calendarEvent: linkedCalendarEvent,
+                    calendarSettingsEnabled: calendarSettingsQuery.data?.enabled ?? false,
+                    calendarSettingsUpdatedAt:
+                      calendarSettingsQuery.data?.configurationUpdatedAt?.toDate() ?? null,
+                    isLatestAssignmentForEvent,
+                    movementType: movementTypeForAssignment,
+                  })
 
                   return (
                     <div
@@ -1410,10 +1692,40 @@ export function AssignmentsPage() {
                                 </span>
                               ) : null}
                             </div>
+
+                            {googleCalendarSyncState ? (
+                              <div
+                                className={`rounded-[18px] border px-4 py-4 ${getGoogleCalendarSyncBadgeClassName(
+                                  googleCalendarSyncState.tone,
+                                )}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <GoogleCalendarButtonMark />
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {googleCalendarSyncState.label}
+                                    </p>
+                                    <p className="mt-1 text-sm leading-6">
+                                      {googleCalendarSyncState.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
 
                         <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                          {googleCalendarSyncState?.canShowAction ? (
+                            <Button
+                              variant="outline"
+                              onClick={() => handleRequestManualGoogleCalendarSync(assignment)}
+                              disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
+                            >
+                              <GoogleCalendarButtonMark />
+                              Sincronizar com agenda
+                            </Button>
+                          ) : null}
                           {hasQuickConfirm ? (
                             <Button
                               onClick={() => handleQuickConfirm(assignment.id)}

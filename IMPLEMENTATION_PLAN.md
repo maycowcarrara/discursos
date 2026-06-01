@@ -22,13 +22,17 @@
 * FASE 10 — Histórico
 * FASE 11 — EmailJS
 
-## Fase atual concluída
+## Última fase concluída
 
 * FASE 11 — EmailJS
 
-## Próxima etapa obrigatória
+## Fase atual em andamento
 
 * FASE 12 — Google Calendar
+
+## Próxima etapa obrigatória
+
+* Concluir a FASE 12 — Google Calendar
 
 ## Entregas já realizadas
 
@@ -158,14 +162,34 @@
 * confirmação pública por link em rota do frontend, com fluxo validado para desktop e mobile
 * worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
 * confirmação pública grava `confirmedAt`, `responseAt` e auditoria no Firestore após validação do token
+* confirmação pública protegida com precondition do Firestore para não reativar designação já substituída em paralelo
 * autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
 * template único do EmailJS reaproveitado para confirmação e lembretes com parâmetros padronizados
+* sincronização da fila preservando estado já processado quando a identidade de entrega não muda, e reabrindo o ciclo apenas quando a entrega realmente muda
 * scripts `test:notifications`, `typecheck:worker`, `deploy:worker` e `worker:deploy` adicionados para a operação da fase
+
+### Google Calendar — início da Fase 12
+
+* `settings/calendar` passa a ser documento real do Firestore para ativação da integração, `calendarId`, horário padrão e duração padrão
+* `calendarEvents` passa a armazenar o vínculo remoto com Google Calendar e o estado oficial de sincronização
+* mudanças em `calendarEvents` continuam podendo marcar pendências técnicas, enquanto `assignments` operacionais passam a depender de solicitação manual pelo botão `Sincronizar com agenda`
+* a última aprovação manual passa a ficar registrada em `calendarEvents.googleCalendarManualSyncRequestedAt`, para que publicação, atualização ou remoção operacional não aconteçam sem novo clique
+* `settings/calendar.configurationUpdatedAt` passa a distinguir alteração real de configuração dos ciclos internos do worker
+* o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account já adotada na Fase 11
+* a tela de configurações passa a exibir a configuração e o último estado global de sincronização da Fase 12
+* o Google Calendar deixa de espelhar slots vazios e passa a publicar apenas `orador visitante`, `discurso fora` e `evento especial`
+* quando o cadastro em `speakers` tiver `email`, o orador envolvido entra como convidado em `orador visitante` e `discurso fora`, com convites, updates e cancelamentos enviados pelo Google Calendar
+
+Impacto técnico desta abertura de fase:
+
+* não foi criada coleção nova para fila paralela de calendário
+* o vínculo remoto fica no próprio `calendarEvents`, reduzindo leituras e evitando mapeamentos duplicados
+* `settings/calendar` concentra a configuração operacional e o status global da integração
 
 Regra de manutenção desta documentação:
 
 * sempre atualizar esta seção quando uma fase for concluída
-* sempre deixar explícita a próxima fase obrigatória
+* sempre deixar explícitas a fase atual e a próxima fase obrigatória
 
 ---
 
@@ -626,6 +650,16 @@ Entregas realizadas:
 * segredos mantidos fora do frontend, via variáveis do worker e service account do Firebase
 * template único do EmailJS alimentado por `email_subject`, `to_email`, `reply_to`, `notification_type_label`, `organization_name`, `speaker_name`, `event_date`, `event_type_label`, `local_congregation_name`, `origin_congregation_name`, `theme_number`, `theme_title`, `status_label`, `notes` e `confirmation_url`
 
+Fluxo operacional oficial da Fase 11:
+
+* `pending`: gera `confirmation`, `reminder7d` e `reminder1d` em `notifications` quando a designação continua operacional, o evento ainda não passou e existe e-mail válido
+* `confirmed`: mantém lembretes futuros ativos e encerra a automação de confirmação
+* `declined`, `cancelled` e `replaced`: encerram as automações pendentes da designação, preservando o histórico
+* edição sem mudança real de entrega preserva status já processado da notificação, evitando reenvio indevido
+* edição com mudança real de entrega reinicia o ciclo da notificação correspondente
+* o worker faz `claim` temporário da notificação antes de enviar para reduzir duplicidade em concorrência
+* retentativas usam novo `scheduledFor`; após o limite, a notificação passa para `failed`
+
 IMPORTANTE:
 
 Não expor chaves sensíveis no frontend.
@@ -636,14 +670,24 @@ Não expor chaves sensíveis no frontend.
 
 Status atual:
 
-* Próxima fase obrigatória
+* Em andamento
 
 Implementar:
 
-* criação automática
-* atualização
-* exclusão
-* sincronização
+* publicação manual por botão `Sincronizar com agenda`
+* atualização manual com processamento por fila do worker
+* remoção manual com processamento por fila do worker
+* sincronização segura via cron e trigger interno
+
+Entregas iniciadas nesta fase:
+
+* `settings/calendar` com persistência real para `enabled`, `calendarId`, horário padrão e duração padrão
+* estado de sincronização do Google Calendar registrado diretamente em `calendarEvents`
+* publicação manual de designações operacionais por botão `Sincronizar com agenda`, sem envio automático ao Google Calendar logo após salvar
+* aprovação manual persistida no próprio `calendarEvents`, impedindo republicação operacional sem novo pedido
+* alinhamento entre UI e worker para usar a designação operacional vigente como referência da ação manual
+* worker preparado para criar, atualizar e excluir eventos no Google Calendar por cron e trigger interno
+* calendário remoto restrito a eventos operacionais reais, sem publicar sábados vazios
 
 ---
 
