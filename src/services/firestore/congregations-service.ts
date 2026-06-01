@@ -25,7 +25,6 @@ export type CongregationFormValues = {
   address: string
   city: string
   state: string
-  zipCode: string
   mapsUrl: string
   meetingDay: string
   meetingTime: string
@@ -54,7 +53,6 @@ export const defaultCongregationFormValues: CongregationFormValues = {
   address: '',
   city: '',
   state: '',
-  zipCode: '',
   mapsUrl: '',
   meetingDay: '',
   meetingTime: '',
@@ -71,16 +69,6 @@ function getCongregationRef(id: string) {
   return doc(firebaseDb, 'congregations', id)
 }
 
-function normalizeZipCode(zipCode: string) {
-  const digitsOnly = zipCode.replace(/\D/g, '')
-
-  if (digitsOnly.length === 8) {
-    return `${digitsOnly.slice(0, 5)}-${digitsOnly.slice(5)}`
-  }
-
-  return zipCode.trim()
-}
-
 function buildCongregationPayload(
   values: CongregationFormValues,
 ): Omit<
@@ -92,7 +80,6 @@ function buildCongregationPayload(
     address: values.address.trim(),
     city: values.city.trim(),
     state: values.state.trim().toUpperCase(),
-    zipCode: normalizeZipCode(values.zipCode),
     mapsUrl: values.mapsUrl.trim(),
     meetingDay: values.meetingDay.trim(),
     meetingTime: values.meetingTime.trim(),
@@ -162,7 +149,6 @@ export function toCongregationFormValues(
     address: congregation.address,
     city: congregation.city,
     state: congregation.state,
-    zipCode: congregation.zipCode,
     mapsUrl: congregation.mapsUrl,
     meetingDay: congregation.meetingDay,
     meetingTime: congregation.meetingTime,

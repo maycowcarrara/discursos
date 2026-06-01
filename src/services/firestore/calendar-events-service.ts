@@ -27,6 +27,11 @@ import {
   parseDateInputValue,
   toLocalDateKey,
 } from '@/utils/calendar-events'
+import {
+  buildCalendarEventsManagementView,
+  getImplicitCalendarEventId,
+  mergeCalendarEventsWithImplicitSaturdaySlots,
+} from '@/services/firestore/calendar-slots-service'
 
 import { appendAuditLogToBatch } from './audit-logs-service'
 import {
@@ -88,12 +93,8 @@ function getCalendarEventRef(id: string) {
   return doc(firebaseDb, 'calendarEvents', id)
 }
 
-function getActiveCalendarEventDocumentId(dateKey: string) {
-  return `active-${dateKey}`
-}
-
 function getActiveCalendarEventRef(dateKey: string) {
-  return getCalendarEventRef(getActiveCalendarEventDocumentId(dateKey))
+  return getCalendarEventRef(getImplicitCalendarEventId(dateKey))
 }
 
 function buildAuditLogDocument(
@@ -292,13 +293,15 @@ export async function listCalendarEventsByYear(
 ): Promise<Array<FirestoreRecord<CalendarEventDocument>>> {
   const calendarEvents = await listCalendarEventsForYear(year)
 
-  return calendarEvents.filter((event) => event.isActive)
+  return mergeCalendarEventsWithImplicitSaturdaySlots(year, calendarEvents)
 }
 
 export async function listCalendarEventsByYearForManagement(
   year: number,
 ): Promise<Array<FirestoreRecord<CalendarEventDocument>>> {
-  return listCalendarEventsForYear(year)
+  const calendarEvents = await listCalendarEventsForYear(year)
+
+  return buildCalendarEventsManagementView(year, calendarEvents)
 }
 
 export async function createCalendarEvent({
@@ -572,8 +575,10 @@ export async function generateCalendarYear({
   actorName,
   actorUid,
 }: GenerateCalendarYearInput) {
-  const existingEvents = await listCalendarEventsByYear(year)
-  const activeDateKeys = new Set(existingEvents.map((event) => toLocalDateKey(event.date)))
+  const existingEvents = await listCalendarEventsForYear(year)
+  const activeDateKeys = new Set(
+    existingEvents.filter((event) => event.isActive).map((event) => toLocalDateKey(event.date)),
+  )
   const saturdayDates = listSaturdayDateValuesForYear(year)
   const missingSaturdayDates = saturdayDates.filter(
     (dateValue) => !activeDateKeys.has(dateValue),

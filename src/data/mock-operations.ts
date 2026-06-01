@@ -303,7 +303,7 @@ export const themeCards = [
 export const settingsCards = [
   {
     title: 'Aplicacao',
-    detail: 'Ano base configuravel e locale pt-BR.',
+    detail: 'Ano base configuravel usado nas telas administrativas.',
   },
   {
     title: 'Notificacoes',

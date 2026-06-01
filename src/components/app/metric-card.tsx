@@ -30,7 +30,7 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        'rounded-[24px] border border-border/70 bg-card px-4 py-4 shadow-[0_18px_34px_-26px_rgba(15,23,42,0.2)] dark:shadow-[0_20px_42px_-28px_rgba(2,8,23,0.84)]',
+        'rounded-[18px] border border-border/70 bg-card px-4 py-4 shadow-[0_12px_26px_-20px_rgba(15,23,42,0.18)] dark:shadow-[0_14px_30px_-22px_rgba(2,8,23,0.82)]',
         className,
       )}
     >
@@ -44,7 +44,7 @@ export function MetricCard({
         {Icon ? (
           <div
             className={cn(
-              'flex size-11 items-center justify-center rounded-2xl',
+              'flex size-10 items-center justify-center rounded-xl',
               toneClasses[tone],
             )}
           >

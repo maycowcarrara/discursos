@@ -99,7 +99,7 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(29,78,216,0.14),transparent_34%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(239,244,255,0.92))] px-4 py-8 dark:bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_30%),linear-gradient(180deg,rgba(2,6,23,0.96),rgba(9,15,32,0.98))]">
-      <section className="w-full max-w-md overflow-hidden rounded-[30px] border border-slate-200/80 bg-[rgba(255,255,255,0.88)] shadow-[0_32px_80px_-42px_rgba(15,23,42,0.3)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(15,23,42,0.72)]">
+      <section className="w-full max-w-md overflow-hidden rounded-[22px] border border-slate-200/80 bg-[rgba(255,255,255,0.88)] shadow-[0_22px_54px_-34px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(15,23,42,0.72)]">
         <div className="border-b border-sidebar-border/70 bg-[linear-gradient(180deg,#0a1d43,#102754_42%,#0c1c3f)] px-6 py-6 text-white">
           <Badge className="rounded-full border-white/10 bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/10">
             Painel administrativo
@@ -116,7 +116,7 @@ export function LoginPage() {
         </div>
 
         {authError ? (
-          <div className="mx-5 mt-5 rounded-[20px] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="mx-5 mt-5 rounded-[16px] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {authError}
           </div>
         ) : null}

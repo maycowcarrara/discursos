@@ -125,11 +125,6 @@ type NotificationRecord = {
   type: NotificationType
 }
 
-type SettingsRecord = {
-  locale: string
-  organizationName: string
-}
-
 type AdminAccessSettingsRecord = {
   adminEmails: string[]
   createdAt: Date | null
@@ -631,7 +626,6 @@ async function buildAssignmentPreview(
 
 async function processDueNotifications(env: Env) {
   const dueNotifications = await listDueNotifications(env)
-  const settings = await getSettingsRecord(env)
   const summary = {
     cancelled: 0,
     failed: 0,
@@ -649,7 +643,7 @@ async function processDueNotifications(env: Env) {
 
     summary.processed += 1
 
-    const result = await processSingleNotification(env, settings, notification)
+    const result = await processSingleNotification(env, notification)
 
     if (result === 'sent') {
       summary.sent += 1
@@ -703,10 +697,7 @@ async function processPendingCalendarSync(env: Env) {
     'Processando eventos pendentes do Google Calendar.',
   )
 
-  const [settings, pendingCalendarEvents] = await Promise.all([
-    getSettingsRecord(env),
-    listPendingCalendarEvents(env),
-  ])
+  const pendingCalendarEvents = await listPendingCalendarEvents(env)
   const congregationCache = new Map<string, CongregationRecord | null>()
   const speakerCache = new Map<string, SpeakerRecord | null>()
 
@@ -730,7 +721,6 @@ async function processPendingCalendarSync(env: Env) {
 
     const result = await processSingleCalendarEventSync(
       env,
-      settings,
       calendarSettings,
       claimedCalendarEvent,
       congregationCache,
@@ -770,7 +760,6 @@ async function processPendingCalendarSync(env: Env) {
 
 async function processSingleCalendarEventSync(
   env: Env,
-  settings: SettingsRecord,
   calendarSettings: CalendarSettingsRecord,
   calendarEvent: CalendarEventRecord,
   congregationCache: Map<string, CongregationRecord | null>,
@@ -888,7 +877,6 @@ async function processSingleCalendarEventSync(
     }
 
     const eventPayload = buildGoogleCalendarEventPayload(
-      settings,
       calendarSettings,
       calendarEvent,
       syncEntry,
@@ -973,7 +961,6 @@ async function processSingleCalendarEventSync(
 
 async function processSingleNotification(
   env: Env,
-  settings: SettingsRecord,
   notification: NotificationRecord,
 ): Promise<NotificationProcessResult> {
   const wasClaimed = await claimNotificationForProcessing(env, notification)
@@ -1028,7 +1015,7 @@ async function processSingleNotification(
     return 'cancelled'
   }
 
-  const emailResponse = await sendEmail(env, settings, notification, assignment)
+  const emailResponse = await sendEmail(env, notification, assignment)
 
   if (emailResponse.ok) {
     await markNotificationSent(env, notification)
@@ -1162,7 +1149,6 @@ function shouldProcessOperationalCalendarSync(
 }
 
 function buildGoogleCalendarEventPayload(
-  settings: SettingsRecord,
   calendarSettings: CalendarSettingsRecord,
   calendarEvent: CalendarEventRecord,
   syncEntry: CalendarSyncEntry,
@@ -1178,7 +1164,6 @@ function buildGoogleCalendarEventPayload(
   return {
     attendees: buildGoogleCalendarAttendees(syncEntry),
     description: buildGoogleCalendarDescription(
-      settings,
       calendarSettings,
       calendarEvent,
       syncEntry,
@@ -1228,15 +1213,18 @@ function buildGoogleCalendarSummary(
 }
 
 function buildGoogleCalendarDescription(
-  settings: SettingsRecord,
   calendarSettings: CalendarSettingsRecord,
   calendarEvent: CalendarEventRecord,
   syncEntry: CalendarSyncEntry,
 ) {
   const meetingTime = syncEntry.congregation?.meetingTime.trim() || calendarSettings.defaultStartTime
-  const locationName = syncEntry.congregation?.name?.trim() || calendarEvent.congregationName?.trim() || settings.organizationName
+  const organizationName = resolveOrganizationName(calendarEvent, syncEntry)
+  const locationName =
+    syncEntry.congregation?.name?.trim() ||
+    calendarEvent.congregationName?.trim() ||
+    organizationName
   const lines = [
-    `Organizacao: ${settings.organizationName}`,
+    `Congregacao local: ${organizationName}`,
     `Tipo: ${getCalendarSyncKindLabel(syncEntry.kind)}`,
     `Local: ${locationName}`,
     `Hora da reuniao: ${meetingTime}`,
@@ -1263,6 +1251,31 @@ function buildGoogleCalendarDescription(
   }
 
   return lines.join('\n')
+}
+
+function resolveOrganizationName(
+  calendarEvent: CalendarEventRecord,
+  syncEntry: CalendarSyncEntry,
+) {
+  const assignmentOrganizationName = syncEntry.assignment?.localCongregationName.trim()
+
+  if (assignmentOrganizationName) {
+    return assignmentOrganizationName
+  }
+
+  const syncCongregationName = syncEntry.congregation?.name.trim()
+
+  if (syncCongregationName) {
+    return syncCongregationName
+  }
+
+  const calendarCongregationName = calendarEvent.congregationName?.trim()
+
+  if (calendarCongregationName) {
+    return calendarCongregationName
+  }
+
+  return 'Congregacao local'
 }
 
 function buildGoogleCalendarLocation(
@@ -1439,13 +1452,9 @@ async function deleteGoogleCalendarEvent(
   }
 }
 
-async function sendEmail(
-  env: Env,
-  settings: SettingsRecord,
-  notification: NotificationRecord,
-  assignment: AssignmentRecord,
-) {
+async function sendEmail(env: Env, notification: NotificationRecord, assignment: AssignmentRecord) {
   const confirmationUrl = buildConfirmationUrl(env, assignment)
+  const organizationName = assignment.localCongregationName.trim() || 'Congregacao local'
   const response = await fetch(emailJsSendUrl, {
     method: 'POST',
     headers: {
@@ -1458,15 +1467,12 @@ async function sendEmail(
       template_params: {
         email_subject: notification.subject,
         confirmation_url: confirmationUrl,
-        event_date: formatEventDateLabel(
-          assignment.eventDate,
-          settings.locale,
-        ),
+        event_date: formatEventDateLabel(assignment.eventDate, defaultLocale),
         event_type_label: eventTypeLabels[assignment.eventType] ?? assignment.eventType,
         local_congregation_name: assignment.localCongregationName,
         notes: assignment.notes,
         notification_type_label: notificationTypeLabels[notification.type],
-        organization_name: settings.organizationName,
+        organization_name: organizationName,
         origin_congregation_name: assignment.originCongregationName,
         reply_to: '',
         speaker_name: assignment.speakerName,
@@ -1814,22 +1820,6 @@ async function resolveCalendarSyncCongregation(
     meetingTime: '',
     name: congregationName.trim(),
     state: '',
-  }
-}
-
-async function getSettingsRecord(env: Env): Promise<SettingsRecord> {
-  const document = await getDocument(env, 'settings/app')
-
-  if (!document) {
-    return {
-      locale: defaultLocale,
-      organizationName: 'Organizacao',
-    }
-  }
-
-  return {
-    locale: getStringField(document, 'locale') ?? defaultLocale,
-    organizationName: getStringField(document, 'organizationName') ?? 'Organizacao',
   }
 }
 

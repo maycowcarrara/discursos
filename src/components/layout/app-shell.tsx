@@ -19,7 +19,7 @@ export function AppShell() {
         </div>
 
         <PageHeaderProvider>
-          <div className="app-surface relative min-w-0 overflow-hidden border border-border/75 shadow-[0_30px_70px_-42px_rgba(15,23,42,0.18)] lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:rounded-[30px]">
+          <div className="app-surface relative min-w-0 overflow-hidden border border-border/75 shadow-[0_20px_46px_-30px_rgba(15,23,42,0.16)] lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:rounded-[24px]">
             <AppTopbar onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
 
             <main className="px-3 py-4 pb-28 md:px-5 md:py-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5 lg:pb-6">

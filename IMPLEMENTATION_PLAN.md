@@ -81,7 +81,7 @@
 * tipagem TypeScript estrita das coleções oficiais
 * base `services/firestore` criada
 * hooks reutilizáveis com TanStack Query para leitura inicial
-* leitura e escrita inicial de `settings/app`
+* leitura e escrita inicial de `settings/app` com foco no ano padrão do painel
 * páginas de `congregations`, `themes` e `speakers` conectadas ao Firestore em modo leitura
 
 ### Firestore — avanço da Fase 3
@@ -389,7 +389,7 @@ Criar:
 
 Entregas desta fase:
 
-* `settings/app` com leitura e salvamento real
+* `settings/app` com leitura e salvamento real do ano padrão do painel
 * `congregations`, `themes` e `speakers` em leitura real
 * validação de documentos via tipagem estrita no frontend
 * `calendarEvents` em leitura real por ano
@@ -424,7 +424,6 @@ Campos:
 * endereço
 * cidade
 * estado
-* CEP
 * mapsUrl
 * meetingDay
 * meetingTime
@@ -452,6 +451,7 @@ Entregas realizadas:
 * proteção contra exclusão ou conversão da congregação local fixa
 * bloqueio de exclusão quando houver oradores vinculados
 * geração de auditoria para create, update e delete
+* remoção do campo `CEP` da UI e do schema oficial por não ter utilidade operacional nesta V1
 
 ---
 
@@ -566,7 +566,8 @@ Entregas realizadas:
 * CRUD administrativo real de `calendarEvents` com validação estrita
 * suporte aos tipos `publicTalk`, `congress`, `assembly`, `visit` e `special`
 * bloqueio automático de designações em congressos e assembleias
-* visão anual por mês com indicação de eventos já designados
+* visão anual por mês com renderização implícita dos sábados regulares, mesmo sem documento salvo
+* `calendarEvents` passa a representar exceções, bloqueios e personalizações do dia, além dos slots materializados sob demanda
 * exclusão lógica com preservação administrativa do histórico do calendário
 * auditoria para create, update e delete
 

@@ -1,7 +1,7 @@
 {
   "name": "discursos",
   "private": true,
-  "version": "1.0.8",
+  "version": "1.0.11",
   "type": "module",
   "scripts": {
     "dev": "node scripts/bump-version.mjs && vite",
@@ -16,6 +16,7 @@
     "verify": "npm run typecheck && npm run typecheck:worker && npm run lint && npm run test:history && npm run test:dashboard && npm run test:notifications && npm run test:calendar-sync && npm run build",
     "admin:grant": "node scripts/set-firebase-admin-claim.mjs",
     "admin:bootstrap": "node scripts/bootstrap-admin-access.mjs",
+    "congregations:remove-zip-code": "node scripts/remove-congregation-zip-code.mjs",
     "preview": "vite preview",
     "deploy:worker": "npm run typecheck:worker && npm run test:calendar-sync && npx wrangler deploy --config workers/email-automation/wrangler.jsonc",
     "worker:deploy": "npm run deploy:worker",

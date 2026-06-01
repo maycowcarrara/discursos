@@ -22,11 +22,11 @@ export function AppSidebar({ mobile = false, onNavigate }: AppSidebarProps) {
       className={cn(
         'flex h-full flex-col overflow-hidden border-sidebar-border/80 bg-[linear-gradient(180deg,#0a1d43,#102754_42%,#0c1c3f)] p-3 text-white shadow-[0_28px_64px_-36px_rgba(8,18,43,0.92)]',
         mobile
-          ? 'w-full rounded-[30px] border'
-          : 'h-full min-h-0 rounded-[26px] border',
+          ? 'w-full rounded-[24px] border'
+          : 'h-full min-h-0 rounded-[22px] border',
       )}
     >
-      <div className="rounded-[20px] border border-white/10 bg-white/8 px-3 py-3.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+      <div className="rounded-[16px] border border-white/10 bg-white/8 px-3 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
         <div className="flex items-center gap-2.5">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-white/12 text-white">
             <MicVocal className="size-4.5" />

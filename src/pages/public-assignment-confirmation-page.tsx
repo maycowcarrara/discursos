@@ -182,7 +182,7 @@ export function PublicAssignmentConfirmationPage() {
     <div className="min-h-screen bg-transparent px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-5xl items-center">
         <div className="grid w-full gap-5 lg:grid-cols-[0.92fr_1.08fr]">
-          <section className="rounded-[32px] border border-sidebar-border/80 bg-[linear-gradient(180deg,rgba(10,26,58,0.995),rgba(14,30,66,0.995) 42%,rgba(10,22,49,1))] p-6 text-white shadow-[0_30px_70px_-42px_rgba(8,18,43,0.78)]">
+          <section className="rounded-[24px] border border-sidebar-border/80 bg-[linear-gradient(180deg,rgba(10,26,58,0.995),rgba(14,30,66,0.995) 42%,rgba(10,22,49,1))] p-6 text-white shadow-[0_20px_48px_-30px_rgba(8,18,43,0.72)]">
             <div className="inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white uppercase">
               Confirmação por link
             </div>
@@ -195,13 +195,13 @@ export function PublicAssignmentConfirmationPage() {
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[20px] border border-white/8 bg-white/6 px-4 py-4">
+              <div className="rounded-[16px] border border-white/8 bg-white/6 px-4 py-3.5">
                 <p className="text-sm font-medium text-white">Leitura rápida</p>
                 <p className="mt-2 text-sm leading-6 text-white/68">
                   Orador, data, congregação e tema ficam visíveis antes da confirmação.
                 </p>
               </div>
-              <div className="rounded-[20px] border border-white/8 bg-white/6 px-4 py-4">
+              <div className="rounded-[16px] border border-white/8 bg-white/6 px-4 py-3.5">
                 <p className="text-sm font-medium text-white">Status confiável</p>
                 <p className="mt-2 text-sm leading-6 text-white/68">
                   Se a programação já mudou, o painel avisa e impede uma confirmação fora de contexto.
@@ -210,7 +210,7 @@ export function PublicAssignmentConfirmationPage() {
             </div>
           </section>
 
-          <Card className="rounded-[32px] border-border/80 bg-card/95 shadow-[0_30px_70px_-50px_rgba(15,23,42,0.3)]">
+          <Card className="rounded-[24px] border-border/80 bg-card/95 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.24)]">
             <CardHeader className="gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -233,14 +233,14 @@ export function PublicAssignmentConfirmationPage() {
                   {Array.from({ length: 3 }, (_, index) => (
                     <div
                       key={index}
-                      className="h-24 animate-pulse rounded-[22px] border border-border/70 bg-background/70"
+                      className="h-24 animate-pulse rounded-[18px] border border-border/70 bg-background/70"
                     />
                   ))}
                 </div>
               ) : null}
 
               {!requestState.isLoading && requestState.error ? (
-                <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm leading-6 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                <div className="rounded-[18px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {requestState.error}
                 </div>
               ) : null}
@@ -249,7 +249,7 @@ export function PublicAssignmentConfirmationPage() {
                 <>
                   <div
                     className={[
-                      'rounded-[24px] border px-5 py-5',
+                      'rounded-[18px] border px-5 py-4',
                       tone === 'success'
                         ? 'border-emerald-200 bg-emerald-50/90 dark:border-emerald-500/20 dark:bg-emerald-500/10'
                         : tone === 'pending'
@@ -278,7 +278,7 @@ export function PublicAssignmentConfirmationPage() {
 
                   {requestState.payload.assignment ? (
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[20px] border border-border/70 bg-background/80 px-4 py-4">
+                      <div className="rounded-[16px] border border-border/70 bg-background/80 px-4 py-3.5">
                         <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                           Orador
                         </p>
@@ -291,7 +291,7 @@ export function PublicAssignmentConfirmationPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-[20px] border border-border/70 bg-background/80 px-4 py-4">
+                      <div className="rounded-[16px] border border-border/70 bg-background/80 px-4 py-3.5">
                         <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                           Data
                         </p>
@@ -303,7 +303,7 @@ export function PublicAssignmentConfirmationPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-[20px] border border-border/70 bg-background/80 px-4 py-4">
+                      <div className="rounded-[16px] border border-border/70 bg-background/80 px-4 py-3.5">
                         <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                           Congregação de origem
                         </p>
@@ -312,7 +312,7 @@ export function PublicAssignmentConfirmationPage() {
                         </p>
                       </div>
 
-                      <div className="rounded-[20px] border border-border/70 bg-background/80 px-4 py-4">
+                      <div className="rounded-[16px] border border-border/70 bg-background/80 px-4 py-3.5">
                         <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
                           Tema
                         </p>

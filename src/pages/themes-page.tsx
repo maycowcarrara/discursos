@@ -61,10 +61,10 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
 }
 
 function formatUpdatedAt(value: Date) {
@@ -328,7 +328,7 @@ export function ThemesPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button
                       type="button"
-                      className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
+                      className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
                         isActive
                           ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                           : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
@@ -346,7 +346,7 @@ export function ThemesPage() {
                     </button>
                     <button
                       type="button"
-                      className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
+                      className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
                         !isActive
                           ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                           : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
@@ -455,7 +455,7 @@ export function ThemesPage() {
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-40 animate-pulse rounded-[22px] border border-border/70 bg-background"
+                    className="h-40 animate-pulse rounded-[18px] border border-border/70 bg-background"
                   />
                 ))}
               </div>
@@ -485,7 +485,7 @@ export function ThemesPage() {
                 {filteredThemes.map((theme) => (
                   <div
                     key={theme.id}
-                    className="rounded-[22px] border border-border/70 bg-background p-5"
+                    className="rounded-[18px] border border-border/70 bg-background p-4"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="flex min-w-0 gap-4">

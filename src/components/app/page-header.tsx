@@ -39,13 +39,19 @@ export function PageHeader({
     }
 
     context.setHeader(nextHeader)
+  }, [actions, context, description, eyebrow, id, meta, title])
+
+  useLayoutEffect(() => {
+    if (!context) {
+      return undefined
+    }
 
     return () => {
       context.setHeader((currentHeader) =>
         currentHeader?.id === id ? null : currentHeader,
       )
     }
-  }, [actions, context, description, eyebrow, id, meta, title])
+  }, [context, id])
 
   return null
 }

@@ -1,4 +1,4 @@
-import { useContext } from 'react'
+import { useContext, useSyncExternalStore } from 'react'
 
 import { Building2, CalendarClock, CalendarDays, Clock3, Menu } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
@@ -17,7 +17,12 @@ type AppTopbarProps = {
 export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
   const location = useLocation()
   const currentItem = getNavigationItem(location.pathname)
-  const registeredHeader = useContext(PageHeaderContext)?.header ?? null
+  const pageHeaderStore = useContext(PageHeaderContext)
+  const registeredHeader = useSyncExternalStore(
+    pageHeaderStore?.subscribe ?? (() => () => undefined),
+    pageHeaderStore?.getHeader ?? (() => null),
+    () => null,
+  )
   const appSettingsQuery = useAppSettingsQuery()
   const congregationsQuery = useCongregationsQuery()
   const baseYear = appSettingsQuery.data?.defaultYear ?? new Date().getFullYear()
@@ -26,7 +31,6 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
   const isDashboard = currentItem.href === '/'
   const title = registeredHeader?.title ?? currentItem.label
   const description = registeredHeader?.description ?? currentItem.description
-  const eyebrow = registeredHeader?.eyebrow
   const actions = registeredHeader?.actions ?? null
   const meta = registeredHeader?.meta ?? null
   const todayCompactLabel = new Intl.DateTimeFormat('pt-BR', {
@@ -165,16 +169,9 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
               </Button>
 
               <div className="min-w-0">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  {eyebrow ? (
-                    <span className="hidden text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/90 sm:inline">
-                      {eyebrow}
-                    </span>
-                  ) : null}
-                  <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-[1.9rem]">
-                    {title}
-                  </h1>
-                </div>
+                <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-[1.9rem]">
+                  {title}
+                </h1>
                 {description ? (
                   <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground md:text-[15px]">
                     {description}

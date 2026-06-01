@@ -55,10 +55,6 @@ import {
 } from '@/utils/operations-display'
 
 const appSettingsFormSchema = z.object({
-  organizationName: z
-    .string()
-    .trim()
-    .min(3, 'Informe o nome da organização.'),
   defaultYear: z
     .number({
       error: 'Informe um ano válido.',
@@ -66,7 +62,6 @@ const appSettingsFormSchema = z.object({
     .int('Informe um ano inteiro.')
     .min(2024, 'Use um ano a partir de 2024.')
     .max(2100, 'Use um ano até 2100.'),
-  locale: z.string().trim().min(2, 'Informe o idioma do painel.'),
 })
 
 const calendarSettingsFormSchema = z
@@ -115,18 +110,18 @@ function getErrorMessage(error: unknown) {
 
 function getCalendarRunStatusLabel(status?: CalendarSyncRunStatus | null) {
   if (status === 'running') {
-    return 'Sincronizando agora'
+    return 'Em andamento'
   }
 
   if (status === 'success') {
-    return 'Última sincronização ok'
+    return 'Sincronização ok'
   }
 
   if (status === 'error') {
-    return 'Última sincronização com falha'
+    return 'Com falha'
   }
 
-  return 'Aguardando sincronização'
+  return 'Aguardando'
 }
 
 function getCalendarRunStatusClassName(status?: CalendarSyncRunStatus | null) {
@@ -252,9 +247,9 @@ export function SettingsPage() {
                   <Settings2 className="size-5" />
                 </div>
                 <div>
-                  <CardTitle>Identidade do painel</CardTitle>
+                  <CardTitle>Base do painel</CardTitle>
                   <CardDescription>
-                    Nome exibido, ano de referência e idioma usados nas telas.
+                    Defina o ano de referência usado como base nas telas administrativas.
                   </CardDescription>
                 </div>
               </div>
@@ -262,22 +257,7 @@ export function SettingsPage() {
 
             <CardContent>
               <form className="space-y-5" onSubmit={submitAppHandler}>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">
-                      Nome da organização
-                    </span>
-                    <Input
-                      placeholder="Ex.: Congregação Central"
-                      {...registerApp('organizationName')}
-                    />
-                    {appErrors.organizationName ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {appErrors.organizationName.message}
-                      </p>
-                    ) : null}
-                  </label>
-
+                <div className="grid gap-4 md:max-w-[18rem]">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
                       Ano padrão
@@ -295,34 +275,22 @@ export function SettingsPage() {
                       </p>
                     ) : null}
                   </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">
-                      Idioma do painel
-                    </span>
-                    <Input placeholder="pt-BR" {...registerApp('locale')} />
-                    {appErrors.locale ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {appErrors.locale.message}
-                      </p>
-                    ) : null}
-                  </label>
                 </div>
 
                 {appSettingsQuery.isError ? (
-                  <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(appSettingsQuery.error)}
                   </div>
                 ) : null}
 
                 {saveAppSettingsMutation.isSuccess ? (
-                  <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                    Ajustes gerais salvos com sucesso.
+                  <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                    Ano padrão salvo com sucesso.
                   </div>
                 ) : null}
 
                 {saveAppSettingsMutation.isError ? (
-                  <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(saveAppSettingsMutation.error)}
                   </div>
                 ) : null}
@@ -377,7 +345,7 @@ export function SettingsPage() {
                   <div>
                     <CardTitle>Integração com agenda</CardTitle>
                     <CardDescription>
-                      Controle o calendário remoto usado para publicar designações.
+                      Use o calendário remoto das publicações.
                     </CardDescription>
                   </div>
                 </div>
@@ -397,7 +365,7 @@ export function SettingsPage() {
 
             <CardContent className="space-y-5">
               <form className="space-y-5" onSubmit={submitCalendarHandler}>
-                <label className="flex items-start gap-3 rounded-[20px] border border-border/70 bg-background px-4 py-4">
+                <label className="flex items-start gap-3 rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
                   <input
                     type="checkbox"
                     className="mt-1 size-4 rounded border-border text-primary"
@@ -408,8 +376,7 @@ export function SettingsPage() {
                       Ativar sincronização com a agenda
                     </span>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      Quando ligado, os envios manuais para a agenda externa passam a
-                      ser processados pela automação.
+                      Quando ligado, a automação processa os envios manuais.
                     </p>
                   </div>
                 </label>
@@ -429,9 +396,8 @@ export function SettingsPage() {
                       </p>
                     ) : (
                       <p className="text-sm leading-6 text-muted-foreground">
-                        Compartilhe esse calendário com o e-mail técnico da integração
-                        antes de ativar o envio. Se o calendário remoto mudar, as
-                        publicações já existentes precisarão de nova solicitação.
+                        Compartilhe com o e-mail da integração antes de ativar.
+                        Se trocar o calendário, peça nova sincronização.
                       </p>
                     )}
                   </label>
@@ -472,28 +438,28 @@ export function SettingsPage() {
                 </div>
 
                 {calendarSettingsQuery.isError ? (
-                  <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(calendarSettingsQuery.error)}
                   </div>
                 ) : null}
 
                 {saveCalendarSettingsMutation.isSuccess ? (
-                  <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                     Ajustes da agenda salvos com sucesso.
                   </div>
                 ) : null}
 
                 {saveCalendarSettingsMutation.isError ? (
-                  <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(saveCalendarSettingsMutation.error)}
                   </div>
                 ) : null}
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   <SummaryStat
                     label="Estado atual"
                     value={persistedCalendarSettings?.enabled ? 'Ativo' : 'Desligado'}
-                    detail="Controle principal da integração."
+                    detail="Liga ou desliga a integração."
                     tone={persistedCalendarSettings?.enabled ? 'green' : 'slate'}
                   />
                   <SummaryStat
@@ -501,7 +467,7 @@ export function SettingsPage() {
                     value={getCalendarRunStatusLabel(
                       persistedCalendarSettings?.lastSyncStatus,
                     )}
-                    detail="Resultado mais recente da automação."
+                    detail="Resultado mais recente."
                     tone={
                       persistedCalendarSettings?.lastSyncStatus === 'error'
                         ? 'amber'
@@ -509,22 +475,23 @@ export function SettingsPage() {
                     }
                   />
                   <SummaryStat
+                    className="md:col-span-2 2xl:col-span-1"
                     label="Última execução"
                     value={
                       persistedCalendarSettings?.lastSyncAt
                         ? formatTimestampDate(persistedCalendarSettings.lastSyncAt)
                         : 'Ainda não executou'
                     }
-                    detail="Momento registrado no último processamento."
+                    detail="Último processamento."
                     tone="slate"
                     icon={Clock3}
                   />
                 </div>
 
-                <div className="rounded-[20px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
                   {persistedCalendarSettings?.lastSyncMessage
                     ? persistedCalendarSettings.lastSyncMessage
-                    : 'A automação verifica a fila periodicamente e atualiza o estado geral da integração aqui.'}
+                    : 'A automação atualiza o estado da integração aqui.'}
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -595,7 +562,7 @@ export function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {notificationsError ? (
-                <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {getErrorMessage(notificationsError)}
                 </div>
               ) : null}
@@ -630,7 +597,7 @@ export function SettingsPage() {
                   {[...pendingNotifications, ...failedNotifications].map((notification) => (
                     <div
                       key={notification.id}
-                      className="rounded-[20px] border border-border/70 bg-background px-4 py-4"
+                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -675,7 +642,7 @@ export function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {auditLogsQuery.isError ? (
-                <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {getErrorMessage(auditLogsQuery.error)}
                 </div>
               ) : null}
@@ -707,7 +674,7 @@ export function SettingsPage() {
                   {recentAuditLogs.map((auditLog) => (
                     <div
                       key={auditLog.id}
-                      className="rounded-[20px] border border-border/70 bg-background px-4 py-4"
+                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>

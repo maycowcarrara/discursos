@@ -76,7 +76,7 @@ import {
 const currentYear = new Date().getFullYear()
 
 const selectClassName =
-  'flex h-11 w-full rounded-2xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70'
+  'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70'
 
 const assignmentFormSchema = z.object({
   calendarEventId: z.string().trim().min(1, 'Selecione o evento da designação.'),
@@ -174,10 +174,10 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
 }
 
 function getStatusClassName(status: AssignmentStatus) {
@@ -1221,7 +1221,7 @@ export function AssignmentsPage() {
                       <button
                         key={option.value}
                         type="button"
-                        className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
+                        className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
                           movementType === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                             : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
@@ -1331,7 +1331,7 @@ export function AssignmentsPage() {
                         <button
                           key={option.value}
                           type="button"
-                          className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
+                          className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
                             watchedStatus === option.value
                               ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                               : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
@@ -1393,7 +1393,7 @@ export function AssignmentsPage() {
               ) : null}
 
               {selectedEvent ? (
-                <div className="rounded-[20px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
                   <p className="font-medium text-foreground">
                     {calendarEventTypeLabels[selectedEvent.type]} em{' '}
                     {formatTimestampDate(selectedEvent.date)}
@@ -1407,7 +1407,7 @@ export function AssignmentsPage() {
               ) : null}
 
               {selectedSpeakerMissingEmail ? (
-                <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   <p className="font-medium">
                     Este orador ainda não possui e-mail cadastrado.
                   </p>
@@ -1418,7 +1418,7 @@ export function AssignmentsPage() {
               ) : null}
 
               {selectedEventCoveredByOtherAssignment ? (
-                <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   <p className="font-medium">Esta data já possui cobertura operacional.</p>
                   <p className="mt-2">
                     {currentOperationalAssignment?.speakerName} esta ocupando o slot
@@ -1438,7 +1438,7 @@ export function AssignmentsPage() {
               ) : null}
 
               {recentThemeUsage ? (
-                <div className="rounded-[20px] border border-sky-200 bg-sky-50 px-4 py-4 text-sm leading-6 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
+                <div className="rounded-[16px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
                   <p className="font-medium">Atenção ao tema recente</p>
                   <p className="mt-2">
                     Tema {recentThemeUsage.themeNumber} foi usado em{' '}
@@ -1561,7 +1561,7 @@ export function AssignmentsPage() {
                 {Array.from({ length: 3 }, (_, index) => (
                   <div
                     key={index}
-                    className="h-56 animate-pulse rounded-[22px] border border-border/70 bg-background"
+                    className="h-56 animate-pulse rounded-[18px] border border-border/70 bg-background"
                   />
                 ))}
               </div>
@@ -1618,7 +1618,7 @@ export function AssignmentsPage() {
                   return (
                     <div
                       key={assignment.id}
-                      className="rounded-[22px] border border-border/70 bg-background p-5"
+                      className="rounded-[18px] border border-border/70 bg-background p-4"
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0 flex-1">
@@ -1637,7 +1637,7 @@ export function AssignmentsPage() {
                           </h3>
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
+                            <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
                               <div className="flex items-start gap-3">
                                 <CalendarDays className="mt-0.5 size-4 text-primary" />
                                 <div>
@@ -1654,7 +1654,7 @@ export function AssignmentsPage() {
                               </div>
                             </div>
 
-                            <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
+                            <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
                               <div className="flex items-start gap-3">
                                 <MapPinned className="mt-0.5 size-4 text-primary" />
                                 <div>
@@ -1709,7 +1709,7 @@ export function AssignmentsPage() {
 
                             {googleCalendarSyncState ? (
                               <div
-                                className={`rounded-[18px] border px-4 py-4 ${getGoogleCalendarSyncBadgeClassName(
+                                className={`rounded-[16px] border px-4 py-3.5 ${getGoogleCalendarSyncBadgeClassName(
                                   googleCalendarSyncState.tone,
                                 )}`}
                               >

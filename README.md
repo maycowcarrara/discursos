@@ -121,9 +121,10 @@ Próxima etapa obrigatória:
 ### Fechamento da Fase 7
 
 * gestão anual real de `calendarEvents` na UI
-* geração automática de sábados ausentes por ano
+* renderização implícita dos sábados regulares na visão anual, sem depender de documento salvo
 * suporte administrativo aos tipos de evento oficiais
 * bloqueio automático de designações para congresso e assembleia
+* `calendarEvents` reservado para exceções, bloqueios, personalizações e materializações operacionais do slot
 * visão anual por mês com destaque para eventos já designados
 * arquivamento lógico e auditoria de create, update e delete
 
@@ -204,7 +205,7 @@ Entregue até o início da Fase 12:
 * CRUD completo de `congregations`
 * CRUD completo de `themes`
 * CRUD completo de `speakers`
-* calendário inteligente com geração automática de sábados
+* calendário inteligente com sábados regulares renderizados implicitamente na visão anual
 * gestão anual real de `calendarEvents`
 * leitura real de `assignments`, `notifications` e `auditLogs`
 * operação real de designações com confirmações, substituições e auditoria

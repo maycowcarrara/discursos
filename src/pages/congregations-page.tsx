@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Home,
   MapPinned,
   PencilLine,
   Plus,
@@ -58,10 +58,6 @@ const commonCongregationFormFields = {
     .string()
     .trim()
     .length(2, 'Use a sigla do estado com 2 caracteres.'),
-  zipCode: z
-    .string()
-    .trim()
-    .regex(/^\d{5}-?\d{3}$/, 'Informe um CEP válido.'),
   mapsUrl: z.string().trim().url('Informe uma URL válida do Google Maps.'),
   meetingDay: z.string().trim().min(3, 'Informe o dia da reunião.'),
   meetingTime: z
@@ -156,10 +152,10 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
 }
 
 function formatUpdatedAt(value: Date) {
@@ -198,6 +194,8 @@ export function CongregationsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [editingExternalId, setEditingExternalId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
+  const [isLocalCardExpanded, setIsLocalCardExpanded] = useState(true)
+  const [hasInitializedLocalCard, setHasInitializedLocalCard] = useState(false)
 
   const congregationsQuery = useCongregationsQuery()
   const createCongregationMutation = useCreateCongregationMutation()
@@ -272,6 +270,15 @@ export function CongregationsPage() {
     updateCongregationMutation.isPending ||
     deleteCongregationMutation.isPending
   const actorName = user?.displayName ?? user?.email ?? null
+
+  const resolvedIsLocalCardExpanded = hasInitializedLocalCard
+    ? isLocalCardExpanded
+    : !localCongregation
+
+  function handleToggleLocalCard() {
+    setHasInitializedLocalCard(true)
+    setIsLocalCardExpanded((currentValue) => !currentValue)
+  }
 
   const submitLocalHandler = handleLocalSubmit(async (values) => {
     if (!user) {
@@ -438,37 +445,7 @@ export function CongregationsPage() {
         eyebrow="Cadastro"
         title="Congregações"
         description="Mantenha a base local fixa e cadastre separadamente as congregações externas usadas na operação."
-        actions={
-          <Button onClick={handleStartCreateExternal} disabled={isSubmitting}>
-            <Plus className="size-4" />
-            Nova externa
-          </Button>
-        }
       />
-
-      <section className="grid gap-4 sm:grid-cols-3">
-        <SummaryStat
-          label="Base local"
-          value={localCongregation ? 'Configurada' : 'Pendente'}
-          detail="Única congregação da própria agenda."
-          icon={Home}
-          tone="green"
-        />
-        <SummaryStat
-          label="Externas"
-          value={String(totalExternalCongregations)}
-          detail="Parceiras usadas para visitantes e saídas."
-          icon={Users}
-          tone="blue"
-        />
-        <SummaryStat
-          label="Ativas"
-          value={String(totalCongregations)}
-          detail="Total disponível na base atual."
-          icon={MapPinned}
-          tone="slate"
-        />
-      </section>
 
       {feedback ? (
         <div className={getFeedbackContainerClassName(feedback.tone)}>
@@ -481,197 +458,6 @@ export function CongregationsPage() {
           {getErrorMessage(congregationsQuery.error)}
         </div>
       ) : null}
-
-      <Card>
-        <CardHeader className="gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle className="text-2xl">Congregação local</CardTitle>
-              <CardDescription>
-                Cadastro fixo da congregação que recebe a agenda principal.
-              </CardDescription>
-            </div>
-            <Badge>{localCongregation ? 'Base local ativa' : 'Cadastro necessário'}</Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          <form className="space-y-5" onSubmit={submitLocalHandler}>
-            <div className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
-              <div className="grid gap-4">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Nome</span>
-                  <Input
-                    placeholder="Ex.: Congregação Central"
-                    {...registerLocal('name')}
-                  />
-                  {localErrors.name ? (
-                    <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {localErrors.name.message}
-                    </p>
-                  ) : null}
-                </label>
-
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Endereço</span>
-                  <Input
-                    placeholder="Rua, número e bairro"
-                    {...registerLocal('address')}
-                  />
-                  {localErrors.address ? (
-                    <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {localErrors.address.message}
-                    </p>
-                  ) : null}
-                </label>
-
-                <div className="grid gap-4 sm:grid-cols-[1.2fr_110px_150px]">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">Cidade</span>
-                    <Input placeholder="Palmas" {...registerLocal('city')} />
-                    {localErrors.city ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {localErrors.city.message}
-                      </p>
-                    ) : null}
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">UF</span>
-                    <select className={selectClassName} {...registerLocal('state')}>
-                      <option value="">Selecione</option>
-                      {brazilStateOptions.map((state) => (
-                        <option key={state} value={state}>
-                          {state}
-                        </option>
-                      ))}
-                    </select>
-                    {localErrors.state ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {localErrors.state.message}
-                      </p>
-                    ) : null}
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">CEP</span>
-                    <Input
-                      inputMode="numeric"
-                      placeholder="77000-000"
-                      {...registerLocal('zipCode')}
-                    />
-                    {localErrors.zipCode ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {localErrors.zipCode.message}
-                      </p>
-                    ) : null}
-                  </label>
-                </div>
-
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">
-                    Link do Google Maps
-                  </span>
-                  <Input
-                    placeholder="https://maps.google.com/..."
-                    {...registerLocal('mapsUrl')}
-                  />
-                  {localErrors.mapsUrl ? (
-                    <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {localErrors.mapsUrl.message}
-                    </p>
-                  ) : null}
-                </label>
-              </div>
-
-              <div className="grid content-start gap-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">
-                      Dia da reunião
-                    </span>
-                    <select className={selectClassName} {...registerLocal('meetingDay')}>
-                      <option value="">Selecione</option>
-                      {meetingDayOptions.map((meetingDay) => (
-                        <option key={meetingDay} value={meetingDay}>
-                          {meetingDay}
-                        </option>
-                      ))}
-                    </select>
-                    {localErrors.meetingDay ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {localErrors.meetingDay.message}
-                      </p>
-                    ) : null}
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">Horário</span>
-                    <Input type="time" {...registerLocal('meetingTime')} />
-                    {localErrors.meetingTime ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {localErrors.meetingTime.message}
-                      </p>
-                    ) : null}
-                  </label>
-                </div>
-
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">
-                    Contato do coordenador de discursos
-                  </span>
-                  <Input
-                    placeholder="Nome, telefone ou e-mail"
-                    {...registerLocal('publicTalkCoordinatorContact')}
-                  />
-                  {localErrors.publicTalkCoordinatorContact ? (
-                    <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {localErrors.publicTalkCoordinatorContact.message}
-                    </p>
-                  ) : null}
-                </label>
-
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Observações</span>
-                  <Textarea
-                    placeholder="Anote detalhes fixos da base local."
-                    {...registerLocal('notes')}
-                  />
-                  {localErrors.notes ? (
-                    <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {localErrors.notes.message}
-                    </p>
-                  ) : null}
-                </label>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm leading-6 text-muted-foreground">
-                {localCongregation
-                  ? `Última atualização em ${formatUpdatedAt(
-                      localCongregation.updatedAt.toDate(),
-                    )}.`
-                  : 'Preencha estes dados para criar a base local fixa da agenda.'}
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={isSubmitting || !isLocalFormDirty}
-                  onClick={() => resetLocalForm(localFormValues)}
-                >
-                  Restaurar
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  <Save className="size-4" />
-                  Salvar base local
-                </Button>
-              </div>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
 
       <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <Card>
@@ -730,7 +516,7 @@ export function CongregationsPage() {
                   ) : null}
                 </label>
 
-                <div className="grid gap-4 sm:grid-cols-[1.2fr_110px_150px]">
+                <div className="grid gap-4 sm:grid-cols-[1fr_110px]">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">Cidade</span>
                     <Input placeholder="Palmas" {...registerExternal('city')} />
@@ -755,22 +541,8 @@ export function CongregationsPage() {
                       <p className="text-sm text-rose-600 dark:text-rose-300">
                         {externalErrors.state.message}
                       </p>
-                    ) : null}
-                  </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">CEP</span>
-                    <Input
-                      inputMode="numeric"
-                      placeholder="77000-000"
-                      {...registerExternal('zipCode')}
-                    />
-                    {externalErrors.zipCode ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {externalErrors.zipCode.message}
-                      </p>
-                    ) : null}
-                  </label>
+                      ) : null}
+                    </label>
                 </div>
 
                 <label className="space-y-2">
@@ -911,7 +683,7 @@ export function CongregationsPage() {
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-44 animate-pulse rounded-[22px] border border-border/70 bg-background"
+                    className="h-44 animate-pulse rounded-[18px] border border-border/70 bg-background"
                   />
                 ))}
               </div>
@@ -941,7 +713,7 @@ export function CongregationsPage() {
                 {paginatedExternalCongregations.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[22px] border border-border/70 bg-background p-5"
+                    className="rounded-[18px] border border-border/70 bg-background p-4"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="flex min-w-0 gap-4">
@@ -956,7 +728,7 @@ export function CongregationsPage() {
                             <Badge>Externa</Badge>
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
-                            {item.city}/{item.state} • {item.zipCode}
+                            {item.city}/{item.state}
                           </p>
                           <p className="mt-2 text-sm text-muted-foreground">
                             {item.meetingDay} • {item.meetingTime}
@@ -1037,6 +809,250 @@ export function CongregationsPage() {
           </CardContent>
         </Card>
       </section>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <SummaryStat
+          label="Externas"
+          value={String(totalExternalCongregations)}
+          detail="Parceiras usadas para visitantes e saídas."
+          icon={Users}
+          tone="blue"
+        />
+        <SummaryStat
+          label="Ativas"
+          value={String(totalCongregations)}
+          detail="Total disponível na base atual."
+          icon={MapPinned}
+          tone="slate"
+        />
+      </section>
+
+      <Card>
+        <CardHeader className="gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="text-2xl">Congregação local</CardTitle>
+              <CardDescription>
+                Cadastro fixo da congregação que recebe a agenda principal.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>{localCongregation ? 'Base local ativa' : 'Cadastro necessário'}</Badge>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleToggleLocalCard}
+                aria-expanded={resolvedIsLocalCardExpanded}
+              >
+                {resolvedIsLocalCardExpanded ? 'Recolher' : 'Expandir'}
+                <ChevronDown
+                  className={`size-4 transition-transform ${
+                    resolvedIsLocalCardExpanded ? 'rotate-180' : ''
+                  }`}
+                />
+              </Button>
+            </div>
+          </div>
+
+          {!resolvedIsLocalCardExpanded ? (
+            <div className="grid gap-3 rounded-[16px] border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground sm:grid-cols-3">
+              {localCongregation ? (
+                <>
+                  <div>
+                    <p className="font-medium text-foreground">{localCongregation.name}</p>
+                    <p className="mt-1">
+                      {localCongregation.city}/{localCongregation.state}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {localCongregation.meetingDay}
+                    </p>
+                    <p className="mt-1">{localCongregation.meetingTime}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Última atualização</p>
+                    <p className="mt-1">
+                      {formatUpdatedAt(localCongregation.updatedAt.toDate())}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <p className="sm:col-span-3">
+                  Abra o card para cadastrar a base local obrigatória da agenda.
+                </p>
+              )}
+            </div>
+          ) : null}
+        </CardHeader>
+
+        {resolvedIsLocalCardExpanded ? (
+          <CardContent>
+            <form className="space-y-5" onSubmit={submitLocalHandler}>
+              <div className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
+                <div className="grid gap-4">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">Nome</span>
+                    <Input
+                      placeholder="Ex.: Congregação Central"
+                      {...registerLocal('name')}
+                    />
+                    {localErrors.name ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {localErrors.name.message}
+                      </p>
+                    ) : null}
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">Endereço</span>
+                    <Input
+                      placeholder="Rua, número e bairro"
+                      {...registerLocal('address')}
+                    />
+                    {localErrors.address ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {localErrors.address.message}
+                      </p>
+                    ) : null}
+                  </label>
+
+                  <div className="grid gap-4 sm:grid-cols-[1fr_110px]">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-foreground">Cidade</span>
+                      <Input placeholder="Palmas" {...registerLocal('city')} />
+                      {localErrors.city ? (
+                        <p className="text-sm text-rose-600 dark:text-rose-300">
+                          {localErrors.city.message}
+                        </p>
+                      ) : null}
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-foreground">UF</span>
+                      <select className={selectClassName} {...registerLocal('state')}>
+                        <option value="">Selecione</option>
+                        {brazilStateOptions.map((state) => (
+                          <option key={state} value={state}>
+                            {state}
+                          </option>
+                        ))}
+                      </select>
+                      {localErrors.state ? (
+                        <p className="text-sm text-rose-600 dark:text-rose-300">
+                          {localErrors.state.message}
+                        </p>
+                      ) : null}
+                    </label>
+                  </div>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Link do Google Maps
+                    </span>
+                    <Input
+                      placeholder="https://maps.google.com/..."
+                      {...registerLocal('mapsUrl')}
+                    />
+                    {localErrors.mapsUrl ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {localErrors.mapsUrl.message}
+                      </p>
+                    ) : null}
+                  </label>
+                </div>
+
+                <div className="grid content-start gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-foreground">
+                        Dia da reunião
+                      </span>
+                      <select className={selectClassName} {...registerLocal('meetingDay')}>
+                        <option value="">Selecione</option>
+                        {meetingDayOptions.map((meetingDay) => (
+                          <option key={meetingDay} value={meetingDay}>
+                            {meetingDay}
+                          </option>
+                        ))}
+                      </select>
+                      {localErrors.meetingDay ? (
+                        <p className="text-sm text-rose-600 dark:text-rose-300">
+                          {localErrors.meetingDay.message}
+                        </p>
+                      ) : null}
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-foreground">Horário</span>
+                      <Input type="time" {...registerLocal('meetingTime')} />
+                      {localErrors.meetingTime ? (
+                        <p className="text-sm text-rose-600 dark:text-rose-300">
+                          {localErrors.meetingTime.message}
+                        </p>
+                      ) : null}
+                    </label>
+                  </div>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Contato do coordenador de discursos
+                    </span>
+                    <Input
+                      placeholder="Nome, telefone ou e-mail"
+                      {...registerLocal('publicTalkCoordinatorContact')}
+                    />
+                    {localErrors.publicTalkCoordinatorContact ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {localErrors.publicTalkCoordinatorContact.message}
+                      </p>
+                    ) : null}
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">Observações</span>
+                    <Textarea
+                      placeholder="Anote detalhes fixos da base local."
+                      {...registerLocal('notes')}
+                    />
+                    {localErrors.notes ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {localErrors.notes.message}
+                      </p>
+                    ) : null}
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {localCongregation
+                    ? `Última atualização em ${formatUpdatedAt(
+                        localCongregation.updatedAt.toDate(),
+                      )}.`
+                    : 'Preencha estes dados para criar a base local fixa da agenda.'}
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={isSubmitting || !isLocalFormDirty}
+                    onClick={() => resetLocalForm(localFormValues)}
+                  >
+                    Restaurar
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    <Save className="size-4" />
+                    Salvar base local
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </CardContent>
+        ) : null}
+      </Card>
     </div>
   )
 }

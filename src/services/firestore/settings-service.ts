@@ -26,9 +26,7 @@ import { buildPendingGoogleCalendarSyncFields } from './google-calendar-sync-ser
 import { getTypedDocument } from './shared'
 
 export type AppSettingsFormValues = {
-  organizationName: string
   defaultYear: number
-  locale: string
 }
 
 export type SaveAppSettingsInput = AppSettingsFormValues & {
@@ -53,9 +51,7 @@ const calendarSettingsDocId = 'calendar'
 const calendarQueueBatchSize = 450
 
 export const defaultAppSettingsValues: AppSettingsFormValues = {
-  organizationName: '',
   defaultYear: new Date().getFullYear(),
-  locale: 'pt-BR',
 }
 
 export const defaultCalendarSettingsValues: CalendarSettingsFormValues = {
@@ -91,9 +87,7 @@ export function toAppSettingsFormValues(
   }
 
   return {
-    organizationName: settings.organizationName,
     defaultYear: settings.defaultYear,
-    locale: settings.locale,
   }
 }
 
@@ -171,9 +165,7 @@ function chunkItems<T>(items: T[], chunkSize: number) {
 
 export async function saveAppSettings({
   actorUid,
-  organizationName,
   defaultYear,
-  locale,
 }: SaveAppSettingsInput) {
   const appSettingsRef = getAppSettingsRef()
   const existingSnapshot = await getDoc(appSettingsRef)
@@ -183,9 +175,9 @@ export async function saveAppSettings({
   await setDoc(
     appSettingsRef,
     {
-      organizationName: organizationName.trim(),
       defaultYear,
-      locale: locale.trim(),
+      organizationName: deleteField(),
+      locale: deleteField(),
       timezone: deleteField(),
       createdAt: existingData?.createdAt ?? now,
       updatedAt: now,

@@ -1,5 +1,6 @@
 import {
   Timestamp,
+  getDoc,
   getDocs,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -18,7 +19,6 @@ import {
 
 import { firebaseDb } from '@/lib/firebase-db'
 import {
-  appSettingsSchema,
   assignmentSchema,
   calendarEventSchema,
   congregationSchema,
@@ -42,6 +42,10 @@ import {
 import { mergeNotificationDocumentForSync } from '@/utils/notification-sync'
 
 import { appendAuditLogToBatch } from './audit-logs-service'
+import {
+  buildImplicitCalendarEventFromId,
+  buildMaterializedImplicitPublicTalkDocument,
+} from './calendar-slots-service'
 import { getTypedCollection, getTypedDocument } from './shared'
 
 export type AssignmentFormValues = {
@@ -122,12 +126,33 @@ function getCalendarEventRef(id: string) {
 }
 
 async function resolveOrganizationName() {
-  const appSettings = await getTypedDocument(
-    doc(firebaseDb, 'settings', 'app'),
-    appSettingsSchema,
+  const localCongregations = await getTypedCollection(
+    query(
+      collection(firebaseDb, 'congregations'),
+      where('isLocal', '==', true),
+      where('isActive', '==', true),
+      limit(1),
+    ),
+    congregationSchema,
   )
 
-  return appSettings?.organizationName.trim() || 'Organizacao'
+  const localCongregationName = localCongregations[0]?.name.trim()
+
+  if (localCongregationName) {
+    return localCongregationName
+  }
+
+  const legacySettingsSnapshot = await getDoc(doc(firebaseDb, 'settings', 'app'))
+  const legacyOrganizationName = legacySettingsSnapshot.data()?.organizationName
+
+  if (
+    typeof legacyOrganizationName === 'string' &&
+    legacyOrganizationName.trim().length > 0
+  ) {
+    return legacyOrganizationName.trim()
+  }
+
+  return 'Congregacao local'
 }
 
 function parseDateBoundaryValue(value: string) {
@@ -514,17 +539,23 @@ async function getSpeakerForNotifications(id: string) {
 async function assertCalendarEventExists(id: string) {
   const calendarEvent = await getTypedDocument(getCalendarEventRef(id), calendarEventSchema)
 
-  if (!calendarEvent || !calendarEvent.isActive) {
+  if (calendarEvent?.isActive) {
+    if (calendarEvent.blocksAssignments) {
+      throw new Error(
+        'Este evento bloqueia designacoes oficialmente. Escolha um sabado ou evento liberado.',
+      )
+    }
+
+    return calendarEvent
+  }
+
+  const implicitCalendarEvent = buildImplicitCalendarEventFromId(id)
+
+  if (!implicitCalendarEvent) {
     throw new Error('O evento selecionado nao esta mais disponivel na agenda ativa.')
   }
 
-  if (calendarEvent.blocksAssignments) {
-    throw new Error(
-      'Este evento bloqueia designacoes oficialmente. Escolha um sabado ou evento liberado.',
-    )
-  }
-
-  return calendarEvent
+  return implicitCalendarEvent
 }
 
 function assertThemeBelongsToSpeaker(
@@ -632,15 +663,15 @@ async function runAssignmentSlotTransaction(options: {
   await runTransaction(firebaseDb, async (transaction) => {
     const calendarEventRef = getCalendarEventRef(options.calendarEventId)
     const calendarEventSnapshot = await transaction.get(calendarEventRef)
+    const lockedCalendarEvent = calendarEventSnapshot.exists()
+      ? ({
+          id: calendarEventSnapshot.id,
+          ...calendarEventSchema.parse(calendarEventSnapshot.data()),
+        } satisfies FirestoreRecord<CalendarEventDocument>)
+      : buildImplicitCalendarEventFromId(options.calendarEventId)
 
-    if (!calendarEventSnapshot.exists()) {
+    if (!lockedCalendarEvent) {
       throw new Error('O evento selecionado nao esta mais disponivel na agenda ativa.')
-    }
-
-    const parsedCalendarEvent = calendarEventSchema.parse(calendarEventSnapshot.data())
-    const lockedCalendarEvent: FirestoreRecord<CalendarEventDocument> = {
-      id: calendarEventSnapshot.id,
-      ...parsedCalendarEvent,
     }
 
     assertCalendarEventAllowsAssignments(lockedCalendarEvent)
@@ -661,14 +692,27 @@ async function runAssignmentSlotTransaction(options: {
       transaction,
     })
 
-    // Touch the event document with a merge-only write so concurrent slot mutations retry
-    // without overwriting sync fields that may have been queued in this transaction.
+    if (calendarEventSnapshot.exists()) {
+      // Touch the event document with a merge-only write so concurrent slot mutations retry
+      // without overwriting sync fields that may have been queued in this transaction.
+      transaction.set(
+        calendarEventRef,
+        {
+          updatedAt: lockedCalendarEvent.updatedAt,
+        },
+        { merge: true },
+      )
+
+      return
+    }
+
     transaction.set(
       calendarEventRef,
-      {
-        updatedAt: lockedCalendarEvent.updatedAt,
-      },
-      { merge: true },
+      buildMaterializedImplicitPublicTalkDocument({
+        actorUid: options.actorUid,
+        now,
+        slot: lockedCalendarEvent,
+      }),
     )
   })
 }

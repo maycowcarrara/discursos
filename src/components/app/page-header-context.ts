@@ -1,4 +1,4 @@
-import { createContext, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import { createContext, type ReactNode, type SetStateAction } from 'react'
 
 export type RegisteredPageHeader = {
   id: string
@@ -9,9 +9,10 @@ export type RegisteredPageHeader = {
   meta?: ReactNode
 }
 
-export type PageHeaderContextValue = {
-  header: RegisteredPageHeader | null
-  setHeader: Dispatch<SetStateAction<RegisteredPageHeader | null>>
+export type PageHeaderStore = {
+  getHeader: () => RegisteredPageHeader | null
+  setHeader: (next: SetStateAction<RegisteredPageHeader | null>) => void
+  subscribe: (listener: () => void) => () => void
 }
 
-export const PageHeaderContext = createContext<PageHeaderContextValue | null>(null)
+export const PageHeaderContext = createContext<PageHeaderStore | null>(null)

@@ -120,13 +120,17 @@ Exemplo de `settings/app`:
 
 ```ts
 {
-  organizationName: string
   defaultYear: number
-  locale: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }
 ```
+
+Observações:
+
+* `settings/app` mantém apenas o ano operacional padrão usado nas telas administrativas
+* o nome exibido no painel e nas automações deve reutilizar a congregação local ativa em `congregations`
+* o locale operacional da V1 permanece fixo em `pt-BR`, sem campo configurável no Firestore
 
 Exemplo de `settings/calendar`:
 
@@ -188,7 +192,6 @@ Campos:
   address: string
   city: string
   state: string
-  zipCode: string
   mapsUrl: string
   meetingDay: string
   meetingTime: string
@@ -209,6 +212,7 @@ Observações:
 * `isLocal = true` identifica a única congregação local ativa da própria agenda
 * a congregação local deve existir sempre, não deve ser excluída pela UI e concentra `publicTalkCoordinatorContact`
 * congregações externas/parceiras devem ser cadastradas com `isLocal = false` automaticamente, sem escolha manual de tipo na UI
+* `zipCode` deixou de fazer parte do schema oficial por não gerar valor operacional no fluxo administrativo da V1; bases legadas devem remover o campo com saneamento controlado
 * não criar campo alternativo como `nome`, `title` ou `congregationName` dentro desta coleção
 
 ### 3. `speakers`
@@ -333,6 +337,9 @@ Observações:
 
 * para congressos e assembleias, `blocksAssignments` deve ser `true`
 * sábados comuns também vivem nesta coleção
+* a UI anual pode renderizar slots regulares de `publicTalk` implicitamente a partir dos sábados do ano, mesmo sem documento salvo
+* quando existir um `calendarEvents` ativo na mesma data, ele passa a ser a fonte oficial da exceção, bloqueio ou personalização daquele dia
+* slots implícitos podem ser materializados sob demanda em `calendarEvents/{active-YYYY-MM-DD}` quando a operação precisar de um documento estável para concorrência, histórico técnico ou sincronização
 * o vínculo remoto do Google Calendar deve ficar neste documento, nunca em coleção paralela
 * `googleCalendarEventId` identifica o evento remoto atual
 * `googleCalendarCalendarId` registra em qual calendário remoto o vínculo foi criado, permitindo migração segura de `calendarId`
@@ -342,7 +349,7 @@ Observações:
 * `googleCalendarRetryCount` e `googleCalendarSyncScheduledFor` controlam retentativas sem perder a pendência após falha transitória
 * o ID enviado ao Google Calendar deve ser determinístico a partir de `calendarEvents/{id}`, para que uma retomada após falha não duplique o evento remoto
 * campos técnicos de sincronização não devem sobrescrever `updatedAt`, que continua representando mudança real feita no calendário administrativo
-* slots vazios de `publicTalk` podem existir no Firestore para planejamento anual sem precisarem existir no Google Calendar
+* slots regulares de `publicTalk` não precisam existir no Firestore para aparecer no planejamento anual e também não precisam existir no Google Calendar
 * quando houver publicação de `orador visitante` ou `discurso fora`, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e adicionar o orador como convidado no Google Calendar
 * não criar coleção paralela como `events`, `schedules` ou `annualCalendar`
 

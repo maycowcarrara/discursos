@@ -44,7 +44,7 @@ import {
 import type { SpeakerStatus, SpeakerType } from '@/types/firestore'
 
 const selectClassName =
-  'flex h-11 w-full rounded-2xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring'
+  'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring'
 
 const speakerTypeLabels: Record<SpeakerType, string> = {
   local: 'Local',
@@ -191,10 +191,10 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
 }
 
 function getStatusBadgeClassName(status: SpeakerStatus) {
@@ -624,7 +624,7 @@ export function SpeakersPage() {
                       <button
                         key={option.value}
                         type="button"
-                        className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
+                        className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
                           selectedType === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                             : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
@@ -650,7 +650,7 @@ export function SpeakersPage() {
                       <button
                         key={option.value}
                         type="button"
-                        className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
+                        className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
                           selectedStatus === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                             : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
@@ -720,7 +720,7 @@ export function SpeakersPage() {
                   </div>
 
                   {hasInvalidSelectedThemes ? (
-                    <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                    <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                       <p className="font-medium">Temas fora da base ativa</p>
                       <p className="mt-2 leading-6">
                         Remova os temas inativos ou ausentes antes de salvar este orador.
@@ -758,7 +758,7 @@ export function SpeakersPage() {
                         <button
                           key={theme.id}
                           type="button"
-                          className={`rounded-[20px] border px-4 py-4 text-left transition ${
+                          className={`rounded-[16px] border px-4 py-3.5 text-left transition ${
                             isSelected
                               ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                               : 'border-border/80 bg-background hover:bg-accent'
@@ -957,7 +957,7 @@ export function SpeakersPage() {
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-48 animate-pulse rounded-[22px] border border-border/70 bg-background"
+                    className="h-48 animate-pulse rounded-[18px] border border-border/70 bg-background"
                   />
                 ))}
               </div>
@@ -1012,7 +1012,7 @@ export function SpeakersPage() {
                   return (
                     <div
                       key={speaker.id}
-                      className="rounded-[22px] border border-border/70 bg-background p-5"
+                      className="rounded-[18px] border border-border/70 bg-background p-4"
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0 flex-1">
@@ -1037,7 +1037,7 @@ export function SpeakersPage() {
                           </div>
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <div className="flex items-start gap-3 rounded-[18px] border border-border/70 bg-background px-4 py-4">
+                            <div className="flex items-start gap-3 rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
                               <Mail className="mt-0.5 size-4 text-primary" />
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-foreground">
@@ -1049,7 +1049,7 @@ export function SpeakersPage() {
                               </div>
                             </div>
 
-                            <div className="flex items-start gap-3 rounded-[18px] border border-border/70 bg-background px-4 py-4">
+                            <div className="flex items-start gap-3 rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
                               <Phone className="mt-0.5 size-4 text-primary" />
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-foreground">
@@ -1076,7 +1076,7 @@ export function SpeakersPage() {
                             </div>
 
                             {hasUnavailableWindow ? (
-                              <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                              <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                                 Período informado:{' '}
                                 {formatDateRange(
                                   unavailableStart.toDate(),

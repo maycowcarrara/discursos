@@ -29,21 +29,21 @@ export function SummaryStat({
   return (
     <div
       className={cn(
-        'rounded-[24px] border border-border/70 bg-background px-4 py-4 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.2)]',
+        'rounded-[18px] border border-border/70 bg-background px-4 py-4 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.18)]',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
+          <p className="mt-1.5 break-words text-2xl leading-tight font-semibold tracking-tight text-foreground sm:text-3xl">
             {value}
           </p>
         </div>
         {Icon ? (
           <div
             className={cn(
-              'flex size-10 items-center justify-center rounded-2xl',
+              'flex size-9 items-center justify-center rounded-xl',
               toneClasses[tone],
             )}
           >
@@ -52,7 +52,7 @@ export function SummaryStat({
         ) : null}
       </div>
       {detail ? (
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">{detail}</p>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">{detail}</p>
       ) : null}
     </div>
   )

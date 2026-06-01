@@ -29,8 +29,8 @@ export function FeaturePage({
       <Card>
         <CardHeader>
           <Badge className="w-fit bg-primary/12 text-primary">{badge}</Badge>
-          <CardTitle className="text-3xl md:text-4xl">{title}</CardTitle>
-          <CardDescription className="max-w-2xl text-base">
+          <CardTitle className="text-2xl md:text-3xl">{title}</CardTitle>
+          <CardDescription className="max-w-2xl text-sm leading-6 md:text-base">
             {description}
           </CardDescription>
         </CardHeader>
@@ -39,7 +39,7 @@ export function FeaturePage({
             {highlights.map((item) => (
               <div
                 key={item}
-                className="rounded-[22px] border border-border/70 bg-background/65 px-4 py-4 text-sm leading-6 text-foreground"
+                className="rounded-[16px] border border-border/70 bg-background/65 px-4 py-3.5 text-sm leading-6 text-foreground"
               >
                 {item}
               </div>

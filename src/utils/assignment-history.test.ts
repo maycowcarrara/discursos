@@ -30,7 +30,6 @@ function makeCongregation(
     address: '',
     city: '',
     state: 'SP',
-    zipCode: '',
     mapsUrl: '',
     meetingDay: 'sabado',
     meetingTime: '19:00',

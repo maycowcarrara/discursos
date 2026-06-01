@@ -1,6 +1,5 @@
 import {
   Building2,
-  CalendarCheck2,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -10,7 +9,6 @@ import {
   Mic2,
   Phone,
   Sparkles,
-  TriangleAlert,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -32,9 +30,7 @@ import {
   calendarEventTypeLabels,
 } from '@/utils/calendar-events'
 import {
-  buildDashboardPendingItems,
   buildDashboardSaturdayEntries,
-  listUpcomingSpecialEvents,
 } from '@/utils/dashboard'
 
 type DashboardSaturdayEntryView = ReturnType<
@@ -49,13 +45,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return 'Não foi possível carregar o dashboard agora.'
-}
-
-function formatShortDate(date: Date) {
-  return date.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-  })
 }
 
 function formatInlineDate(date: Date) {
@@ -149,16 +138,10 @@ export function DashboardPage() {
     calendarEvents,
     assignments,
     today,
-  )
-  const pendingItems = buildDashboardPendingItems(upcomingSaturdayEntries)
-  const upcomingSpecialEvents = listUpcomingSpecialEvents(
-    calendarEvents,
-    assignments,
-    today,
+    10,
   )
   const nextSaturdayEntry = upcomingSaturdayEntries[0] ?? null
   const remainingSaturdayEntries = upcomingSaturdayEntries.slice(1)
-  const nextSpecialEvent = upcomingSpecialEvents[0] ?? null
   const nextSpeakerQuery = useSpeakerByIdQuery(nextSaturdayEntry?.assignment?.speakerId)
   const nextSpeaker = nextSpeakerQuery.data
   const combinedError =
@@ -379,45 +362,43 @@ export function DashboardPage() {
 
               {remainingSaturdayEntries.length > 0 ? (
                 <div className="border-t border-border/70 pt-3">
-                  <div className="-mx-3 overflow-x-auto px-3 pb-1 md:-mx-4 md:px-4">
-                    <div className="flex min-w-max gap-2">
-                      {remainingSaturdayEntries.map((entry) => {
-                        const entryStatus = getEntryStatus(entry)
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {remainingSaturdayEntries.map((entry) => {
+                      const entryStatus = getEntryStatus(entry)
 
-                        return (
-                          <div
-                            key={entry.event.id}
-                            className="w-[220px] rounded-[8px] border border-border/70 bg-card px-3 py-2.5"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-foreground">
-                                {formatInlineDate(entry.event.date.toDate())}
-                              </p>
-                              <span
-                                className={cn(
-                                  'size-2.5 rounded-full',
-                                  entryStatus === 'confirmed'
-                                    ? 'bg-emerald-500'
-                                    : entryStatus === 'event'
-                                      ? 'bg-violet-500'
-                                      : 'bg-amber-500',
-                                )}
-                              />
-                            </div>
-                            <p className="mt-1 text-xs font-medium text-foreground">
-                              {getEntryStatusLabel(entry)}
+                      return (
+                        <div
+                          key={entry.event.id}
+                          className="rounded-[8px] border border-border/70 bg-card px-3 py-2.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-foreground">
+                              {formatInlineDate(entry.event.date.toDate())}
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {entry.assignment
-                                ? entry.assignment.speakerName
-                                : entry.event.blocksAssignments
-                                  ? entry.event.title
-                                  : 'Sem designação'}
-                            </p>
+                            <span
+                              className={cn(
+                                'size-2.5 rounded-full',
+                                entryStatus === 'confirmed'
+                                  ? 'bg-emerald-500'
+                                  : entryStatus === 'event'
+                                    ? 'bg-violet-500'
+                                    : 'bg-amber-500',
+                              )}
+                            />
                           </div>
-                        )
-                      })}
-                    </div>
+                          <p className="mt-1 text-xs font-medium text-foreground">
+                            {getEntryStatusLabel(entry)}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {entry.assignment
+                              ? entry.assignment.speakerName
+                              : entry.event.blocksAssignments
+                                ? entry.event.title
+                                : 'Sem designação'}
+                          </p>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ) : null}
@@ -426,101 +407,16 @@ export function DashboardPage() {
         </CardContent>
       </Card>
 
-      <Card className={cardClass}>
-        <CardHeader className="p-3 pb-1 md:p-3.5 md:pb-1">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-[15px] tracking-normal md:text-base">
-              Ações da semana
-            </CardTitle>
-            {!isLoading && !combinedError && pendingItems.length > 0 ? (
-              <span className="text-sm font-semibold text-amber-700 dark:text-amber-200">
-                {pendingItems.length} pendências
-              </span>
-            ) : null}
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-3 p-3 pt-1 md:p-3.5 md:pt-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-          <div className="space-y-1.5">
-            {isLoading ? (
-              Array.from({ length: 3 }, (_, index) => (
-                <div
-                  key={index}
-                  className="h-12 animate-pulse rounded-[8px] border border-border/70 bg-background"
-                />
-              ))
-            ) : null}
-
-            {!isLoading && combinedError ? (
-              <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                {getErrorMessage(combinedError)}
-              </div>
-            ) : null}
-
-            {!isLoading && !combinedError && pendingItems.length === 0 ? (
-              <p className="rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                Sem alertas críticos na janela atual.
-              </p>
-            ) : null}
-
-            {!isLoading && !combinedError && pendingItems.length > 0
-              ? pendingItems.slice(0, 5).map((item) => (
-                  <Link
-                    key={item.id}
-                    className="block rounded-[8px] border border-amber-200/70 bg-amber-50/40 px-3 py-2 transition-colors hover:bg-amber-50 dark:bg-amber-500/5 dark:hover:bg-amber-500/10"
-                    to={item.kind === 'unassigned' ? '/designacoes' : '/agenda'}
-                  >
-                    <div className="flex items-start gap-2">
-                      <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium leading-5 text-foreground">
-                          {formatShortDate(item.event.date.toDate())}{' '}
-                          {item.kind === 'unassigned'
-                            ? 'Sem designação'
-                            : 'Aguardando confirmação'}
-                        </p>
-                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                          {item.assignment
-                            ? `${item.assignment.speakerName} - Tema ${item.assignment.themeNumber}`
-                            : item.event.title}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              : null}
-          </div>
-
-          <div className="space-y-2">
-            {nextSpecialEvent ? (
-              <div className="rounded-[8px] border border-blue-200/70 bg-blue-50/40 px-3 py-2.5 dark:bg-blue-500/5">
-                <div className="flex items-start gap-2">
-                  <CalendarCheck2 className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium leading-5 text-foreground">
-                      {formatShortDate(nextSpecialEvent.event.date.toDate())}{' '}
-                      {calendarEventTypeLabels[nextSpecialEvent.event.type]}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {nextSpecialEvent.event.title}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              {dashboardShortcuts.map(({ href, label, Icon }) => (
-                <Link key={href} className={dashboardShortcutClass} to={href}>
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-muted/50 text-muted-foreground">
-                    <Icon className="size-4" />
-                  </span>
-                  <span>{label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {dashboardShortcuts.map(({ href, label, Icon }) => (
+          <Link key={href} className={dashboardShortcutClass} to={href}>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-muted/50 text-muted-foreground">
+              <Icon className="size-4" />
+            </span>
+            <span>{label}</span>
+          </Link>
+        ))}
+      </section>
     </div>
   )
 }
