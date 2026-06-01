@@ -34,6 +34,7 @@ function makeCongregation(
     mapsUrl: '',
     meetingDay: 'sabado',
     meetingTime: '19:00',
+    publicTalkCoordinatorContact: '',
     notes: '',
     isLocal,
     isActive: true,

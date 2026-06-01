@@ -29,6 +29,7 @@ export type CongregationFormValues = {
   mapsUrl: string
   meetingDay: string
   meetingTime: string
+  publicTalkCoordinatorContact: string
   notes: string
   isLocal: boolean
 }
@@ -57,6 +58,7 @@ export const defaultCongregationFormValues: CongregationFormValues = {
   mapsUrl: '',
   meetingDay: '',
   meetingTime: '',
+  publicTalkCoordinatorContact: '',
   notes: '',
   isLocal: false,
 }
@@ -94,8 +96,38 @@ function buildCongregationPayload(
     mapsUrl: values.mapsUrl.trim(),
     meetingDay: values.meetingDay.trim(),
     meetingTime: values.meetingTime.trim(),
+    publicTalkCoordinatorContact: values.publicTalkCoordinatorContact.trim(),
     notes: values.notes.trim(),
     isLocal: values.isLocal,
+  }
+}
+
+async function listOtherActiveLocalCongregations(exceptId?: string) {
+  const localCongregationsQuery = query(
+    getCongregationsCollection(),
+    where('isLocal', '==', true),
+  )
+  const localCongregations = await getTypedCollection(
+    localCongregationsQuery,
+    congregationSchema,
+  )
+
+  return localCongregations.filter(
+    (congregation) => congregation.isActive && congregation.id !== exceptId,
+  )
+}
+
+async function assertCanSaveLocalCongregation(values: CongregationFormValues, id?: string) {
+  if (!values.isLocal) {
+    return
+  }
+
+  const otherActiveLocalCongregations = await listOtherActiveLocalCongregations(id)
+
+  if (otherActiveLocalCongregations.length > 0) {
+    throw new Error(
+      'Ja existe uma congregacao local ativa. Atualize a congregacao local fixa em vez de cadastrar outra.',
+    )
   }
 }
 
@@ -134,6 +166,7 @@ export function toCongregationFormValues(
     mapsUrl: congregation.mapsUrl,
     meetingDay: congregation.meetingDay,
     meetingTime: congregation.meetingTime,
+    publicTalkCoordinatorContact: congregation.publicTalkCoordinatorContact,
     notes: congregation.notes,
     isLocal: congregation.isLocal,
   }
@@ -166,6 +199,9 @@ export async function createCongregation({
 }: CreateCongregationInput) {
   const now = Timestamp.now()
   const congregationRef = doc(getCongregationsCollection())
+
+  await assertCanSaveLocalCongregation(values)
+
   const payload = buildCongregationPayload(values)
   const congregationDocument: CongregationDocument = {
     ...payload,
@@ -211,6 +247,12 @@ export async function updateCongregation({
     throw new Error('A congregacao selecionada nao esta mais disponivel.')
   }
 
+  if (existingCongregation.isLocal && !values.isLocal) {
+    throw new Error('A congregacao local fixa nao pode ser convertida em externa.')
+  }
+
+  await assertCanSaveLocalCongregation(values, id)
+
   const now = Timestamp.now()
   const payload = buildCongregationPayload(values)
   const existingDocument = stripRecordId(existingCongregation)
@@ -253,6 +295,10 @@ export async function deleteCongregation({
 
   if (!existingCongregation || !existingCongregation.isActive) {
     throw new Error('A congregacao selecionada nao esta mais disponivel.')
+  }
+
+  if (existingCongregation.isLocal) {
+    throw new Error('A congregacao local fixa nao pode ser excluida da base ativa.')
   }
 
   const linkedSpeakersQuery = query(

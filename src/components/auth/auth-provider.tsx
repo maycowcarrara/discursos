@@ -15,6 +15,7 @@ function mapAuthUser(user: User): AuthUser {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
+    photoURL: user.photoURL,
     isAdmin: true,
   }
 }

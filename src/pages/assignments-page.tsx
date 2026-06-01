@@ -18,6 +18,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
+import { EmptyState } from '@/components/app/empty-state'
+import { PageHeader } from '@/components/app/page-header'
+import { SummaryStat } from '@/components/app/summary-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -76,11 +79,11 @@ const selectClassName =
   'flex h-11 w-full rounded-2xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70'
 
 const assignmentFormSchema = z.object({
-  calendarEventId: z.string().trim().min(1, 'Selecione o evento da designacao.'),
+  calendarEventId: z.string().trim().min(1, 'Selecione o evento da designação.'),
   localCongregationId: z
     .string()
     .trim()
-    .min(1, 'Selecione a congregacao que recebera o discurso.'),
+    .min(1, 'Selecione a congregação que receberá o discurso.'),
   speakerId: z.string().trim().min(1, 'Selecione o orador.'),
   themeId: z.string().trim().min(1, 'Selecione o tema.'),
   status: z.enum(['pending', 'confirmed', 'declined', 'cancelled', 'replaced']),
@@ -113,17 +116,17 @@ const movementOptions: Array<{
   {
     value: 'incoming',
     title: 'Orador visitante',
-    description: 'Orador visitante designado para falar em uma congregacao local da sua agenda.',
+    description: 'Orador visitante designado para falar em uma congregação local.',
   },
   {
     value: 'outgoing',
     title: 'Discurso fora',
-    description: 'Um orador local designado para atender uma congregacao parceira.',
+    description: 'Um orador local designado para atender uma congregação parceira.',
   },
   {
     value: 'local',
-    title: 'Designacao local',
-    description: 'O orador local permanece falando dentro da propria base.',
+    title: 'Designação local',
+    description: 'O orador local permanece falando dentro da própria congregação.',
   },
 ]
 
@@ -135,7 +138,7 @@ const editableStatusOptions: Array<{
   {
     value: 'pending',
     title: 'Pendente',
-    description: 'A designacao foi montada, mas ainda aguarda retorno formal.',
+    description: 'A designação foi montada, mas ainda aguarda resposta.',
   },
   {
     value: 'confirmed',
@@ -145,16 +148,16 @@ const editableStatusOptions: Array<{
   {
     value: 'declined',
     title: 'Recusado',
-    description: 'O orador nao aceitou e o slot precisa ser remanejado.',
+    description: 'O orador não aceitou e a data precisa ser reorganizada.',
   },
   {
     value: 'cancelled',
     title: 'Cancelado',
-    description: 'O registro permanece no historico, mas sai da operacao atual.',
+    description: 'O registro permanece no histórico, mas sai da operação atual.',
   },
   {
     value: 'replaced',
-    title: 'Substituido',
+    title: 'Substituído',
     description: 'Fica preservado apenas como trilha da troca realizada.',
   },
 ]
@@ -166,7 +169,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Nao foi possivel concluir a operacao em designacoes.'
+  return 'Não foi possível concluir a operação em designações.'
 }
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
@@ -327,8 +330,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
       ? {
           canRequestSync: false,
           canShowAction: false,
-          description: 'O evento da agenda nao foi encontrado para esta designacao.',
-          label: 'Evento indisponivel',
+          description: 'O evento da agenda não foi encontrado para esta designação.',
+          label: 'Evento indisponível',
           tone: 'error',
         }
       : null
@@ -368,8 +371,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: false,
       canShowAction: true,
-      description: 'Ative a integracao em Configuracoes antes de publicar ou remover este item no Google Calendar.',
-      label: 'Integracao desligada',
+      description: 'Ative a integração nas configurações antes de publicar ou remover este item na agenda.',
+      label: 'Integração desligada',
       tone: 'warning',
     }
   }
@@ -378,8 +381,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: false,
       canShowAction: true,
-      description: 'Este item ja entrou na fila manual e sera processado no proximo ciclo do worker.',
-      label: 'Na fila do Google Calendar',
+      description: 'Este item já entrou na fila manual e será processado em breve.',
+      label: 'Na fila de sincronização',
       tone: 'warning',
     }
   }
@@ -390,8 +393,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
       canShowAction: true,
       description:
         options.calendarEvent.googleCalendarSyncError?.trim() ||
-        'A ultima tentativa falhou. Revise e tente sincronizar novamente.',
-      label: 'Erro de sincronizacao',
+        'A última tentativa falhou. Revise os dados e tente sincronizar novamente.',
+      label: 'Erro de sincronização',
       tone: 'error',
     }
   }
@@ -400,8 +403,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: true,
       canShowAction: true,
-      description: 'A agenda remota ainda precisa remover a publicacao anterior deste evento.',
-      label: 'Remocao pronta para sincronizar',
+      description: 'A agenda externa ainda precisa remover a publicação anterior deste evento.',
+      label: 'Remoção pendente',
       tone: 'warning',
     }
   }
@@ -411,11 +414,11 @@ function getAssignmentGoogleCalendarSyncState(options: {
       canRequestSync: true,
       canShowAction: true,
       description: hasRemoteEvent
-        ? 'O Google Calendar ainda nao recebeu esta atualizacao mais recente.'
-        : 'Esta designacao esta pronta para ser publicada manualmente na agenda.',
+        ? 'A agenda externa ainda não recebeu esta atualização mais recente.'
+        : 'Esta designação já pode ser enviada para a agenda externa.',
       label: hasRemoteEvent
-        ? 'Atualizacao pronta para sincronizar'
-        : 'Pronto para sincronizar',
+        ? 'Atualização pronta'
+        : 'Pronto para enviar',
       tone: 'neutral',
     }
   }
@@ -424,8 +427,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: true,
       canShowAction: true,
-      description: 'O Google Calendar ja esta alinhado com a versao atual deste item.',
-      label: 'Sincronizado com a agenda',
+      description: 'A agenda externa já está alinhada com a versão atual deste item.',
+      label: 'Agenda atualizada',
       tone: 'success',
     }
   }
@@ -917,7 +920,7 @@ export function AssignmentsPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -928,7 +931,7 @@ export function AssignmentsPage() {
       if (!editingAssignment && !creatableStatusValues.includes(values.status)) {
         setFeedback({
           tone: 'error',
-          message: 'Novas designacoes desta fase devem iniciar como pendentes ou confirmadas.',
+          message: 'Novas designações devem iniciar como pendentes ou confirmadas.',
         })
         return
       }
@@ -945,8 +948,8 @@ export function AssignmentsPage() {
           tone: 'success',
           message: buildAssignmentSaveFeedbackMessage(
             values.status === 'confirmed'
-              ? 'Designacao atualizada e confirmada com sucesso.'
-              : 'Designacao atualizada com sucesso.',
+              ? 'Designação atualizada e confirmada com sucesso.'
+              : 'Designação atualizada com sucesso.',
             movementType,
           ),
         })
@@ -961,10 +964,10 @@ export function AssignmentsPage() {
           tone: 'success',
           message: buildAssignmentSaveFeedbackMessage(
             willReplaceCurrentAssignment
-              ? 'Nova designacao criada e a anterior foi marcada como substituida.'
+              ? 'Nova designação criada e a anterior foi marcada como substituída.'
               : values.status === 'confirmed'
-                ? 'Designacao criada ja como confirmada.'
-                : 'Designacao criada com sucesso.',
+                ? 'Designação criada já como confirmada.'
+                : 'Designação criada com sucesso.',
             movementType,
           ),
         })
@@ -989,7 +992,7 @@ export function AssignmentsPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -1018,7 +1021,7 @@ export function AssignmentsPage() {
       setFeedback({
         tone: 'success',
         message: buildAssignmentSaveFeedbackMessage(
-          'Designacao confirmada com sucesso.',
+          'Designação confirmada com sucesso.',
           assignmentToConfirm
             ? inferAssignmentMovementType(assignmentToConfirm, congregationsById)
             : 'local',
@@ -1036,15 +1039,15 @@ export function AssignmentsPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
 
     const confirmed = window.confirm(
-      `Cancelar a designacao de ${assignment.speakerName} em ${formatTimestampDate(
+      `Cancelar a designação de ${assignment.speakerName} em ${formatTimestampDate(
         assignment.eventDate,
-      )}? O historico sera preservado com status cancelado.`,
+      )}? O histórico será preservado com status cancelado.`,
     )
 
     if (!confirmed) {
@@ -1075,7 +1078,7 @@ export function AssignmentsPage() {
       setFeedback({
         tone: 'success',
         message: buildAssignmentSaveFeedbackMessage(
-          'Designacao cancelada com sucesso.',
+          'Designação cancelada com sucesso.',
           inferAssignmentMovementType(assignment, congregationsById),
         ),
       })
@@ -1093,7 +1096,7 @@ export function AssignmentsPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -1101,7 +1104,7 @@ export function AssignmentsPage() {
     if (!calendarSettingsQuery.data?.enabled) {
       setFeedback({
         tone: 'error',
-        message: 'Ative a integracao do Google Calendar em Configuracoes antes de sincronizar.',
+        message: 'Ative a integração da agenda nas configurações antes de sincronizar.',
       })
       return
     }
@@ -1117,7 +1120,7 @@ export function AssignmentsPage() {
 
       setFeedback({
         tone: 'success',
-        message: 'Evento enviado para a fila manual do Google Calendar. O worker vai processar no proximo ciclo.',
+        message: 'Solicitação enviada para sincronização com a agenda. Ela será processada no próximo ciclo.',
       })
     } catch (error) {
       setFeedback({
@@ -1129,60 +1132,58 @@ export function AssignmentsPage() {
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader className="gap-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle className="text-3xl">Designacoes</CardTitle>
-              <CardDescription className="mt-2 text-base">
-                A Fase 8 libera operacao real em `assignments` para entrada de
-                oradores visitantes, discursos fora, status, observacoes,
-                confirmacao manual e envio controlado para o Google Calendar.
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Badge className="bg-primary/10 text-primary">{activeYear}</Badge>
-              <Button onClick={handleStartCreate} disabled={isSubmitting}>
-                <Plus className="size-4" />
-                Nova designacao
-              </Button>
-            </div>
-          </div>
+      <PageHeader
+        eyebrow="Operação"
+        title="Designações"
+        description="Organize visitantes, saídas locais e confirmações em uma visão mais direta para o uso diário."
+        actions={
+          <>
+            <Badge className="bg-primary/10 text-primary">{activeYear}</Badge>
+            <Button onClick={handleStartCreate} disabled={isSubmitting}>
+              <Plus className="size-4" />
+              Nova designação
+            </Button>
+          </>
+        }
+      />
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Designacoes no ano</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.total}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Pendentes</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.pending}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Confirmadas</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.confirmed}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Saidas locais</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.outgoing}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Slots ainda livres</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.openSlots}
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <SummaryStat
+          label="Designações no ano"
+          value={String(stats.total)}
+          detail="Total de registros do ano selecionado."
+          icon={CalendarDays}
+          tone="blue"
+        />
+        <SummaryStat
+          label="Pendentes"
+          value={String(stats.pending)}
+          detail="Aguardando resposta do orador."
+          icon={Clock3}
+          tone="amber"
+        />
+        <SummaryStat
+          label="Confirmadas"
+          value={String(stats.confirmed)}
+          detail="Datas já prontas para operar."
+          icon={CheckCircle2}
+          tone="green"
+        />
+        <SummaryStat
+          label="Saídas locais"
+          value={String(stats.outgoing)}
+          detail="Oradores locais atendendo fora."
+          icon={ArrowRightLeft}
+          tone="slate"
+        />
+        <SummaryStat
+          label="Datas sem cobertura"
+          value={String(stats.openSlots)}
+          detail="Eventos ainda sem designação ativa."
+          icon={ShieldAlert}
+          tone="amber"
+        />
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
@@ -1190,12 +1191,12 @@ export function AssignmentsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-2xl">
-                  {editingAssignment ? 'Editar designacao' : 'Nova designacao'}
+                  {editingAssignment ? 'Editar designação' : 'Nova designação'}
                 </CardTitle>
                 <CardDescription>
                   {editingAssignment
-                    ? 'Atualize status, observacoes, destino, tema e confirmacoes mantendo o historico oficial.'
-                    : 'Monte um novo orador visitante ou discurso fora sem sair do schema oficial. A publicacao na agenda externa fica manual pelo botao da lista.'}
+                    ? 'Atualize status, observações, destino e tema sem perder o histórico da data.'
+                    : 'Cadastre uma nova designação e depois envie para a agenda externa somente quando fizer sentido.'}
                 </CardDescription>
               </div>
               {editingAssignment ? (
@@ -1204,7 +1205,7 @@ export function AssignmentsPage() {
                   onClick={handleStartCreate}
                   disabled={isSubmitting}
                 >
-                  Cancelar edicao
+                  Cancelar edição
                 </Button>
               ) : null}
             </div>
@@ -1214,7 +1215,7 @@ export function AssignmentsPage() {
             <form className="space-y-5" onSubmit={submitHandler}>
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Movimento</span>
+                  <span className="text-sm font-medium text-foreground">Tipo de designação</span>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {movementOptions.map((option) => (
                       <button
@@ -1235,7 +1236,7 @@ export function AssignmentsPage() {
                 </div>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Evento</span>
+                  <span className="text-sm font-medium text-foreground">Data</span>
                   <select className={selectClassName} {...register('calendarEventId')}>
                     <option value="">Selecione um evento</option>
                     {eligibleEvents.map((event) => {
@@ -1248,7 +1249,7 @@ export function AssignmentsPage() {
                         <option key={event.id} value={event.id}>
                           {activeAssignment
                             ? `${eventLabel} - ocupado por ${activeAssignment.speakerName}`
-                            : `${eventLabel} - livre`}
+                            : `${eventLabel} - disponível`}
                         </option>
                       )
                     })}
@@ -1263,10 +1264,10 @@ export function AssignmentsPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Congregacao que recebe
+                      Congregação de destino
                     </span>
                     <select className={selectClassName} {...register('localCongregationId')}>
-                      <option value="">Selecione a congregacao</option>
+                      <option value="">Selecione a congregação</option>
                       {destinationOptions.map((congregation) => (
                         <option key={congregation.id} value={congregation.id}>
                           {congregation.name}
@@ -1286,7 +1287,7 @@ export function AssignmentsPage() {
                       <option value="">Selecione o orador</option>
                       {speakerOptions.map((speaker) => (
                         <option key={speaker.id} value={speaker.id}>
-                          {speaker.name} - {speaker.congregationName ?? 'Sem congregacao'}
+                          {speaker.name} - {speaker.congregationName ?? 'Sem congregação'}
                         </option>
                       ))}
                     </select>
@@ -1355,16 +1356,16 @@ export function AssignmentsPage() {
                   </div>
                   {!editingAssignment ? (
                     <p className="text-xs leading-5 text-muted-foreground">
-                      Novas designacoes iniciam como pendentes ou confirmadas. Os
-                      demais status ficam disponiveis em edicoes posteriores.
+                      Novas designações começam como pendentes ou confirmadas. Os
+                      demais status ficam disponíveis quando a data já estiver criada.
                     </p>
                   ) : null}
                 </div>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Observacoes</span>
+                  <span className="text-sm font-medium text-foreground">Observações</span>
                   <Textarea
-                    placeholder="Anote detalhes operacionais sobre retorno, troca, transporte ou observacoes da designacao."
+                    placeholder="Anote retorno, transporte, troca ou qualquer detalhe útil para a organização."
                     {...register('notes')}
                   />
                   {errors.notes ? (
@@ -1378,16 +1379,16 @@ export function AssignmentsPage() {
               {!canSubmit ? (
                 <div className={getFeedbackContainerClassName('error')}>
                   {eligibleEvents.length === 0
-                    ? 'Cadastre ao menos um evento liberado no calendario antes de salvar designacoes.'
+                    ? 'Cadastre ao menos uma data disponível na agenda antes de salvar uma designação.'
                     : !hasDestinations
                       ? movementType === 'outgoing'
-                        ? 'Cadastre ao menos uma congregacao parceira ativa para registrar saidas locais.'
-                        : 'Cadastre ao menos uma congregacao local ativa para registrar entradas ou designacoes locais.'
+                        ? 'Cadastre ao menos uma congregação parceira ativa para registrar saídas locais.'
+                        : 'Cadastre ao menos uma congregação local ativa para registrar entradas ou designações locais.'
                       : !hasSpeakerOptions
                         ? movementType === 'incoming'
-                          ? 'Cadastre ao menos um orador visitante ativo para registrar esse tipo de designacao.'
-                          : 'Cadastre ao menos um orador local ativo para registrar esta operacao.'
-                        : 'Selecione um orador com temas ativos para concluir a designacao.'}
+                          ? 'Cadastre ao menos um orador visitante ativo para registrar esse tipo de designação.'
+                          : 'Cadastre ao menos um orador local ativo para registrar esta operação.'
+                        : 'Selecione um orador com temas ativos para concluir a designação.'}
                 </div>
               ) : null}
 
@@ -1399,8 +1400,8 @@ export function AssignmentsPage() {
                   </p>
                   <p className="mt-2">
                     {selectedDestinationCongregation
-                      ? `Congregacao de destino: ${selectedDestinationCongregation.name}.`
-                      : 'Selecione a congregacao de destino para completar o snapshot.'}
+                      ? `Congregação de destino: ${selectedDestinationCongregation.name}.`
+                      : 'Selecione a congregação de destino para completar a designação.'}
                   </p>
                 </div>
               ) : null}
@@ -1408,20 +1409,17 @@ export function AssignmentsPage() {
               {selectedSpeakerMissingEmail ? (
                 <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   <p className="font-medium">
-                    Este orador ainda nao possui e-mail cadastrado.
+                    Este orador ainda não possui e-mail cadastrado.
                   </p>
                   <p className="mt-2">
-                    A designacao pode ser salva, mas a automacao da Fase 11 nao
-                    conseguira enviar confirmacao nem lembretes, e a Fase 12 nao
-                    conseguira adicionar o orador como convidado no Google Calendar
-                    ate que o cadastro seja atualizado.
+                    A designação pode ser salva, mas os lembretes por e-mail e o convite na agenda não poderão ser enviados até que o cadastro seja atualizado.
                   </p>
                 </div>
               ) : null}
 
               {selectedEventCoveredByOtherAssignment ? (
                 <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                  <p className="font-medium">Este evento ja possui cobertura operacional.</p>
+                  <p className="font-medium">Esta data já possui cobertura operacional.</p>
                   <p className="mt-2">
                     {currentOperationalAssignment?.speakerName} esta ocupando o slot
                     agora com status{' '}
@@ -1432,8 +1430,8 @@ export function AssignmentsPage() {
                   </p>
                   {!editingAssignment && isAssignmentCoveringCalendarSlot(watchedStatus) ? (
                     <p className="mt-2">
-                      Se voce salvar uma nova designacao pendente ou confirmada,
-                      a anterior sera marcada como substituida automaticamente.
+                      Se você salvar uma nova designação pendente ou confirmada,
+                      a anterior será marcada como substituída automaticamente.
                     </p>
                   ) : null}
                 </div>
@@ -1441,7 +1439,7 @@ export function AssignmentsPage() {
 
               {recentThemeUsage ? (
                 <div className="rounded-[20px] border border-sky-200 bg-sky-50 px-4 py-4 text-sm leading-6 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
-                  <p className="font-medium">RN007: uso recente de tema detectado.</p>
+                  <p className="font-medium">Atenção ao tema recente</p>
                   <p className="mt-2">
                     Tema {recentThemeUsage.themeNumber} foi usado em{' '}
                     {formatTimestampDate(recentThemeUsage.eventDate)} por{' '}
@@ -1466,10 +1464,10 @@ export function AssignmentsPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-muted-foreground">
                   {editingAssignment
-                    ? `Ultima atualizacao em ${formatUpdatedAt(
+                    ? `Última atualização em ${formatUpdatedAt(
                         editingAssignment.updatedAt.toDate(),
                       )}.`
-                    : 'RN001, RN002, RN003, RN006 e RN007 sao avaliadas pela camada de servico desta fase.'}
+                    : 'As validações de tema, disponibilidade e bloqueio de datas continuam ativas ao salvar.'}
                 </p>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -1493,7 +1491,7 @@ export function AssignmentsPage() {
                   </Button>
                   <Button type="submit" disabled={isSubmitting || !canSubmit}>
                     <Plus className="size-4" />
-                    {editingAssignment ? 'Salvar alteracoes' : 'Salvar designacao'}
+                    {editingAssignment ? 'Salvar alterações' : 'Salvar designação'}
                   </Button>
                 </div>
               </div>
@@ -1505,10 +1503,9 @@ export function AssignmentsPage() {
           <CardHeader className="gap-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <CardTitle className="text-2xl">Operacao do ano</CardTitle>
+                <CardTitle className="text-2xl">Designações do ano</CardTitle>
                 <CardDescription>
-                  Lista administrativa com filtros locais, confirmacoes rapidas e
-                  substituicao controlada sem apagar historico.
+                  Localize, confirme, substitua ou cancele uma designação sem sair da mesma tela.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
@@ -1524,7 +1521,7 @@ export function AssignmentsPage() {
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-11"
-                  placeholder="Buscar por orador, tema ou congregacao..."
+                  placeholder="Buscar por orador, tema ou congregação..."
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
@@ -1539,7 +1536,7 @@ export function AssignmentsPage() {
                 <option value="all">Todos os movimentos</option>
                 <option value="incoming">Oradores visitantes</option>
                 <option value="outgoing">Discursos fora</option>
-                <option value="local">Designacoes locais</option>
+                <option value="local">Designações locais</option>
               </select>
               <select
                 className={selectClassName}
@@ -1573,11 +1570,18 @@ export function AssignmentsPage() {
             {!assignmentsQuery.isLoading &&
             !assignmentsQuery.isError &&
             filteredAssignments.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-border/80 bg-background px-5 py-8 text-sm leading-6 text-muted-foreground">
-                {assignments.length > 0
-                  ? 'Nenhuma designacao corresponde aos filtros aplicados.'
-                  : 'Nenhuma designacao encontrada ainda para o ano selecionado.'}
-              </div>
+              <EmptyState
+                title={
+                  assignments.length > 0
+                    ? 'Nenhuma designação encontrada'
+                    : 'Ainda não há designações neste ano'
+                }
+                description={
+                  assignments.length > 0
+                    ? 'Ajuste os filtros para encontrar a designação desejada.'
+                    : 'Crie a primeira designação para começar a organizar a agenda.'
+                }
+              />
             ) : null}
 
             {!assignmentsQuery.isLoading &&
@@ -1680,7 +1684,7 @@ export function AssignmentsPage() {
                                 <p>{assignment.themeTitle}</p>
                                 {theme && !theme.isActive ? (
                                   <p className="text-xs text-amber-700 dark:text-amber-200">
-                                    Tema atualmente inativo, preservado aqui por historico.
+                                    Tema atualmente inativo, preservado aqui por histórico.
                                   </p>
                                 ) : null}
                               </div>
@@ -1733,7 +1737,7 @@ export function AssignmentsPage() {
                               disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
                             >
                               <GoogleCalendarButtonMark />
-                              Sincronizar com agenda
+                              Enviar para agenda
                             </Button>
                           ) : null}
                           {hasQuickConfirm ? (
@@ -1783,57 +1787,6 @@ export function AssignmentsPage() {
           </CardContent>
         </Card>
       </section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Regras aplicadas nesta fase</CardTitle>
-          <CardDescription className="mt-2">
-            A operacao principal agora tambem agenda confirmacoes e lembretes
-            da Fase 11, preservando o historico completo em `assignments`.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
-            <p className="flex items-center gap-2 font-medium text-foreground">
-              <ShieldAlert className="size-4 text-primary" />
-              RN001
-            </p>
-            <p className="mt-2">
-              O tema escolhido precisa existir dentro de `speakers.themeIds`.
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
-            <p className="flex items-center gap-2 font-medium text-foreground">
-              <CalendarDays className="size-4 text-primary" />
-              RN002 e RN003
-            </p>
-            <p className="mt-2">
-              Congressos e assembleias continuam bloqueados por
-              `calendarEvents.blocksAssignments`.
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
-            <p className="flex items-center gap-2 font-medium text-foreground">
-              <Clock3 className="size-4 text-primary" />
-              RN006
-            </p>
-            <p className="mt-2">
-              Ferias e indisponibilidade por periodo impedem novas designacoes no
-              intervalo cadastrado.
-            </p>
-          </div>
-          <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
-            <p className="flex items-center gap-2 font-medium text-foreground">
-              <ArrowRightLeft className="size-4 text-primary" />
-              Historico preservado
-            </p>
-            <p className="mt-2">
-              Cancelamentos mudam status e substituicoes geram trilha em
-              `auditLogs`, sem apagar `assignments`.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

@@ -128,7 +128,6 @@ type NotificationRecord = {
 type SettingsRecord = {
   locale: string
   organizationName: string
-  timezone: string
 }
 
 type AdminAccessSettingsRecord = {
@@ -253,6 +252,8 @@ const googleWorkerScopes =
   `${googleDatastoreScope} ${googleCalendarScope} ${googleIdentityToolkitScope}`
 const defaultBatchSize = 10
 const defaultCalendarSyncBatchSize = 10
+const defaultLocale = 'pt-BR'
+const defaultCalendarZoneId = 'America/Sao_Paulo'
 const maxRetryCount = 3
 const processingLeaseMinutes = 5
 const retryDelayMinutes = 30
@@ -1184,13 +1185,13 @@ function buildGoogleCalendarEventPayload(
     ),
     end: {
       dateTime: dateRange.endDateTime,
-      timeZone: settings.timezone,
+      timeZone: defaultCalendarZoneId,
     },
     location,
     summary: buildGoogleCalendarSummary(calendarEvent, syncEntry),
     start: {
       dateTime: dateRange.startDateTime,
-      timeZone: settings.timezone,
+      timeZone: defaultCalendarZoneId,
     },
   }
 }
@@ -1460,7 +1461,6 @@ async function sendEmail(
         event_date: formatEventDateLabel(
           assignment.eventDate,
           settings.locale,
-          settings.timezone,
         ),
         event_type_label: eventTypeLabels[assignment.eventType] ?? assignment.eventType,
         local_congregation_name: assignment.localCongregationName,
@@ -1822,16 +1822,14 @@ async function getSettingsRecord(env: Env): Promise<SettingsRecord> {
 
   if (!document) {
     return {
-      locale: 'pt-BR',
+      locale: defaultLocale,
       organizationName: 'Organizacao',
-      timezone: 'America/Sao_Paulo',
     }
   }
 
   return {
-    locale: getStringField(document, 'locale') ?? 'pt-BR',
+    locale: getStringField(document, 'locale') ?? defaultLocale,
     organizationName: getStringField(document, 'organizationName') ?? 'Organizacao',
-    timezone: getStringField(document, 'timezone') ?? 'America/Sao_Paulo',
   }
 }
 
@@ -2160,7 +2158,6 @@ function mapAssignmentSummary(assignment: AssignmentRecord) {
     eventDateLabel: formatEventDateLabel(
       assignment.eventDate,
       'pt-BR',
-      'America/Sao_Paulo',
     ),
     localCongregationName: assignment.localCongregationName,
     originCongregationName: assignment.originCongregationName,
@@ -3273,10 +3270,10 @@ function getTimestampField(document: FirestoreDocument, fieldName: string) {
   return new Date(field.timestampValue)
 }
 
-function formatEventDateLabel(value: Date, locale: string, timezone: string) {
+function formatEventDateLabel(value: Date, locale: string) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: 'full',
-    timeZone: timezone,
+    timeZone: defaultCalendarZoneId,
   }).format(value)
 }
 

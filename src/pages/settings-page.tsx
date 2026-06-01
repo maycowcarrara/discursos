@@ -1,7 +1,7 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   BellRing,
   CalendarDays,
+  Clock3,
   Save,
   Settings2,
   ShieldCheck,
@@ -9,9 +9,13 @@ import {
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
 
-import { useAuth } from '@/components/auth/use-auth'
+import { EmptyState } from '@/components/app/empty-state'
+import { PageHeader } from '@/components/app/page-header'
+import { SummaryStat } from '@/components/app/summary-stat'
 import { AdminUsersCard } from '@/components/settings/admin-users-card'
+import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,13 +26,14 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useAppSettingsQuery, useCalendarSettingsQuery, useSaveAppSettingsMutation, useSaveCalendarSettingsMutation } from '@/hooks/use-app-settings'
+import {
+  useAppSettingsQuery,
+  useCalendarSettingsQuery,
+  useSaveAppSettingsMutation,
+  useSaveCalendarSettingsMutation,
+} from '@/hooks/use-app-settings'
 import { useRecentAuditLogsQuery } from '@/hooks/use-audit-logs'
 import { useNotificationsByStatusQuery } from '@/hooks/use-notifications'
-import {
-  currentDeliveredPhaseLabel,
-  nextRequiredStepLabel,
-} from '@/config/project-status'
 import {
   defaultAppSettingsValues,
   defaultCalendarSettingsValues,
@@ -53,16 +58,15 @@ const appSettingsFormSchema = z.object({
   organizationName: z
     .string()
     .trim()
-    .min(3, 'Informe o nome da organizacao.'),
+    .min(3, 'Informe o nome da organização.'),
   defaultYear: z
     .number({
-      error: 'Informe um ano valido.',
+      error: 'Informe um ano válido.',
     })
     .int('Informe um ano inteiro.')
     .min(2024, 'Use um ano a partir de 2024.')
-    .max(2100, 'Use um ano ate 2100.'),
-  locale: z.string().trim().min(2, 'Informe o locale.'),
-  timezone: z.string().trim().min(3, 'Informe o timezone.'),
+    .max(2100, 'Use um ano até 2100.'),
+  locale: z.string().trim().min(2, 'Informe o idioma do painel.'),
 })
 
 const calendarSettingsFormSchema = z
@@ -74,21 +78,21 @@ const calendarSettingsFormSchema = z
       .trim()
       .regex(
         /^([01]\d|2[0-3]):([0-5]\d)$/,
-        'Use o formato HH:mm para o horario padrao.',
+        'Use o formato HH:mm no horário padrão.',
       ),
     defaultDurationMinutes: z
       .number({
-        error: 'Informe a duracao em minutos.',
+        error: 'Informe a duração em minutos.',
       })
       .int('Use minutos inteiros.')
       .min(15, 'Use pelo menos 15 minutos.')
-      .max(360, 'Use ate 360 minutos.'),
+      .max(360, 'Use até 360 minutos.'),
   })
   .superRefine((values, context) => {
     if (values.enabled && values.calendarId.length < 3) {
       context.addIssue({
         code: 'custom',
-        message: 'Informe o Calendar ID para habilitar a sincronizacao.',
+        message: 'Informe o Calendar ID para ativar a integração.',
         path: ['calendarId'],
       })
     }
@@ -106,7 +110,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Nao foi possivel carregar os dados do Firestore.'
+  return 'Não foi possível carregar as configurações agora.'
 }
 
 function getCalendarRunStatusLabel(status?: CalendarSyncRunStatus | null) {
@@ -115,14 +119,14 @@ function getCalendarRunStatusLabel(status?: CalendarSyncRunStatus | null) {
   }
 
   if (status === 'success') {
-    return 'Ultima sincronizacao ok'
+    return 'Última sincronização ok'
   }
 
   if (status === 'error') {
-    return 'Ultima sincronizacao com falha'
+    return 'Última sincronização com falha'
   }
 
-  return 'Aguardando sincronizacao'
+  return 'Aguardando sincronização'
 }
 
 function getCalendarRunStatusClassName(status?: CalendarSyncRunStatus | null) {
@@ -203,36 +207,56 @@ export function SettingsPage() {
 
   const persistedSettings = appSettingsQuery.data
   const persistedCalendarSettings = calendarSettingsQuery.data
-  const isAppSaving = saveAppSettingsMutation.isPending
-  const isAppLoading = appSettingsQuery.isLoading
-  const hasAppError = appSettingsQuery.isError
-  const isCalendarSaving = saveCalendarSettingsMutation.isPending
-  const isCalendarLoading = calendarSettingsQuery.isLoading
-  const hasCalendarError = calendarSettingsQuery.isError
   const notificationsError =
     pendingNotificationsQuery.error ?? failedNotificationsQuery.error
   const pendingNotifications = pendingNotificationsQuery.data ?? []
   const failedNotifications = failedNotificationsQuery.data ?? []
   const recentAuditLogs = auditLogsQuery.data ?? []
+  const isAppLoading = appSettingsQuery.isLoading
+  const isCalendarLoading = calendarSettingsQuery.isLoading
+  const isAppSaving = saveAppSettingsMutation.isPending
+  const isCalendarSaving = saveCalendarSettingsMutation.isPending
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+      <PageHeader
+        eyebrow="Ajustes do sistema"
+        title="Configurações"
+        description="Defina a base do painel, mantenha a integração da agenda alinhada e acompanhe os últimos envios e movimentos administrativos."
+        meta={
+          <>
+            <Badge className="bg-primary/10 text-primary">
+              {persistedSettings ? 'Painel configurado' : 'Configuração inicial pendente'}
+            </Badge>
+            <Badge
+              className={getCalendarRunStatusClassName(
+                persistedCalendarSettings?.lastSyncStatus,
+              )}
+            >
+              {persistedCalendarSettings?.enabled
+                ? getCalendarRunStatusLabel(
+                    persistedCalendarSettings.lastSyncStatus,
+                  )
+                : 'Integração desligada'}
+            </Badge>
+          </>
+        }
+      />
+
+      <section className="grid gap-5 xl:grid-cols-[1.06fr_0.94fr]">
         <div className="space-y-5">
           <Card>
-            <CardHeader className="gap-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <Settings2 className="size-5" />
+                </div>
                 <div>
-                  <CardTitle className="text-3xl">Configuracoes</CardTitle>
-                  <CardDescription className="mt-2 text-base">
-                    A Fase 3 consolidou a base real de Firestore em
-                    <span className="font-medium text-foreground"> settings/app</span>,
-                    sem inventar campos fora do schema oficial.
+                  <CardTitle>Identidade do painel</CardTitle>
+                  <CardDescription>
+                    Nome exibido, ano de referência e idioma usados nas telas.
                   </CardDescription>
                 </div>
-                <Badge className="bg-primary/10 text-primary">
-                  {persistedSettings ? 'Firestore ativo' : 'Aguardando primeiro salvamento'}
-                </Badge>
               </div>
             </CardHeader>
 
@@ -241,10 +265,10 @@ export function SettingsPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Nome da organizacao
+                      Nome da organização
                     </span>
                     <Input
-                      placeholder="Ex.: Congregacao Central"
+                      placeholder="Ex.: Congregação Central"
                       {...registerApp('organizationName')}
                     />
                     {appErrors.organizationName ? (
@@ -256,7 +280,7 @@ export function SettingsPage() {
 
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Ano padrao
+                      Ano padrão
                     </span>
                     <Input
                       type="number"
@@ -273,7 +297,9 @@ export function SettingsPage() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">Locale</span>
+                    <span className="text-sm font-medium text-foreground">
+                      Idioma do painel
+                    </span>
                     <Input placeholder="pt-BR" {...registerApp('locale')} />
                     {appErrors.locale ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
@@ -281,22 +307,9 @@ export function SettingsPage() {
                       </p>
                     ) : null}
                   </label>
-
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">Timezone</span>
-                    <Input
-                      placeholder="America/Sao_Paulo"
-                      {...registerApp('timezone')}
-                    />
-                    {appErrors.timezone ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {appErrors.timezone.message}
-                      </p>
-                    ) : null}
-                  </label>
                 </div>
 
-                {hasAppError ? (
+                {appSettingsQuery.isError ? (
                   <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(appSettingsQuery.error)}
                   </div>
@@ -304,7 +317,7 @@ export function SettingsPage() {
 
                 {saveAppSettingsMutation.isSuccess ? (
                   <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                    Configuracao salva no Firestore com sucesso.
+                    Ajustes gerais salvos com sucesso.
                   </div>
                 ) : null}
 
@@ -317,17 +330,19 @@ export function SettingsPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm leading-6 text-muted-foreground">
                     {persistedSettings
-                      ? `Ultima atualizacao em ${formatUpdatedAt(
+                      ? `Última atualização em ${formatUpdatedAt(
                           persistedSettings.updatedAt.toDate(),
                         )}.`
-                      : 'Ainda nao existe documento salvo em settings/app.'}
+                      : 'A configuração inicial ainda não foi salva.'}
                   </p>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
                       variant="outline"
                       type="button"
                       disabled={isAppLoading || isAppSaving}
-                      onClick={() => resetApp(toAppSettingsFormValues(appSettingsQuery.data))}
+                      onClick={() =>
+                        resetApp(toAppSettingsFormValues(appSettingsQuery.data))
+                      }
                     >
                       Restaurar valores
                     </Button>
@@ -341,8 +356,8 @@ export function SettingsPage() {
                     >
                       <Save className="size-4" />
                       {persistedSettings
-                        ? 'Salvar configuracao'
-                        : 'Criar configuracao inicial'}
+                        ? 'Salvar ajustes'
+                        : 'Criar configuração inicial'}
                     </Button>
                   </div>
                 </div>
@@ -353,19 +368,16 @@ export function SettingsPage() {
           <AdminUsersCard />
 
           <Card>
-            <CardHeader className="gap-4">
+            <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <CalendarDays className="size-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl">Google Calendar</CardTitle>
-                    <CardDescription className="mt-2 text-base">
-                      Integracao entregue na Fase 12 com
-                      <span className="font-medium text-foreground"> settings/calendar</span>,
-                      sincronizacao por worker e fila leve no proprio
-                      <span className="font-medium text-foreground"> calendarEvents</span>.
+                    <CardTitle>Integração com agenda</CardTitle>
+                    <CardDescription>
+                      Controle o calendário remoto usado para publicar designações.
                     </CardDescription>
                   </div>
                 </div>
@@ -378,12 +390,12 @@ export function SettingsPage() {
                     ? getCalendarRunStatusLabel(
                         persistedCalendarSettings.lastSyncStatus,
                       )
-                    : 'Integracao desligada'}
+                    : 'Integração desligada'}
                 </Badge>
               </div>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="space-y-5">
               <form className="space-y-5" onSubmit={submitCalendarHandler}>
                 <label className="flex items-start gap-3 rounded-[20px] border border-border/70 bg-background px-4 py-4">
                   <input
@@ -393,11 +405,11 @@ export function SettingsPage() {
                   />
                   <div className="space-y-1">
                     <span className="text-sm font-medium text-foreground">
-                      Habilitar integracao com Google Calendar
+                      Ativar sincronização com a agenda
                     </span>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      Quando ligado, o worker pode processar publicacoes e
-                      atualizacoes marcadas para a fila do Google Calendar.
+                      Quando ligado, os envios manuais para a agenda externa passam a
+                      ser processados pela automação.
                     </p>
                   </div>
                 </label>
@@ -417,17 +429,16 @@ export function SettingsPage() {
                       </p>
                     ) : (
                       <p className="text-sm leading-6 text-muted-foreground">
-                        Compartilhe esse calendario com o e-mail da service account
-                        usada no worker antes de ativar a sincronizacao. Se voce
-                        alterar esta configuracao depois, as designacoes operacionais
-                        precisarao de novo clique em `Sincronizar com agenda`.
+                        Compartilhe esse calendário com o e-mail técnico da integração
+                        antes de ativar o envio. Se o calendário remoto mudar, as
+                        publicações já existentes precisarão de nova solicitação.
                       </p>
                     )}
                   </label>
 
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Horario padrao
+                      Horário padrão
                     </span>
                     <Input
                       placeholder="19:30"
@@ -443,7 +454,7 @@ export function SettingsPage() {
 
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Duracao padrao (min)
+                      Duração padrão (min)
                     </span>
                     <Input
                       type="number"
@@ -460,7 +471,7 @@ export function SettingsPage() {
                   </label>
                 </div>
 
-                {hasCalendarError ? (
+                {calendarSettingsQuery.isError ? (
                   <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(calendarSettingsQuery.error)}
                   </div>
@@ -468,7 +479,7 @@ export function SettingsPage() {
 
                 {saveCalendarSettingsMutation.isSuccess ? (
                   <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                    Configuracao do Google Calendar salva com sucesso.
+                    Ajustes da agenda salvos com sucesso.
                   </div>
                 ) : null}
 
@@ -478,44 +489,51 @@ export function SettingsPage() {
                   </div>
                 ) : null}
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                    <p className="text-sm text-muted-foreground">Estado atual</p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">
-                      {persistedCalendarSettings?.enabled ? 'Ativo' : 'Desligado'}
-                    </p>
-                  </div>
-                  <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                    <p className="text-sm text-muted-foreground">Ultimo ciclo</p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">
-                      {getCalendarRunStatusLabel(
-                        persistedCalendarSettings?.lastSyncStatus,
-                      )}
-                    </p>
-                  </div>
-                  <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                    <p className="text-sm text-muted-foreground">Ultima execucao</p>
-                    <p className="mt-2 text-lg font-semibold text-foreground">
-                      {persistedCalendarSettings?.lastSyncAt
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <SummaryStat
+                    label="Estado atual"
+                    value={persistedCalendarSettings?.enabled ? 'Ativo' : 'Desligado'}
+                    detail="Controle principal da integração."
+                    tone={persistedCalendarSettings?.enabled ? 'green' : 'slate'}
+                  />
+                  <SummaryStat
+                    label="Último ciclo"
+                    value={getCalendarRunStatusLabel(
+                      persistedCalendarSettings?.lastSyncStatus,
+                    )}
+                    detail="Resultado mais recente da automação."
+                    tone={
+                      persistedCalendarSettings?.lastSyncStatus === 'error'
+                        ? 'amber'
+                        : 'blue'
+                    }
+                  />
+                  <SummaryStat
+                    label="Última execução"
+                    value={
+                      persistedCalendarSettings?.lastSyncAt
                         ? formatTimestampDate(persistedCalendarSettings.lastSyncAt)
-                        : 'Ainda nao executou'}
-                    </p>
-                  </div>
+                        : 'Ainda não executou'
+                    }
+                    detail="Momento registrado no último processamento."
+                    tone="slate"
+                    icon={Clock3}
+                  />
                 </div>
 
-                <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-[20px] border border-border/70 bg-background px-4 py-4 text-sm leading-6 text-muted-foreground">
                   {persistedCalendarSettings?.lastSyncMessage
                     ? persistedCalendarSettings.lastSyncMessage
-                    : 'O worker verifica a fila periodicamente e atualiza o status global desta integracao.'}
+                    : 'A automação verifica a fila periodicamente e atualiza o estado geral da integração aqui.'}
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm leading-6 text-muted-foreground">
                     {persistedCalendarSettings
-                      ? `Ultima atualizacao em ${formatUpdatedAt(
+                      ? `Última atualização em ${formatUpdatedAt(
                           persistedCalendarSettings.updatedAt.toDate(),
                         )}.`
-                      : 'Ainda nao existe documento salvo em settings/calendar.'}
+                      : 'A integração ainda não foi configurada.'}
                   </p>
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
@@ -540,8 +558,8 @@ export function SettingsPage() {
                     >
                       <Save className="size-4" />
                       {persistedCalendarSettings
-                        ? 'Salvar integracao'
-                        : 'Criar configuracao da integracao'}
+                        ? 'Salvar integração'
+                        : 'Criar integração'}
                     </Button>
                   </div>
                 </div>
@@ -551,97 +569,31 @@ export function SettingsPage() {
         </div>
 
         <div className="space-y-5">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+            <SummaryStat
+              label="Envios pendentes"
+              value={String(pendingNotifications.length)}
+              detail="Notificações aguardando processamento."
+              tone={pendingNotifications.length > 0 ? 'amber' : 'green'}
+              icon={BellRing}
+            />
+            <SummaryStat
+              label="Falhas recentes"
+              value={String(failedNotifications.length)}
+              detail="Itens que merecem nova revisão."
+              tone={failedNotifications.length > 0 ? 'amber' : 'green'}
+              icon={ShieldCheck}
+            />
+          </section>
+
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">Escopo entregue</CardTitle>
+              <CardTitle>Fila de notificações</CardTitle>
               <CardDescription>
-                A fundacao do Firestore foi concluida na Fase 3 e a Fase 12
-                foi entregue sem criar colecoes paralelas para integracao externa.
+                Acompanhe o que ainda será enviado e o que precisa de nova tentativa.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                Tipagem oficial do Firestore para as colecoes aprovadas.
-              </div>
-              <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                Hooks React Query para leitura de agenda, designacoes,
-                notificacoes, auditoria e configuracoes.
-              </div>
-              <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                Escrita segura em
-                <span className="font-medium text-foreground"> settings/app</span> e
-                <span className="font-medium text-foreground"> settings/calendar</span>.
-              </div>
-              <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                `calendarEvents` passa a concentrar o vinculo remoto e o estado
-                de sincronizacao do Google Calendar.
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Settings2 className="size-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl">{currentDeliveredPhaseLabel}</CardTitle>
-                  <CardDescription>
-                    A Fase 12 esta concluida sobre a mesma infraestrutura de worker.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <p>
-                `assignments` continua sincronizando a fila oficial de
-                `notifications`, sem abrir colecoes paralelas para EmailJS.
-              </p>
-              <p>
-                O proximo passo obrigatorio e
-                <span className="font-medium text-foreground"> {nextRequiredStepLabel}</span>,
-                com `settings/calendar` ativo e fila manual nas designacoes
-                publicaveis.
-              </p>
-              <p>
-                Os segredos seguem fora do frontend, enquanto o worker reutiliza
-                a service account para Firestore e Google Calendar.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <BellRing className="size-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl">Fila de notificacoes</CardTitle>
-                  <CardDescription>
-                    Leitura real da colecao `notifications`, agora abastecida pela
-                    automacao da Fase 11.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                  <p className="text-sm text-muted-foreground">Pendentes carregadas</p>
-                  <p className="mt-2 text-3xl font-semibold text-foreground">
-                    {pendingNotifications.length}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-                  <p className="text-sm text-muted-foreground">Falhas carregadas</p>
-                  <p className="mt-2 text-3xl font-semibold text-foreground">
-                    {failedNotifications.length}
-                  </p>
-                </div>
-              </div>
-
               {notificationsError ? (
                 <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {getErrorMessage(notificationsError)}
@@ -664,9 +616,10 @@ export function SettingsPage() {
               !notificationsError &&
               pendingNotifications.length === 0 &&
               failedNotifications.length === 0 ? (
-                <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-6 text-sm leading-6 text-muted-foreground">
-                  Nenhuma notificacao pendente ou com falha encontrada ainda.
-                </div>
+                <EmptyState
+                  title="Sem movimentação na fila"
+                  description="Não há notificações pendentes nem falhas recentes neste momento."
+                />
               ) : null}
 
               {!pendingNotificationsQuery.isLoading &&
@@ -677,7 +630,7 @@ export function SettingsPage() {
                   {[...pendingNotifications, ...failedNotifications].map((notification) => (
                     <div
                       key={notification.id}
-                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
+                      className="rounded-[20px] border border-border/70 bg-background px-4 py-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -694,13 +647,13 @@ export function SettingsPage() {
                           {notificationStatusLabels[notification.status]}
                         </Badge>
                       </div>
+
                       <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>
-                          Agendado: {formatTimestampDate(notification.scheduledFor)}
-                        </span>
-                        <span>Provider: {notificationProviderLabels[notification.provider]}</span>
-                        <span>Retry: {notification.retryCount}</span>
+                        <span>Agendado: {formatTimestampDate(notification.scheduledFor)}</span>
+                        <span>Canal: {notificationProviderLabels[notification.provider]}</span>
+                        <span>Tentativas: {notification.retryCount}</span>
                       </div>
+
                       {notification.errorMessage ? (
                         <p className="mt-3 text-sm leading-6 text-rose-700 dark:text-rose-200">
                           {notification.errorMessage}
@@ -715,18 +668,10 @@ export function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <ShieldCheck className="size-5" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl">Auditoria recente</CardTitle>
-                  <CardDescription>
-                    Leitura real da colecao `auditLogs` para confirmar a trilha
-                    append-only da V1.
-                  </CardDescription>
-                </div>
-              </div>
+              <CardTitle>Atividade recente</CardTitle>
+              <CardDescription>
+                Últimos movimentos administrativos registrados no sistema.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {auditLogsQuery.isError ? (
@@ -749,9 +694,10 @@ export function SettingsPage() {
               {!auditLogsQuery.isLoading &&
               !auditLogsQuery.isError &&
               recentAuditLogs.length === 0 ? (
-                <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-6 text-sm leading-6 text-muted-foreground">
-                  Nenhum registro de auditoria encontrado ainda.
-                </div>
+                <EmptyState
+                  title="Sem atividade recente"
+                  description="Os próximos ajustes e confirmações aparecerão aqui."
+                />
               ) : null}
 
               {!auditLogsQuery.isLoading &&
@@ -761,7 +707,7 @@ export function SettingsPage() {
                   {recentAuditLogs.map((auditLog) => (
                     <div
                       key={auditLog.id}
-                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
+                      className="rounded-[20px] border border-border/70 bg-background px-4 py-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -769,7 +715,7 @@ export function SettingsPage() {
                             {auditEntityTypeLabels[auditLog.entityType]}
                           </p>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            {auditLog.entityId}
+                            {auditLog.actorName ?? 'Administrador'}
                           </p>
                         </div>
                         <Badge className={getAuditActionClassName(auditLog.action)}>
@@ -778,7 +724,7 @@ export function SettingsPage() {
                       </div>
                       <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
                         <span>Em: {formatTimestampDate(auditLog.createdAt)}</span>
-                        <span>Actor: {auditLog.actorName ?? auditLog.actorUid}</span>
+                        <span>Registro: {auditLog.entityId}</span>
                       </div>
                     </div>
                   ))}

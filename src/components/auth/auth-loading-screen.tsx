@@ -1,16 +1,31 @@
+import { LoaderCircle, ShieldCheck } from 'lucide-react'
+
 export function AuthLoadingScreen() {
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
-      <div className="rounded-[32px] border border-border/70 bg-card/90 px-8 py-10 text-center shadow-sm">
-        <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          Autenticacao
+    <div className="flex min-h-screen items-center justify-center px-4 py-8 md:px-8">
+      <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 w-full max-w-sm rounded-[28px] border border-border/75 bg-card px-6 py-7 text-center shadow-[0_28px_54px_-42px_rgba(15,23,42,0.24)] backdrop-blur-sm motion-safe:duration-500 dark:shadow-[0_28px_54px_-38px_rgba(2,8,23,0.9)]">
+        <div
+          className="relative mx-auto mb-5 flex size-12 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-[0_16px_34px_-24px_rgba(37,99,235,0.55)]"
+          aria-hidden="true"
+        >
+          <span className="absolute inset-0 rounded-2xl border border-primary/20 motion-safe:animate-ping" />
+          <LoaderCircle className="absolute size-12 opacity-70 motion-safe:animate-spin motion-safe:[animation-duration:1.8s]" />
+          <ShieldCheck className="relative size-5" />
+        </div>
+        <p className="text-xs font-semibold tracking-[0.22em] text-primary uppercase">
+          Acesso administrativo
         </p>
-        <h1 className="mt-3 font-serif text-3xl font-semibold text-foreground">
-          Verificando sessao
+        <h1 className="mt-2 text-xl font-semibold tracking-tight text-foreground md:text-[1.35rem]">
+          Validando seu acesso
         </h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Restaurando acesso e preparando as rotas protegidas.
+        <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
+          Estamos confirmando sua sessão e preparando o painel com segurança.
         </p>
+        <div className="mt-5 flex justify-center gap-1.5" aria-hidden="true">
+          <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-bounce" />
+          <span className="size-1.5 rounded-full bg-primary/60 motion-safe:animate-bounce motion-safe:[animation-delay:150ms]" />
+          <span className="size-1.5 rounded-full bg-primary/40 motion-safe:animate-bounce motion-safe:[animation-delay:300ms]" />
+        </div>
       </div>
     </div>
   )

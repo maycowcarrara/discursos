@@ -10,6 +10,9 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
+import { EmptyState } from '@/components/app/empty-state'
+import { PageHeader } from '@/components/app/page-header'
+import { SummaryStat } from '@/components/app/summary-stat'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -75,7 +78,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Nao foi possivel carregar o historico permanente.'
+  return 'Não foi possível carregar o histórico permanente.'
 }
 
 function getStatusClassName(status: AssignmentStatus) {
@@ -95,7 +98,7 @@ function getStatusClassName(status: AssignmentStatus) {
 }
 
 function getMovementClassName(movementLabel: string) {
-  if (movementLabel === 'Designacao local') {
+  if (movementLabel === 'Designação local') {
     return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-500/20 dark:bg-slate-500/10 dark:text-slate-200'
   }
 
@@ -112,7 +115,7 @@ function formatPeriodBoundary(value: string) {
 
 function buildPeriodSummary(periodStart: string, periodEnd: string) {
   if (!periodStart && !periodEnd) {
-    return 'Todo o historico'
+    return 'Todo o histórico'
   }
 
   if (periodStart && periodEnd) {
@@ -123,7 +126,7 @@ function buildPeriodSummary(periodStart: string, periodEnd: string) {
     return `A partir de ${formatPeriodBoundary(periodStart)}`
   }
 
-  return `Ate ${formatPeriodBoundary(periodEnd)}`
+  return `Até ${formatPeriodBoundary(periodEnd)}`
 }
 
 function buildTimelineSections(
@@ -319,40 +322,30 @@ export function HistoryPage() {
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader className="gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-3">
-            <Badge className="w-fit bg-primary/10 text-primary">FASE 10 concluida</Badge>
-            <div>
-              <CardTitle className="text-3xl">Historico permanente</CardTitle>
-              <CardDescription className="mt-2 max-w-3xl">
-                A tela agora consulta `assignments` por periodo, aplica filtros
-                por tema, orador e congregacao sem colecao paralela e carrega o
-                historico progressivamente para preservar custo e fluidez.
-              </CardDescription>
-            </div>
-          </div>
-
-          <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4 text-sm text-muted-foreground lg:max-w-sm">
-            <p className="font-medium text-foreground">Consulta atual</p>
-            <p className="mt-2">{buildPeriodSummary(appliedPeriod.periodStart, appliedPeriod.periodEnd)}</p>
-            <p className="mt-2 text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
-              {loadedAssignments.length} registros carregados em lotes de {historyPageSize}
-            </p>
-          </div>
-        </CardHeader>
-      </Card>
+      <PageHeader
+        eyebrow="Histórico"
+        title="Histórico de designações"
+        description="Revise períodos anteriores, encontre temas já usados e acompanhe a movimentação de oradores com filtros simples."
+        meta={
+          <>
+            <Badge className="bg-primary/10 text-primary">
+              {buildPeriodSummary(appliedPeriod.periodStart, appliedPeriod.periodEnd)}
+            </Badge>
+            <Badge variant="outline">
+              {loadedAssignments.length} registros carregados
+            </Badge>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Filter className="size-5 text-primary" />
-            <CardTitle className="text-2xl">Filtros de consulta</CardTitle>
+            <CardTitle className="text-2xl">Filtros</CardTitle>
           </div>
           <CardDescription>
-            O periodo controla a leitura no Firestore. Os demais filtros refinam
-            localmente os registros ja carregados para manter o historico util
-            sem desperdiçar leituras.
+            Escolha o período principal e depois refine por orador, tema ou congregação.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -410,7 +403,7 @@ export function HistoryPage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Congregacao</span>
+              <span className="text-sm font-medium text-foreground">Congregação</span>
               <select
                 className={selectClassName}
                 value={congregationFilter}
@@ -427,7 +420,7 @@ export function HistoryPage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Periodo inicial</span>
+              <span className="text-sm font-medium text-foreground">Período inicial</span>
               <Input
                 type="date"
                 value={draftPeriod.periodStart}
@@ -441,7 +434,7 @@ export function HistoryPage() {
             </label>
 
             <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Periodo final</span>
+              <span className="text-sm font-medium text-foreground">Período final</span>
               <Input
                 type="date"
                 value={draftPeriod.periodEnd}
@@ -463,7 +456,7 @@ export function HistoryPage() {
               </Button>
               <Button variant="outline" size="sm" onClick={handleAllHistoryShortcut}>
                 <History className="size-4" />
-                Todo historico
+                Todo histórico
               </Button>
               <Button variant="outline" size="sm" onClick={handleResetLocalFilters}>
                 <RotateCcw className="size-4" />
@@ -472,64 +465,41 @@ export function HistoryPage() {
             </div>
 
             <Button size="lg" onClick={handleApplyPeriod}>
-              Aplicar periodo
+              Aplicar período
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <History className="size-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">Registros carregados</p>
-                <p className="text-3xl font-semibold text-foreground">{metrics.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <UsersRound className="size-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">Confirmados carregados</p>
-                <p className="text-3xl font-semibold text-foreground">
-                  {metrics.confirmed}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <CalendarDays className="size-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">Pendentes carregados</p>
-                <p className="text-3xl font-semibold text-foreground">{metrics.pending}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <Church className="size-5 text-primary" />
-              <div>
-                <p className="text-sm text-muted-foreground">Congregacoes carregadas</p>
-                <p className="text-3xl font-semibold text-foreground">
-                  {metrics.congregations}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <SummaryStat
+          label="Registros"
+          value={String(metrics.total)}
+          detail="Total após os filtros atuais."
+          icon={History}
+          tone="blue"
+        />
+        <SummaryStat
+          label="Confirmados"
+          value={String(metrics.confirmed)}
+          detail="Designações já aceitas."
+          icon={UsersRound}
+          tone="green"
+        />
+        <SummaryStat
+          label="Pendentes"
+          value={String(metrics.pending)}
+          detail="Ainda aguardando resposta."
+          icon={CalendarDays}
+          tone="amber"
+        />
+        <SummaryStat
+          label="Congregações"
+          value={String(metrics.congregations)}
+          detail="Origem e destino envolvidos."
+          icon={Church}
+          tone="slate"
+        />
       </section>
 
       <Card>
@@ -554,19 +524,20 @@ export function HistoryPage() {
           {!historyQuery.isLoading &&
           !historyQuery.isError &&
           loadedAssignments.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border/80 bg-background px-5 py-10 text-sm leading-6 text-muted-foreground">
-              Nenhuma designacao foi encontrada para o periodo consultado.
-            </div>
+            <EmptyState
+              title="Nenhuma designação encontrada"
+              description="Não houve resultados para o período consultado."
+            />
           ) : null}
 
           {!historyQuery.isLoading &&
           !historyQuery.isError &&
           loadedAssignments.length > 0 &&
           filteredAssignments.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border/80 bg-background px-5 py-10 text-sm leading-6 text-muted-foreground">
-              O periodo possui registros carregados, mas nenhum deles atende aos
-              filtros de orador, tema e congregacao aplicados agora.
-            </div>
+            <EmptyState
+              title="Nenhum registro com os filtros atuais"
+              description="O período possui registros, mas nenhum atende aos filtros de orador, tema e congregação."
+            />
           ) : null}
 
           {!historyQuery.isLoading &&
@@ -671,7 +642,7 @@ export function HistoryPage() {
                 </div>
               ) : loadedAssignments.length > 0 ? (
                 <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-4 text-center text-sm text-muted-foreground">
-                  Todos os registros disponiveis para este filtro ja foram carregados.
+                  Todos os registros disponíveis para este filtro já foram carregados.
                 </div>
               ) : null}
             </div>

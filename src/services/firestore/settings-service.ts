@@ -1,6 +1,7 @@
 import {
   Timestamp,
   collection,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -28,7 +29,6 @@ export type AppSettingsFormValues = {
   organizationName: string
   defaultYear: number
   locale: string
-  timezone: string
 }
 
 export type SaveAppSettingsInput = AppSettingsFormValues & {
@@ -56,7 +56,6 @@ export const defaultAppSettingsValues: AppSettingsFormValues = {
   organizationName: '',
   defaultYear: new Date().getFullYear(),
   locale: 'pt-BR',
-  timezone: 'America/Sao_Paulo',
 }
 
 export const defaultCalendarSettingsValues: CalendarSettingsFormValues = {
@@ -95,7 +94,6 @@ export function toAppSettingsFormValues(
     organizationName: settings.organizationName,
     defaultYear: settings.defaultYear,
     locale: settings.locale,
-    timezone: settings.timezone,
   }
 }
 
@@ -176,7 +174,6 @@ export async function saveAppSettings({
   organizationName,
   defaultYear,
   locale,
-  timezone,
 }: SaveAppSettingsInput) {
   const appSettingsRef = getAppSettingsRef()
   const existingSnapshot = await getDoc(appSettingsRef)
@@ -189,7 +186,7 @@ export async function saveAppSettings({
       organizationName: organizationName.trim(),
       defaultYear,
       locale: locale.trim(),
-      timezone: timezone.trim(),
+      timezone: deleteField(),
       createdAt: existingData?.createdAt ?? now,
       updatedAt: now,
       createdBy: existingData?.createdBy ?? actorUid,

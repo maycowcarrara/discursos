@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  Building2,
   CalendarDays,
-  Church,
   History,
   LayoutDashboard,
   Mic2,
@@ -20,7 +20,7 @@ export type NavigationItem = {
 const dashboardNavigationItem: NavigationItem = {
   href: '/',
   label: 'Dashboard',
-  description: 'Visao geral da operacao',
+  description: 'Visão geral da operação',
   icon: LayoutDashboard,
 }
 
@@ -29,43 +29,43 @@ export const navigationItems: NavigationItem[] = [
   {
     href: '/agenda',
     label: 'Agenda',
-    description: 'Calendario e datas especiais',
+    description: 'Planejamento anual e datas especiais',
     icon: CalendarDays,
   },
   {
     href: '/designacoes',
-    label: 'Designacoes',
-    description: 'Entradas, saidas e confirmacoes',
+    label: 'Designações',
+    description: 'Convites, confirmações e ajustes',
     icon: Speech,
   },
   {
     href: '/oradores',
     label: 'Oradores',
-    description: 'Locais, visitantes e temas',
+    description: 'Locais, visitantes e repertório',
     icon: UsersRound,
   },
   {
     href: '/temas',
     label: 'Temas',
-    description: 'Catalogo oficial de discursos',
+    description: 'Catálogo oficial de discursos',
     icon: Mic2,
   },
   {
     href: '/congregacoes',
-    label: 'Congregacoes',
+    label: 'Congregações',
     description: 'Base local e parceiras',
-    icon: Church,
+    icon: Building2,
   },
   {
     href: '/historico',
-    label: 'Historico',
-    description: 'Linha do tempo e filtros do historico',
+    label: 'Histórico',
+    description: 'Linha do tempo e consultas do ano',
     icon: History,
   },
   {
     href: '/configuracoes',
-    label: 'Configuracoes',
-    description: 'Preferencias gerais do sistema',
+    label: 'Configurações',
+    description: 'Ajustes gerais e integrações',
     icon: Settings,
   },
 ]

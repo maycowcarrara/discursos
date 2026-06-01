@@ -30,14 +30,14 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        'rounded-[24px] border border-border/70 bg-card px-5 py-5 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)] dark:shadow-[0_22px_56px_-34px_rgba(2,8,23,0.92)]',
+        'rounded-[24px] border border-border/70 bg-card px-4 py-4 shadow-[0_18px_34px_-26px_rgba(15,23,42,0.2)] dark:shadow-[0_20px_42px_-28px_rgba(2,8,23,0.84)]',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
             {value}
           </p>
         </div>
@@ -52,7 +52,7 @@ export function MetricCard({
           </div>
         ) : null}
       </div>
-      <p className="mt-3 text-sm leading-6 text-muted-foreground">{detail}</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p>
     </div>
   )
 }

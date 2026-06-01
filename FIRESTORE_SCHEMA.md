@@ -123,7 +123,6 @@ Exemplo de `settings/app`:
   organizationName: string
   defaultYear: number
   locale: string
-  timezone: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -193,6 +192,7 @@ Campos:
   mapsUrl: string
   meetingDay: string
   meetingTime: string
+  publicTalkCoordinatorContact: string
   notes: string
   isLocal: boolean
   isActive: boolean
@@ -206,7 +206,9 @@ Campos:
 Observações:
 
 * `name` é o nome oficial exibido na UI
-* `isLocal = true` identifica congregação da própria agenda
+* `isLocal = true` identifica a única congregação local ativa da própria agenda
+* a congregação local deve existir sempre, não deve ser excluída pela UI e concentra `publicTalkCoordinatorContact`
+* congregações externas/parceiras devem ser cadastradas com `isLocal = false` automaticamente, sem escolha manual de tipo na UI
 * não criar campo alternativo como `nome`, `title` ou `congregationName` dentro desta coleção
 
 ### 3. `speakers`

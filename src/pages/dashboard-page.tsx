@@ -1,30 +1,35 @@
 import {
+  Building2,
   CalendarCheck2,
   CalendarDays,
   CheckCircle2,
+  ClipboardList,
   Clock3,
   LoaderCircle,
+  Mail,
+  Mic2,
+  Phone,
   Sparkles,
   TriangleAlert,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
-import { MetricCard } from '@/components/app/metric-card'
+import { EmptyState } from '@/components/app/empty-state'
 import { StatusPill } from '@/components/app/status-pill'
-import { useAppSettingsQuery } from '@/hooks/use-app-settings'
-import { useCongregationsQuery } from '@/hooks/use-congregations'
-import { useDashboardSnapshotQuery } from '@/hooks/use-dashboard'
-import { Badge } from '@/components/ui/badge'
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { useAppSettingsQuery } from '@/hooks/use-app-settings'
+import { useCongregationsQuery } from '@/hooks/use-congregations'
+import { useDashboardSnapshotQuery } from '@/hooks/use-dashboard'
+import { useSpeakerByIdQuery } from '@/hooks/use-speakers'
+import { cn } from '@/lib/utils'
 import {
   assignmentStatusLabels,
   calendarEventTypeLabels,
-  formatTimestampDate,
 } from '@/utils/calendar-events'
 import {
   buildDashboardPendingItems,
@@ -32,21 +37,18 @@ import {
   listUpcomingSpecialEvents,
 } from '@/utils/dashboard'
 
+type DashboardSaturdayEntryView = ReturnType<
+  typeof buildDashboardSaturdayEntries
+>[number]
+
+type DashboardEntryStatus = 'confirmed' | 'pending' | 'event'
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message
   }
 
-  return 'Nao foi possivel carregar o dashboard agora.'
-}
-
-function formatLongDate(date: Date) {
-  return date.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
+  return 'Não foi possível carregar o dashboard agora.'
 }
 
 function formatShortDate(date: Date) {
@@ -56,19 +58,39 @@ function formatShortDate(date: Date) {
   })
 }
 
-function formatMonthBadge(date: Date) {
-  return date
-    .toLocaleDateString('pt-BR', {
-      month: 'short',
-      year: 'numeric',
-    })
-    .replace('.', '')
-    .toUpperCase()
+function formatInlineDate(date: Date) {
+  return date.toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+  })
 }
 
-function getHighlightStyle(
-  status: 'confirmed' | 'pending' | 'event',
-) {
+function getEntryStatus(entry: DashboardSaturdayEntryView): DashboardEntryStatus {
+  if (entry.event.blocksAssignments) {
+    return 'event'
+  }
+
+  if (entry.assignment?.status === 'confirmed') {
+    return 'confirmed'
+  }
+
+  return 'pending'
+}
+
+function getEntryStatusLabel(entry: DashboardSaturdayEntryView) {
+  if (entry.event.blocksAssignments) {
+    return calendarEventTypeLabels[entry.event.type]
+  }
+
+  if (entry.assignment) {
+    return assignmentStatusLabels[entry.assignment.status]
+  }
+
+  return 'Sem designação'
+}
+
+function getHighlightStyle(status: DashboardEntryStatus) {
   if (status === 'confirmed') {
     return {
       wrapperClass:
@@ -92,11 +114,28 @@ function getHighlightStyle(
   }
 }
 
+function normalizePhoneLink(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+
+  if (!digits) {
+    return null
+  }
+
+  return `tel:${digits}`
+}
+
+const cardClass =
+  'rounded-[8px] shadow-[0_16px_32px_-30px_rgba(15,23,42,0.22)]'
+
+const quickActionClass =
+  'inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-border/70 bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
+
+const dashboardShortcutClass =
+  'flex items-center gap-3 rounded-[8px] border border-border/70 bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
+
 export function DashboardPage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-
-  const currentYear = today.getFullYear()
 
   const appSettingsQuery = useAppSettingsQuery()
   const congregationsQuery = useCongregationsQuery()
@@ -106,8 +145,6 @@ export function DashboardPage() {
   const assignments = dashboardSnapshotQuery.data?.assignments ?? []
   const localCongregation =
     congregationsQuery.data?.find((congregation) => congregation.isLocal) ?? null
-  const organizationName =
-    appSettingsQuery.data?.organizationName.trim() || localCongregation?.name || 'Agenda local'
   const upcomingSaturdayEntries = buildDashboardSaturdayEntries(
     calendarEvents,
     assignments,
@@ -119,492 +156,371 @@ export function DashboardPage() {
     assignments,
     today,
   )
-  const unassignedItems = pendingItems.filter((item) => item.kind === 'unassigned')
-  const awaitingResponseItems = pendingItems.filter(
-    (item) => item.kind === 'awaitingResponse',
-  )
   const nextSaturdayEntry = upcomingSaturdayEntries[0] ?? null
+  const remainingSaturdayEntries = upcomingSaturdayEntries.slice(1)
   const nextSpecialEvent = upcomingSpecialEvents[0] ?? null
-  const nextPendingItem = pendingItems[0] ?? null
-  const nextUnassignedItem = unassignedItems[0] ?? null
-  const nextAwaitingResponseItem = awaitingResponseItems[0] ?? null
-
+  const nextSpeakerQuery = useSpeakerByIdQuery(nextSaturdayEntry?.assignment?.speakerId)
+  const nextSpeaker = nextSpeakerQuery.data
   const combinedError =
     appSettingsQuery.error ??
     congregationsQuery.error ??
     dashboardSnapshotQuery.error
-
   const isLoading =
     appSettingsQuery.isLoading ||
     congregationsQuery.isLoading ||
     dashboardSnapshotQuery.isLoading
 
-  const nextSaturdayStatus: 'confirmed' | 'pending' | 'event' = nextSaturdayEntry
-    ? nextSaturdayEntry.event.blocksAssignments
-      ? 'event'
-      : nextSaturdayEntry.assignment?.status === 'confirmed'
-        ? 'confirmed'
-        : 'pending'
+  const nextSaturdayStatus = nextSaturdayEntry
+    ? getEntryStatus(nextSaturdayEntry)
     : 'pending'
   const highlightStyle = getHighlightStyle(nextSaturdayStatus)
   const HighlightIcon = highlightStyle.Icon
-  const metrics = [
+  const nextSpeakerEmail = nextSpeaker?.email.trim() ?? ''
+  const nextSpeakerPhone = nextSpeaker?.phone.trim() ?? ''
+  const nextSpeakerPhoneLink = normalizePhoneLink(nextSpeakerPhone)
+  const dashboardShortcuts = [
     {
-      label: 'Pendencias',
-      value: String(pendingItems.length),
-      detail: nextPendingItem
-        ? `${formatShortDate(nextPendingItem.event.date.toDate())} exige acao imediata.`
-        : 'Nenhuma pendencia nos proximos 8 sabados.',
-      tone: pendingItems.length > 0 ? 'amber' : 'green',
-      icon: TriangleAlert,
+      href: '/designacoes',
+      label: 'Designações',
+      Icon: ClipboardList,
     },
     {
-      label: 'Sem designacao',
-      value: String(unassignedItems.length),
-      detail: nextUnassignedItem
-        ? `${formatShortDate(nextUnassignedItem.event.date.toDate())} ainda sem orador definido.`
-        : 'Todos os sabados livres da janela estao cobertos.',
-      tone: unassignedItems.length > 0 ? 'amber' : 'green',
-      icon: CalendarDays,
+      href: '/agenda',
+      label: 'Agenda',
+      Icon: CalendarDays,
     },
     {
-      label: 'Aguardando resposta',
-      value: String(awaitingResponseItems.length),
-      detail:
-        nextAwaitingResponseItem && nextAwaitingResponseItem.assignment
-          ? `${nextAwaitingResponseItem.assignment.speakerName} ainda nao confirmou.`
-          : 'Nenhuma confirmacao pendente na janela atual.',
-      tone: awaitingResponseItems.length > 0 ? 'blue' : 'green',
-      icon: Clock3,
+      href: '/oradores',
+      label: 'Oradores',
+      Icon: Mic2,
     },
     {
-      label: 'Eventos especiais',
-      value: String(upcomingSpecialEvents.length),
-      detail: nextSpecialEvent
-        ? `${calendarEventTypeLabels[nextSpecialEvent.event.type]} em ${formatShortDate(
-            nextSpecialEvent.event.date.toDate(),
-          )}.`
-        : 'Nenhum evento especial futuro carregado.',
-      tone: upcomingSpecialEvents.length > 0 ? 'blue' : 'green',
-      icon: Sparkles,
+      href: '/congregacoes',
+      label: 'Congregações',
+      Icon: Building2,
     },
   ] as const
+  const nextSaturdayDateLabel = nextSaturdayEntry
+    ? formatInlineDate(nextSaturdayEntry.event.date.toDate())
+    : ''
+  const nextSaturdayMeetingTime = localCongregation?.meetingTime ?? 'Horário a definir'
+  const nextSaturdayHeadline = nextSaturdayEntry
+    ? nextSaturdayEntry.assignment
+      ? nextSaturdayEntry.assignment.speakerName
+      : nextSaturdayEntry.event.blocksAssignments
+        ? nextSaturdayEntry.event.title
+        : 'Sem designação'
+    : ''
+  const nextSaturdayCongregation = nextSaturdayEntry?.assignment
+    ? nextSaturdayEntry.assignment.originCongregationName
+    : 'Ainda não definida'
+  const nextSaturdayTheme = nextSaturdayEntry?.assignment
+    ? `${nextSaturdayEntry.assignment.themeNumber} - ${nextSaturdayEntry.assignment.themeTitle}`
+    : 'Ainda não definido'
 
   return (
-    <div className="space-y-5">
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-3xl">Dashboard</CardTitle>
-                <CardDescription className="mt-1 text-base">
-                  Panorama operacional real da agenda local com foco nos
-                  proximos 8 sabados.
-                </CardDescription>
-              </div>
-              <Badge className="bg-primary/10 text-primary">Painel operacional</Badge>
+    <div className="mx-auto max-w-7xl space-y-2.5">
+      <Card className={cardClass}>
+        <CardHeader className="p-3 pb-1.5 md:p-4 md:pb-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base tracking-normal md:text-lg">
+                Próximo discurso
+              </CardTitle>
             </div>
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="rounded-[22px] border border-border/70 bg-background p-5">
-              <p className="text-sm font-medium text-muted-foreground">Base local</p>
-              <h3 className="mt-2 text-2xl font-semibold text-foreground">
-                {organizationName}
-              </h3>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {localCongregation
-                  ? `${localCongregation.address} - ${localCongregation.city}/${localCongregation.state}`
-                  : 'Cadastre uma congregacao com `isLocal = true` para destacar a base principal do painel.'}
-              </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[18px] border border-border/70 bg-card px-4 py-4">
-                  <p className="text-sm text-muted-foreground">Reuniao publica</p>
-                  <p className="mt-2 flex items-center gap-2 font-medium">
-                    <CalendarDays className="size-4 text-primary" />
-                    {localCongregation?.meetingDay ?? 'Dia nao definido'}
-                  </p>
-                  <p className="mt-2 flex items-center gap-2 font-medium">
-                    <Clock3 className="size-4 text-primary" />
-                    {localCongregation?.meetingTime ?? 'Horario nao definido'}
-                  </p>
-                </div>
-                <div className="rounded-[18px] border border-border/70 bg-card px-4 py-4">
-                  <p className="text-sm text-muted-foreground">Configuracao base</p>
-                  <p className="mt-2 text-lg font-semibold text-foreground">
-                    Ano {appSettingsQuery.data?.defaultYear ?? currentYear}
-                  </p>
-                  <p className="mt-2 text-sm text-primary">
-                    {appSettingsQuery.data?.timezone ?? 'America/Sao_Paulo'}
-                  </p>
-                </div>
-              </div>
+            {!isLoading && !combinedError && nextSaturdayEntry ? (
+              <StatusPill status={nextSaturdayStatus}>
+                {getEntryStatusLabel(nextSaturdayEntry)}
+              </StatusPill>
+            ) : null}
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-3 pt-2 md:p-4 md:pt-2">
+          {isLoading ? (
+            <div className="flex min-h-28 items-center justify-center rounded-[8px] border border-dashed border-border/80 bg-background">
+              <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
             </div>
+          ) : null}
 
-            <div className="rounded-[22px] border border-border/70 bg-background p-5">
-              <p className="text-sm font-medium text-muted-foreground">
-                Proximo sabado
-              </p>
-              {isLoading ? (
-                <div className="mt-5 flex min-h-52 items-center justify-center rounded-[22px] border border-dashed border-border/80 bg-card">
-                  <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : null}
+          {!isLoading && combinedError ? (
+            <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+              {getErrorMessage(combinedError)}
+            </div>
+          ) : null}
 
-              {!isLoading && combinedError ? (
-                <div className="mt-5 rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                  {getErrorMessage(combinedError)}
-                </div>
-              ) : null}
+          {!isLoading && !combinedError && !nextSaturdayEntry ? (
+            <EmptyState
+              className="px-4 py-6"
+              title="Nenhum sábado carregado"
+              description="Gere a agenda anual para começar a acompanhar a cobertura da base."
+            />
+          ) : null}
 
-              {!isLoading && !combinedError && !nextSaturdayEntry ? (
-                <div className="mt-5 rounded-[20px] border border-dashed border-border/80 bg-card px-4 py-5 text-sm leading-6 text-muted-foreground">
-                  Nenhum sabado futuro foi encontrado em `calendarEvents`. Gere
-                  a agenda anual na Fase 7 para liberar o painel operacional.
-                </div>
-              ) : null}
-
-              {!isLoading && !combinedError && nextSaturdayEntry ? (
-                <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start">
-                  <div className="w-full max-w-[128px] rounded-[22px] border border-primary/20 bg-primary/5 px-4 py-5 text-center">
-                    <p className="text-4xl font-semibold tracking-tight text-primary">
-                      {nextSaturdayEntry.event.date
-                        .toDate()
-                        .toLocaleDateString('pt-BR', { day: '2-digit' })}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-primary">
-                      {formatMonthBadge(nextSaturdayEntry.event.date.toDate())}
-                    </p>
-                    <p className="mt-4 text-xs text-muted-foreground">
-                      {formatLongDate(nextSaturdayEntry.event.date.toDate())}
-                    </p>
+          {!isLoading && !combinedError && nextSaturdayEntry ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_minmax(230px,0.8fr)]">
+                <div className="min-w-0 rounded-[8px] border border-border/70 bg-background px-3 py-3">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                    <span className="rounded-full border border-border/70 bg-muted/40 px-3 py-1 font-medium text-foreground">
+                      {nextSaturdayDateLabel}
+                    </span>
+                    <span>{nextSaturdayMeetingTime}</span>
+                    {nextSaturdayEntry.assignment ? (
+                      <StatusPill status={nextSaturdayEntry.assignment.speakerType}>
+                        {nextSaturdayEntry.assignment.speakerType === 'local'
+                          ? 'Local'
+                          : 'Visitante'}
+                      </StatusPill>
+                    ) : null}
                   </div>
 
-                  <div className="flex-1 space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-2xl font-semibold text-foreground">
-                        {nextSaturdayEntry.assignment
-                          ? nextSaturdayEntry.assignment.speakerName
-                          : nextSaturdayEntry.event.blocksAssignments
-                            ? nextSaturdayEntry.event.title
-                            : 'Sem designacao'}
-                      </p>
-                      <StatusPill status={nextSaturdayStatus}>
-                        {nextSaturdayEntry.event.blocksAssignments
-                          ? calendarEventTypeLabels[nextSaturdayEntry.event.type]
-                          : nextSaturdayEntry.assignment
-                            ? assignmentStatusLabels[nextSaturdayEntry.assignment.status]
-                            : 'Sem designacao'}
-                      </StatusPill>
+                  <div className="mt-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-semibold text-foreground md:text-xl">
+                        {nextSaturdayHeadline}
+                      </h3>
                       {nextSaturdayEntry.assignment ? (
-                        <StatusPill status={nextSaturdayEntry.assignment.speakerType}>
-                          {nextSaturdayEntry.assignment.speakerType === 'local'
-                            ? 'Local'
-                            : 'Visitante'}
-                        </StatusPill>
-                      ) : null}
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Cobertura definida para a próxima reunião pública.
+                        </p>
+                      ) : nextSaturdayEntry.event.blocksAssignments ? (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Data reservada para {calendarEventTypeLabels[nextSaturdayEntry.event.type].toLowerCase()}.
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Ainda falta fechar a cobertura desta data.
+                        </p>
+                      )}
                     </div>
-                    <div className="space-y-2 text-sm leading-6 text-muted-foreground">
-                      <p>
-                        <span className="font-medium text-foreground">Evento:</span>{' '}
-                        {nextSaturdayEntry.event.title}
+                    <div
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-full ${highlightStyle.wrapperClass}`}
+                    >
+                      <HighlightIcon className="size-5" />
+                    </div>
+                  </div>
+
+                  {!nextSaturdayEntry.assignment &&
+                  !nextSaturdayEntry.event.blocksAssignments ? (
+                    <div className="mt-3 rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                      Ainda falta definir orador e tema para esta data.
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-1">
+                  <div className="rounded-[8px] border border-border/70 bg-background px-3 py-3">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                      Congregação
+                    </p>
+                    <p className="mt-1.5 text-sm font-medium text-foreground">
+                      {nextSaturdayCongregation}
+                    </p>
+                  </div>
+                  <div className="rounded-[8px] border border-border/70 bg-background px-3 py-3">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                      Tema
+                    </p>
+                    <p className="mt-1.5 text-sm font-medium text-foreground">
+                      {nextSaturdayTheme}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-[8px] border border-border/70 bg-background p-3 lg:col-span-2 xl:col-span-1">
+                  {nextSaturdayEntry.assignment ? (
+                    <>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        Contato rápido
                       </p>
-                      <p>
-                        <span className="font-medium text-foreground">Tipo:</span>{' '}
-                        {calendarEventTypeLabels[nextSaturdayEntry.event.type]}
-                      </p>
-                      {nextSaturdayEntry.assignment ? (
-                        <>
-                          <p>
-                            <span className="font-medium text-foreground">Congregacao:</span>{' '}
-                            {nextSaturdayEntry.assignment.originCongregationName}
+                      <div className="mt-2.5 flex flex-wrap gap-2">
+                        {nextSpeakerEmail ? (
+                          <a
+                            className={quickActionClass}
+                            href={`mailto:${nextSpeakerEmail}`}
+                          >
+                            <Mail className="size-3.5" />
+                            E-mail
+                          </a>
+                        ) : null}
+                        {nextSpeakerPhoneLink ? (
+                          <a className={quickActionClass} href={nextSpeakerPhoneLink}>
+                            <Phone className="size-3.5" />
+                            Telefone
+                          </a>
+                        ) : null}
+                        {!nextSpeakerEmail && !nextSpeakerPhoneLink ? (
+                          <p className="text-sm text-muted-foreground">
+                            Sem contato rápido disponível.
                           </p>
-                          <p>
-                            <span className="font-medium text-foreground">Tema:</span>{' '}
-                            {`${nextSaturdayEntry.assignment.themeNumber} - ${nextSaturdayEntry.assignment.themeTitle}`}
-                          </p>
-                        </>
-                      ) : null}
-                      {!nextSaturdayEntry.assignment &&
-                      !nextSaturdayEntry.event.blocksAssignments ? (
-                        <p className="text-amber-700 dark:text-amber-200">
-                          Cadastre orador e tema para cobrir este sabado.
+                        ) : null}
+                      </div>
+                      {nextSpeakerQuery.isLoading ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Carregando contato do orador...
                         </p>
                       ) : null}
-                      {nextSaturdayEntry.event.description ? (
-                        <p>{nextSaturdayEntry.event.description}</p>
-                      ) : null}
+                    </>
+                  ) : (
+                    <div className="flex h-full flex-col justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        Ação prioritária
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {nextSaturdayEntry.event.blocksAssignments
+                          ? 'Nenhuma cobertura é necessária para esta data.'
+                          : 'Priorize a escolha do orador e do tema para fechar a agenda desta semana.'}
+                      </p>
                     </div>
-                  </div>
+                  )}
+                </div>
+              </div>
 
-                  <div
-                    className={`flex size-12 shrink-0 items-center justify-center rounded-full ${highlightStyle.wrapperClass}`}
-                  >
-                    <HighlightIcon className="size-7" />
+              {remainingSaturdayEntries.length > 0 ? (
+                <div className="border-t border-border/70 pt-3">
+                  <div className="-mx-3 overflow-x-auto px-3 pb-1 md:-mx-4 md:px-4">
+                    <div className="flex min-w-max gap-2">
+                      {remainingSaturdayEntries.map((entry) => {
+                        const entryStatus = getEntryStatus(entry)
+
+                        return (
+                          <div
+                            key={entry.event.id}
+                            className="w-[220px] rounded-[8px] border border-border/70 bg-card px-3 py-2.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-foreground">
+                                {formatInlineDate(entry.event.date.toDate())}
+                              </p>
+                              <span
+                                className={cn(
+                                  'size-2.5 rounded-full',
+                                  entryStatus === 'confirmed'
+                                    ? 'bg-emerald-500'
+                                    : entryStatus === 'event'
+                                      ? 'bg-violet-500'
+                                      : 'bg-amber-500',
+                                )}
+                              />
+                            </div>
+                            <p className="mt-1 text-xs font-medium text-foreground">
+                              {getEntryStatusLabel(entry)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {entry.assignment
+                                ? entry.assignment.speakerName
+                                : entry.event.blocksAssignments
+                                  ? entry.event.title
+                                  : 'Sem designação'}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               ) : null}
             </div>
-          </CardContent>
-        </Card>
-      </section>
+          ) : null}
+        </CardContent>
+      </Card>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            detail={metric.detail}
-            tone={metric.tone}
-            icon={metric.icon}
-          />
-        ))}
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Proximos 8 sabados</CardTitle>
-            <CardDescription>
-              Leitura operacional direta de `calendarEvents` e `assignments`,
-              sem depender de mocks nesta fase.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              Array.from({ length: 4 }, (_, index) => (
-                <div
-                  key={index}
-                  className="h-28 animate-pulse rounded-[18px] border border-border/70 bg-background"
-                />
-              ))
+      <Card className={cardClass}>
+        <CardHeader className="p-3 pb-1 md:p-3.5 md:pb-1">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-[15px] tracking-normal md:text-base">
+              Ações da semana
+            </CardTitle>
+            {!isLoading && !combinedError && pendingItems.length > 0 ? (
+              <span className="text-sm font-semibold text-amber-700 dark:text-amber-200">
+                {pendingItems.length} pendências
+              </span>
             ) : null}
-
-            {!isLoading && combinedError ? (
-              <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                {getErrorMessage(combinedError)}
-              </div>
-            ) : null}
-
-            {!isLoading && !combinedError && upcomingSaturdayEntries.length === 0 ? (
-              <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-6 text-sm leading-6 text-muted-foreground">
-                Ainda nao ha sabados futuros carregados para esta janela.
-              </div>
-            ) : null}
-
-            {!isLoading && !combinedError && upcomingSaturdayEntries.length > 0
-              ? upcomingSaturdayEntries.map((entry) => {
-                  const status: 'confirmed' | 'pending' | 'event' =
-                    entry.event.blocksAssignments
-                      ? 'event'
-                      : entry.assignment?.status === 'confirmed'
-                        ? 'confirmed'
-                        : 'pending'
-
-                  return (
-                    <div
-                      key={entry.event.id}
-                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
-                    >
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-base font-semibold text-foreground">
-                              {formatLongDate(entry.event.date.toDate())}
-                            </p>
-                            <StatusPill status={status}>
-                              {entry.event.blocksAssignments
-                                ? calendarEventTypeLabels[entry.event.type]
-                                : entry.assignment
-                                  ? assignmentStatusLabels[entry.assignment.status]
-                                  : 'Sem designacao'}
-                            </StatusPill>
-                            {entry.assignment ? (
-                              <StatusPill status={entry.assignment.speakerType}>
-                                {entry.assignment.speakerType === 'local'
-                                  ? 'Local'
-                                  : 'Visitante'}
-                              </StatusPill>
-                            ) : null}
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {entry.event.title}
-                          </p>
-                          {entry.assignment ? (
-                            <div className="mt-3 space-y-1 text-sm leading-6 text-muted-foreground">
-                              <p>
-                                <span className="font-medium text-foreground">Orador:</span>{' '}
-                                {entry.assignment.speakerName}
-                              </p>
-                              <p>
-                                <span className="font-medium text-foreground">Origem:</span>{' '}
-                                {entry.assignment.originCongregationName}
-                              </p>
-                              <p>
-                                <span className="font-medium text-foreground">Tema:</span>{' '}
-                                {`${entry.assignment.themeNumber} - ${entry.assignment.themeTitle}`}
-                              </p>
-                            </div>
-                          ) : null}
-                          {!entry.assignment && !entry.event.blocksAssignments ? (
-                            <p className="mt-3 text-sm leading-6 text-amber-700 dark:text-amber-200">
-                              Sem designacao operacional para este sabado.
-                            </p>
-                          ) : null}
-                          {entry.event.description ? (
-                            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                              {entry.event.description}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatTimestampDate(entry.event.date)}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Pendencias da janela</CardTitle>
-            <CardDescription>
-              Priorizacao automatica do que exige acao primeiro.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-3 pt-1 md:p-3.5 md:pt-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+          <div className="space-y-1.5">
             {isLoading ? (
               Array.from({ length: 3 }, (_, index) => (
                 <div
                   key={index}
-                  className="h-24 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                  className="h-12 animate-pulse rounded-[8px] border border-border/70 bg-background"
                 />
               ))
             ) : null}
 
             {!isLoading && combinedError ? (
-              <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+              <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                 {getErrorMessage(combinedError)}
               </div>
             ) : null}
 
             {!isLoading && !combinedError && pendingItems.length === 0 ? (
-              <div className="rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-6 text-sm leading-6 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                Nenhuma pendencia critica encontrada na janela dos proximos 8
-                sabados.
-              </div>
+              <p className="rounded-[8px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                Sem alertas críticos na janela atual.
+              </p>
             ) : null}
 
             {!isLoading && !combinedError && pendingItems.length > 0
-              ? pendingItems.map((item) => (
-                  <div
+              ? pendingItems.slice(0, 5).map((item) => (
+                  <Link
                     key={item.id}
-                    className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
+                    className="block rounded-[8px] border border-amber-200/70 bg-amber-50/40 px-3 py-2 transition-colors hover:bg-amber-50 dark:bg-amber-500/5 dark:hover:bg-amber-500/10"
+                    to={item.kind === 'unassigned' ? '/designacoes' : '/agenda'}
                   >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusPill status="pending">
-                        {item.kind === 'unassigned'
-                          ? 'Sem designacao'
-                          : 'Aguardando resposta'}
-                      </StatusPill>
-                      <p className="text-sm font-medium text-foreground">
-                        {formatLongDate(item.event.date.toDate())}
-                      </p>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                      {item.kind === 'unassigned'
-                        ? `Defina orador e tema para ${item.event.title.toLowerCase()}.`
-                        : `${item.assignment?.speakerName ?? 'O orador'} ainda nao confirmou ${item.event.title.toLowerCase()}.`}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {item.assignment
-                        ? `${item.assignment.originCongregationName} • Tema ${item.assignment.themeNumber} - ${item.assignment.themeTitle}`
-                        : calendarEventTypeLabels[item.event.type]}
-                    </p>
-                  </div>
-                ))
-              : null}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Proximos eventos especiais</CardTitle>
-            <CardDescription>
-              Congressos, assembleias, visitas e eventos especiais ja visiveis
-              na agenda futura.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              Array.from({ length: 3 }, (_, index) => (
-                <div
-                  key={index}
-                  className="h-24 animate-pulse rounded-[18px] border border-border/70 bg-background"
-                />
-              ))
-            ) : null}
-
-            {!isLoading && combinedError ? (
-              <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                {getErrorMessage(combinedError)}
-              </div>
-            ) : null}
-
-            {!isLoading && !combinedError && upcomingSpecialEvents.length === 0 ? (
-              <div className="rounded-[18px] border border-dashed border-border/80 bg-background px-4 py-6 text-sm leading-6 text-muted-foreground">
-                Nenhum evento especial futuro foi encontrado na agenda ativa.
-              </div>
-            ) : null}
-
-            {!isLoading && !combinedError && upcomingSpecialEvents.length > 0
-              ? upcomingSpecialEvents.slice(0, 4).map((entry) => (
-                  <div
-                    key={entry.event.id}
-                    className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusPill status="event">
-                            {calendarEventTypeLabels[entry.event.type]}
-                          </StatusPill>
-                          <p className="text-sm font-medium text-foreground">
-                            {entry.event.title}
-                          </p>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                          {entry.event.description ??
-                            (entry.event.blocksAssignments
-                              ? 'Bloqueia designacoes para esta data.'
-                              : 'Evento especial sem bloqueio automatico de designacoes.')}
+                    <div className="flex items-start gap-2">
+                      <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium leading-5 text-foreground">
+                          {formatShortDate(item.event.date.toDate())}{' '}
+                          {item.kind === 'unassigned'
+                            ? 'Sem designação'
+                            : 'Aguardando confirmação'}
                         </p>
-                        <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
-                          <span>{formatLongDate(entry.event.date.toDate())}</span>
-                          {entry.event.congregationName ? (
-                            <span>{entry.event.congregationName}</span>
-                          ) : null}
-                          {entry.assignment ? (
-                            <span>{`Cobertura: ${entry.assignment.speakerName}`}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                        <CalendarCheck2 className="size-4" />
+                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                          {item.assignment
+                            ? `${item.assignment.speakerName} - Tema ${item.assignment.themeNumber}`
+                            : item.event.title}
+                        </p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))
               : null}
-          </CardContent>
-        </Card>
-      </section>
+          </div>
+
+          <div className="space-y-2">
+            {nextSpecialEvent ? (
+              <div className="rounded-[8px] border border-blue-200/70 bg-blue-50/40 px-3 py-2.5 dark:bg-blue-500/5">
+                <div className="flex items-start gap-2">
+                  <CalendarCheck2 className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-5 text-foreground">
+                      {formatShortDate(nextSpecialEvent.event.date.toDate())}{' '}
+                      {calendarEventTypeLabels[nextSpecialEvent.event.type]}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {nextSpecialEvent.event.title}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              {dashboardShortcuts.map(({ href, label, Icon }) => (
+                <Link key={href} className={dashboardShortcutClass} to={href}>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-muted/50 text-muted-foreground">
+                    <Icon className="size-4" />
+                  </span>
+                  <span>{label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -13,6 +13,9 @@ import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { AvatarBadge } from '@/components/app/avatar-badge'
+import { EmptyState } from '@/components/app/empty-state'
+import { PageHeader } from '@/components/app/page-header'
+import { SummaryStat } from '@/components/app/summary-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -52,8 +55,8 @@ const speakerStatusLabels: Record<SpeakerStatus, string> = {
   active: 'Ativo',
   inactive: 'Inativo',
   transferred: 'Transferido',
-  unavailable: 'Indisponivel',
-  vacation: 'Ferias',
+  unavailable: 'Indisponível',
+  vacation: 'Férias',
 }
 
 const speakerTypeOptions: Array<{
@@ -64,12 +67,12 @@ const speakerTypeOptions: Array<{
   {
     value: 'local',
     title: 'Local',
-    description: 'Permanece na base principal de oradores da propria agenda.',
+    description: 'Permanece na base principal de oradores da própria agenda.',
   },
   {
     value: 'visitor',
     title: 'Visitante',
-    description: 'Representa oradores de congregacoes parceiras ou visitantes.',
+    description: 'Representa oradores de congregações parceiras ou visitantes.',
   },
 ]
 
@@ -85,23 +88,23 @@ const speakerStatusOptions: Array<{
   },
   {
     value: 'vacation',
-    title: 'Ferias',
-    description: 'Permanece cadastrado, mas exige periodo de indisponibilidade.',
+    title: 'Férias',
+    description: 'Permanece cadastrado, mas exige período de indisponibilidade.',
   },
   {
     value: 'unavailable',
-    title: 'Indisponivel',
-    description: 'Mantem o cadastro e registra um intervalo bloqueado.',
+    title: 'Indisponível',
+    description: 'Mantém o cadastro e registra um intervalo bloqueado.',
   },
   {
     value: 'transferred',
     title: 'Transferido',
-    description: 'Sai da base ativa, mas continua no cadastro para historico.',
+    description: 'Sai da base ativa, mas continua no cadastro para histórico.',
   },
   {
     value: 'inactive',
     title: 'Inativo',
-    description: 'Sai da operacao atual e pode ser reativado depois por edicao.',
+    description: 'Sai da operação atual e pode ser reativado depois por edição.',
   },
 ]
 
@@ -111,8 +114,8 @@ const speakerFilterOptions: Array<{
 }> = [
   { value: 'all', label: 'Todos os status' },
   { value: 'active', label: 'Ativos' },
-  { value: 'vacation', label: 'Ferias' },
-  { value: 'unavailable', label: 'Indisponiveis' },
+  { value: 'vacation', label: 'Férias' },
+  { value: 'unavailable', label: 'Indisponíveis' },
   { value: 'transferred', label: 'Transferidos' },
   { value: 'inactive', label: 'Inativos' },
 ]
@@ -120,9 +123,9 @@ const speakerFilterOptions: Array<{
 const speakerFormSchema = z
   .object({
     name: z.string().trim().min(3, 'Informe o nome do orador.'),
-    email: z.string().trim().email('Informe um e-mail valido.'),
-    phone: z.string().trim().min(8, 'Informe um telefone valido.'),
-    congregationId: z.string().trim().min(1, 'Selecione a congregacao.'),
+    email: z.string().trim().email('Informe um e-mail válido.'),
+    phone: z.string().trim().min(8, 'Informe um telefone válido.'),
+    congregationId: z.string().trim().min(1, 'Selecione a congregação.'),
     type: z.enum(['local', 'visitor']),
     themeIds: z
       .array(z.string().trim().min(1))
@@ -157,7 +160,7 @@ const speakerFormSchema = z
     if (!needsUnavailableWindow && (hasStart || hasEnd)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Datas de indisponibilidade so valem para ferias ou indisponivel.',
+        message: 'Datas de indisponibilidade só valem para férias ou indisponível.',
         path: ['unavailableStart'],
       })
     }
@@ -165,7 +168,7 @@ const speakerFormSchema = z
     if (hasStart && hasEnd && values.unavailableStart > values.unavailableEnd) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'A data final precisa ser igual ou posterior a data inicial.',
+        message: 'A data final precisa ser igual ou posterior à data inicial.',
         path: ['unavailableEnd'],
       })
     }
@@ -183,7 +186,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Nao foi possivel concluir a operacao em oradores.'
+  return 'Não foi possível concluir a operação em oradores.'
 }
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
@@ -221,7 +224,7 @@ function formatDateRange(start: Date, end: Date) {
   const startLabel = start.toLocaleDateString('pt-BR')
   const endLabel = end.toLocaleDateString('pt-BR')
 
-  return `${startLabel} ate ${endLabel}`
+  return `${startLabel} até ${endLabel}`
 }
 
 export function SpeakersPage() {
@@ -338,7 +341,7 @@ export function SpeakersPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -424,13 +427,13 @@ export function SpeakersPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
 
     const confirmed = window.confirm(
-      `Remover ${name} da base ativa? O cadastro permanece para historico e futura reativacao.`,
+      `Remover ${name} da base ativa? O cadastro permanece para histórico e futura reativação.`,
     )
 
     if (!confirmed) {
@@ -482,51 +485,64 @@ export function SpeakersPage() {
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader className="gap-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle className="text-3xl">Oradores</CardTitle>
-              <CardDescription className="mt-2 text-base">
-                A Fase 6 entrega o CRUD completo de `speakers` com temas
-                multiplos, status operacional e filtros locais por congregacao e
-                status.
-              </CardDescription>
-            </div>
-            <Button onClick={handleStartCreate} disabled={isSubmitting}>
-              <Plus className="size-4" />
-              Novo orador
-            </Button>
-          </div>
+      <PageHeader
+        eyebrow="Cadastro"
+        title="Oradores"
+        description="Mantenha a base de oradores organizada, com filtros simples e destaque para o que mais importa no uso diário."
+        actions={
+          <Button onClick={handleStartCreate} disabled={isSubmitting}>
+            <Plus className="size-4" />
+            Novo orador
+          </Button>
+        }
+      />
 
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <Badge className="bg-primary/10 text-primary">
-              {totalSpeakers} cadastrados
-            </Badge>
-            <Badge variant="outline">{operationalSpeakersCount} operacionais</Badge>
-            <Badge variant="outline">
-              {temporarilyUnavailableCount} com indisponibilidade
-            </Badge>
-            <Badge variant="outline">{visitorsCount} visitantes</Badge>
-          </div>
-        </CardHeader>
-      </Card>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryStat
+          label="Cadastrados"
+          value={String(totalSpeakers)}
+          detail="Total de oradores salvos no sistema."
+          icon={Mic2}
+          tone="blue"
+        />
+        <SummaryStat
+          label="Operacionais"
+          value={String(operationalSpeakersCount)}
+          detail="Disponíveis para novas designações."
+          icon={Plus}
+          tone="green"
+        />
+        <SummaryStat
+          label="Com indisponibilidade"
+          value={String(temporarilyUnavailableCount)}
+          detail="Exigem atenção antes de designar."
+          icon={Phone}
+          tone="amber"
+        />
+        <SummaryStat
+          label="Visitantes"
+          value={String(visitorsCount)}
+          detail="Oradores vinculados a congregações parceiras."
+          icon={Mail}
+          tone="slate"
+        />
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card>
+        <Card className="xl:order-2">
           <CardHeader className="gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-2xl">{formModeLabel}</CardTitle>
                 <CardDescription>
                   {editingSpeaker
-                    ? 'Atualize dados, status e temas sem sair do schema oficial.'
-                    : 'Cadastre um orador com vinculo de congregacao, temas e status operacional.'}
+                    ? 'Atualize dados, status e temas sem sair desta tela.'
+                    : 'Cadastre um orador com congregação, temas e status bem definidos.'}
                 </CardDescription>
               </div>
               {editingSpeaker ? (
                 <Button variant="outline" onClick={handleStartCreate} disabled={isSubmitting}>
-                  Cancelar edicao
+                  Cancelar edição
                 </Button>
               ) : null}
             </div>
@@ -577,10 +593,10 @@ export function SpeakersPage() {
 
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">
-                    Congregacao
+                    Congregação
                   </span>
                   <select className={selectClassName} {...register('congregationId')}>
-                    <option value="">Selecione a congregacao</option>
+                    <option value="">Selecione a congregação</option>
                     {availableCongregationOptions.map((congregation) => (
                       <option key={congregation.id} value={congregation.id}>
                         {congregation.name}
@@ -589,8 +605,8 @@ export function SpeakersPage() {
                   </select>
                   <p className="text-xs leading-5 text-muted-foreground">
                     {selectedType === 'local'
-                      ? 'Oradores locais so podem ser vinculados a congregacoes locais.'
-                      : 'Oradores visitantes so podem ser vinculados a congregacoes parceiras ou externas.'}
+                      ? 'Oradores locais só podem ser vinculados a congregações locais.'
+                      : 'Oradores visitantes só podem ser vinculados a congregações parceiras ou externas.'}
                   </p>
                   {errors.congregationId ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
@@ -671,7 +687,7 @@ export function SpeakersPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="space-y-2">
                       <span className="text-sm font-medium text-foreground">
-                        Inicio da indisponibilidade
+                        Início da indisponibilidade
                       </span>
                       <Input type="date" {...register('unavailableStart')} />
                       {errors.unavailableStart ? (
@@ -699,7 +715,7 @@ export function SpeakersPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm font-medium text-foreground">Temas</span>
                     <span className="text-xs text-muted-foreground">
-                      Somente temas ativos entram em novas designacoes
+                      Somente temas ativos entram em novas designações
                     </span>
                   </div>
 
@@ -775,9 +791,9 @@ export function SpeakersPage() {
                 </div>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Observacoes</span>
+                  <span className="text-sm font-medium text-foreground">Observações</span>
                   <Textarea
-                    placeholder="Anote detalhes operacionais relevantes sobre o orador."
+                    placeholder="Anote detalhes importantes sobre este orador."
                     {...register('notes')}
                   />
                   {errors.notes ? (
@@ -792,15 +808,15 @@ export function SpeakersPage() {
                 <div className={getFeedbackContainerClassName('error')}>
                   {!hasCongregationOptions
                     ? selectedType === 'local'
-                      ? 'Cadastre ao menos uma congregacao local ativa antes de salvar oradores locais.'
-                      : 'Cadastre ao menos uma congregacao parceira ativa antes de salvar oradores visitantes.'
+                      ? 'Cadastre ao menos uma congregação local ativa antes de salvar oradores locais.'
+                      : 'Cadastre ao menos uma congregação parceira ativa antes de salvar oradores visitantes.'
                     : 'Cadastre ao menos um tema ativo antes de salvar oradores.'}
                 </div>
               ) : null}
 
               {hasInvalidSelectedThemes ? (
                 <div className={getFeedbackContainerClassName('error')}>
-                  O formulario ainda contem temas fora da base ativa. Remova esses vinculos antes de salvar.
+                  O formulário ainda contém temas fora da base ativa. Remova esses vínculos antes de salvar.
                 </div>
               ) : null}
 
@@ -837,10 +853,10 @@ export function SpeakersPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-muted-foreground">
                   {editingSpeaker
-                    ? `Ultima atualizacao em ${formatUpdatedAt(
+                    ? `Última atualização em ${formatUpdatedAt(
                         editingSpeaker.updatedAt.toDate(),
                       )}.`
-                    : 'Create, update e exclusao logica geram auditoria automatica.'}
+                    : 'O cadastro permanece no histórico mesmo quando sai da base ativa.'}
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
@@ -861,7 +877,7 @@ export function SpeakersPage() {
                     }
                   >
                     <Plus className="size-4" />
-                    {editingSpeaker ? 'Salvar alteracoes' : 'Cadastrar orador'}
+                    {editingSpeaker ? 'Salvar alterações' : 'Salvar orador'}
                   </Button>
                 </div>
               </div>
@@ -869,14 +885,13 @@ export function SpeakersPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="xl:order-1">
           <CardHeader className="gap-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <CardTitle className="text-2xl">Cadastro completo</CardTitle>
+                <CardTitle className="text-2xl">Base de oradores</CardTitle>
                 <CardDescription>
-                  Lista administrativa com filtros por tipo, congregacao e status,
-                  sem leituras extras a cada busca local.
+                  Veja rapidamente quem está ativo, quem está indisponível e quem já precisa de atualização.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
@@ -913,7 +928,7 @@ export function SpeakersPage() {
                 value={congregationFilter}
                 onChange={(event) => setCongregationFilter(event.target.value)}
               >
-                <option value="all">Todas congregacoes</option>
+                <option value="all">Todas as congregações</option>
                 {(congregationsQuery.data ?? []).map((congregation) => (
                   <option key={congregation.id} value={congregation.id}>
                     {congregation.name}
@@ -951,11 +966,18 @@ export function SpeakersPage() {
             {!speakersQuery.isLoading &&
             !speakersQuery.isError &&
             filteredSpeakers.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-border/80 bg-background px-5 py-8 text-sm leading-6 text-muted-foreground">
-                {totalSpeakers > 0
-                  ? 'Nenhum orador corresponde aos filtros aplicados.'
-                  : 'Nenhum orador cadastrado ainda na base do Firestore.'}
-              </div>
+              <EmptyState
+                title={
+                  totalSpeakers > 0
+                    ? 'Nenhum orador encontrado'
+                    : 'Ainda não há oradores cadastrados'
+                }
+                description={
+                  totalSpeakers > 0
+                    ? 'Ajuste os filtros para localizar o cadastro desejado.'
+                    : 'Cadastre o primeiro orador para começar a montar a base.'
+                }
+              />
             ) : null}
 
             {!speakersQuery.isLoading &&
@@ -968,7 +990,7 @@ export function SpeakersPage() {
                       (congregation) => congregation.id === speaker.congregationId,
                     )?.name ??
                     speaker.congregationName ??
-                    'Congregacao nao encontrada'
+                    'Congregação não encontrada'
                   const themeLabels = speaker.themeIds
                     .map((themeId) => {
                       const theme = themesById.get(themeId)
@@ -1055,7 +1077,7 @@ export function SpeakersPage() {
 
                             {hasUnavailableWindow ? (
                               <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                                Periodo informado:{' '}
+                                Período informado:{' '}
                                 {formatDateRange(
                                   unavailableStart.toDate(),
                                   unavailableEnd.toDate(),
@@ -1064,7 +1086,7 @@ export function SpeakersPage() {
                             ) : null}
 
                             <p className="leading-6">
-                              {speaker.notes || 'Sem observacoes cadastradas.'}
+                              {speaker.notes || 'Sem observações cadastradas.'}
                             </p>
                             <p className="text-xs">
                               Atualizado em {formatUpdatedAt(speaker.updatedAt.toDate())}
@@ -1087,7 +1109,7 @@ export function SpeakersPage() {
                             disabled={isSubmitting || !speaker.isActive}
                           >
                             <Trash2 className="size-4" />
-                            Excluir
+                            Remover da base ativa
                           </Button>
                         </div>
                       </div>

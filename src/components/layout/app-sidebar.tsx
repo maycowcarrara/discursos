@@ -1,14 +1,13 @@
-import { BookOpenText, ChevronDown, ShieldCheck } from 'lucide-react'
+import { LogOut, MicVocal } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { AvatarBadge } from '@/components/app/avatar-badge'
 import { useAuth } from '@/components/auth/use-auth'
-import {
-  currentDeliveredPhaseLabel,
-  nextRequiredStepLabel,
-} from '@/config/project-status'
+import { ThemeToggle } from '@/components/theme/theme-toggle'
+import { Button } from '@/components/ui/button'
 import { navigationItems } from '@/config/navigation'
 import { cn } from '@/lib/utils'
+import { logout } from '@/services/auth/auth-service'
 
 type AppSidebarProps = {
   mobile?: boolean
@@ -21,25 +20,26 @@ export function AppSidebar({ mobile = false, onNavigate }: AppSidebarProps) {
   return (
     <aside
       className={cn(
-        'flex h-full flex-col overflow-hidden rounded-[28px] border border-sidebar-border/80 bg-[linear-gradient(180deg,rgba(11,26,60,0.98),rgba(8,21,49,0.99))] p-3 text-sidebar-foreground shadow-[0_30px_80px_-44px_rgba(8,18,43,0.95)] backdrop-blur',
-        mobile ? 'w-full' : 'min-h-[calc(100vh-2rem)]',
+        'flex h-full flex-col overflow-hidden border-sidebar-border/80 bg-[linear-gradient(180deg,#0a1d43,#102754_42%,#0c1c3f)] p-3 text-white shadow-[0_28px_64px_-36px_rgba(8,18,43,0.92)]',
+        mobile
+          ? 'w-full rounded-[30px] border'
+          : 'h-full min-h-0 rounded-[26px] border',
       )}
     >
-      <div className="rounded-[22px] border border-white/8 bg-white/4 px-4 py-5 text-sidebar-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <div className="flex items-start gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white">
-            <BookOpenText className="size-5" />
+      <div className="rounded-[20px] border border-white/10 bg-white/8 px-3 py-3.5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] bg-white/12 text-white">
+            <MicVocal className="size-4.5" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-white/88">Sistema de</p>
-            <h1 className="mt-0.5 text-xl font-semibold leading-6 text-white">
-              Discursos Publicos
+            <h1 className="truncate text-[1.05rem] font-semibold leading-5 text-white">
+              Discursos Públicos
             </h1>
           </div>
         </div>
       </div>
 
-      <nav className="mt-5 flex flex-1 flex-col gap-1.5">
+      <nav className="mt-5 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
         {navigationItems.map((item) => {
           const Icon = item.icon
 
@@ -51,10 +51,10 @@ export function AppSidebar({ mobile = false, onNavigate }: AppSidebarProps) {
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
-                  'group rounded-[18px] px-3.5 py-3 transition-colors',
+                  'group rounded-[18px] px-3.5 py-2.5 transition-colors',
                   isActive
                     ? 'bg-[linear-gradient(135deg,#1f66e5,#1d4ed8)] text-sidebar-accent-foreground shadow-[0_16px_32px_-24px_rgba(37,99,235,0.95)]'
-                    : 'text-sidebar-foreground/88 hover:bg-white/6 hover:text-sidebar-accent-foreground',
+                    : 'text-white/92 hover:bg-white/10 hover:text-white',
                 )
               }
             >
@@ -65,14 +65,12 @@ export function AppSidebar({ mobile = false, onNavigate }: AppSidebarProps) {
                       'rounded-xl border p-2',
                       isActive
                         ? 'border-white/10 bg-white/14 text-white'
-                        : 'border-white/8 bg-white/4 text-sidebar-foreground/88',
+                        : 'border-white/10 bg-white/8 text-white/92',
                     )}
                   >
                     <Icon className="size-4" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-medium">{item.label}</p>
-                  </div>
+                  <p className="min-w-0 truncate font-medium">{item.label}</p>
                 </div>
               )}
             </NavLink>
@@ -80,28 +78,42 @@ export function AppSidebar({ mobile = false, onNavigate }: AppSidebarProps) {
         })}
       </nav>
 
-      <div className="rounded-[22px] border border-white/8 bg-white/4 px-4 py-4">
-        <div className="flex items-center gap-2 text-white/82">
-          <ShieldCheck className="size-4" />
-          <p className="text-sm font-medium">Fase atual entregue</p>
+      <div className="mt-3 rounded-[18px] border border-white/10 bg-white/8 p-2">
+        <div className="rounded-[16px] border border-white/10 bg-white/7 px-2.5 py-2">
+          <div className="flex items-center gap-2.5">
+            <AvatarBadge
+              name={user?.displayName ?? 'Administrador'}
+              photoUrl={user?.photoURL ?? null}
+              size="sm"
+              className="ring-2 ring-white/12"
+            />
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-sm font-semibold text-white">
+                {user?.displayName ?? 'Administrador'}
+              </p>
+              <p className="truncate text-[11px] text-white/72">
+                {user?.email ?? 'admin@congregacao.org'}
+              </p>
+            </div>
+          </div>
         </div>
-        <p className="mt-2 text-sm leading-6 text-sidebar-foreground/72">
-          {currentDeliveredPhaseLabel} concluida. Proxima etapa obrigatoria:{' '}
-          {nextRequiredStepLabel}.
-        </p>
-      </div>
 
-      <div className="mt-3 flex items-center gap-3 rounded-[22px] border border-white/8 bg-white/4 px-4 py-4">
-        <AvatarBadge name={user?.displayName ?? 'Administrador'} size="sm" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white">
-            {user?.displayName ?? 'Administrador'}
-          </p>
-          <p className="truncate text-xs text-sidebar-foreground/70">
-            {user?.email ?? 'admin@congregacao.org'}
-          </p>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <ThemeToggle
+            size="icon"
+            className="size-9 shrink-0 rounded-[14px] border-white/12 bg-white/8 text-white hover:bg-white/12 hover:text-white"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 min-w-0 flex-1 justify-start rounded-[14px] border-white/12 bg-white/8 px-3 text-white hover:bg-white/12 hover:text-white"
+            onClick={() => void logout()}
+            aria-label="Sair do sistema"
+          >
+            <LogOut className="size-4" />
+            <span>Sair da conta</span>
+          </Button>
         </div>
-        <ChevronDown className="size-4 text-sidebar-foreground/70" />
       </div>
     </aside>
   )

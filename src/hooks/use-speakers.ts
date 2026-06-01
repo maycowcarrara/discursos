@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createSpeaker,
   deleteSpeaker,
+  getSpeakerById,
   listSpeakers,
   listSpeakersForManagement,
   updateSpeaker,
@@ -22,6 +23,14 @@ export function useSpeakersQuery() {
   return useQuery({
     queryKey: speakersQueryKey,
     queryFn: listSpeakers,
+  })
+}
+
+export function useSpeakerByIdQuery(speakerId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['firestore', 'speakers', 'by-id', speakerId],
+    queryFn: async () => getSpeakerById(speakerId ?? ''),
+    enabled: Boolean(speakerId),
   })
 }
 

@@ -272,6 +272,10 @@ export async function listSpeakers(): Promise<
   return getTypedCollection(speakersQuery, speakerSchema)
 }
 
+export async function getSpeakerById(id: string) {
+  return getTypedDocument(getSpeakerRef(id), speakerSchema)
+}
+
 export async function listSpeakersForManagement(): Promise<
   Array<FirestoreRecord<SpeakerDocument>>
 > {

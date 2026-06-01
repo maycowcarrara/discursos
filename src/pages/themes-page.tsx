@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
+import { EmptyState } from '@/components/app/empty-state'
+import { PageHeader } from '@/components/app/page-header'
+import { SummaryStat } from '@/components/app/summary-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,11 +35,11 @@ const themeFormSchema = z.object({
   number: z
     .string()
     .trim()
-    .regex(/^\d+$/, 'Informe um numero inteiro valido.')
+    .regex(/^\d+$/, 'Informe um número inteiro válido.')
     .refine((value) => Number.parseInt(value, 10) > 0, {
-      message: 'Use um numero maior que zero.',
+      message: 'Use um número maior que zero.',
     }),
-  title: z.string().trim().min(3, 'Informe o titulo oficial do tema.'),
+  title: z.string().trim().min(3, 'Informe o título oficial do tema.'),
   notes: z.string().trim(),
   isActive: z.boolean(),
 })
@@ -53,7 +56,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Nao foi possivel concluir a operacao em temas.'
+  return 'Não foi possível concluir a operação em temas.'
 }
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
@@ -129,7 +132,7 @@ export function ThemesPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -176,13 +179,13 @@ export function ThemesPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
 
     const confirmed = window.confirm(
-      `Excluir o tema "${title}" da base ativa? Ele permanecera no historico, mas saira das listas operacionais.`,
+      `Excluir o tema "${title}" da base ativa? Ele permanecerá no histórico, mas sairá das listas operacionais.`,
     )
 
     if (!confirmed) {
@@ -234,30 +237,41 @@ export function ThemesPage() {
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader className="gap-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle className="text-3xl">Temas</CardTitle>
-              <CardDescription className="mt-2 text-base">
-                A Fase 5 entrega o CRUD completo de `themes`, com busca rapida,
-                ordenacao por numero e controle administrativo de ativo/inativo.
-              </CardDescription>
-            </div>
-            <Button onClick={handleStartCreate} disabled={isSubmitting}>
-              <Plus className="size-4" />
-              Novo tema
-            </Button>
-          </div>
+      <PageHeader
+        eyebrow="Catálogo"
+        title="Temas"
+        description="Mantenha o catálogo oficial enxuto, fácil de buscar e pronto para as próximas designações."
+        actions={
+          <Button onClick={handleStartCreate} disabled={isSubmitting}>
+            <Plus className="size-4" />
+            Novo tema
+          </Button>
+        }
+      />
 
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <Badge className="bg-primary/10 text-primary">{totalThemes} no catalogo</Badge>
-            <Badge variant="outline">{activeThemesCount} ativos</Badge>
-            <Badge variant="outline">{inactiveThemesCount} inativos</Badge>
-            <span>A busca e local e a ordenacao principal segue o numero oficial.</span>
-          </div>
-        </CardHeader>
-      </Card>
+      <section className="grid gap-4 sm:grid-cols-3">
+        <SummaryStat
+          label="No catálogo"
+          value={String(totalThemes)}
+          detail="Total de temas cadastrados."
+          icon={BookText}
+          tone="blue"
+        />
+        <SummaryStat
+          label="Ativos"
+          value={String(activeThemesCount)}
+          detail="Disponíveis para novas designações."
+          icon={Plus}
+          tone="green"
+        />
+        <SummaryStat
+          label="Inativos"
+          value={String(inactiveThemesCount)}
+          detail="Preservados para histórico e revisão."
+          icon={PencilLine}
+          tone="slate"
+        />
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <Card>
@@ -267,13 +281,13 @@ export function ThemesPage() {
                 <CardTitle className="text-2xl">{formModeLabel}</CardTitle>
                 <CardDescription>
                   {editingTheme
-                    ? 'Atualize numero, titulo, status e observacoes sem sair do schema aprovado.'
-                    : 'Cadastre um novo tema oficial com numero unico e status operacional.'}
+                    ? 'Atualize número, título, status e observações nesta mesma tela.'
+                    : 'Cadastre um novo tema com número único e título claro.'}
                 </CardDescription>
               </div>
               {editingTheme ? (
                 <Button variant="outline" onClick={handleStartCreate} disabled={isSubmitting}>
-                  Cancelar edicao
+                  Cancelar edição
                 </Button>
               ) : null}
             </div>
@@ -283,7 +297,7 @@ export function ThemesPage() {
             <form className="space-y-5" onSubmit={submitHandler}>
               <div className="grid gap-4">
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Numero</span>
+                  <span className="text-sm font-medium text-foreground">Número</span>
                   <Input
                     inputMode="numeric"
                     placeholder="Ex.: 84"
@@ -297,9 +311,9 @@ export function ThemesPage() {
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Titulo</span>
+                  <span className="text-sm font-medium text-foreground">Título</span>
                   <Input
-                    placeholder="Ex.: Como fortalecer a familia"
+                    placeholder="Ex.: Como fortalecer a família"
                     {...register('title')}
                   />
                   {errors.title ? (
@@ -327,7 +341,7 @@ export function ThemesPage() {
                     >
                       <p className="font-medium text-foreground">Ativo</p>
                       <p className="mt-1 leading-6">
-                        Disponivel nas listas operacionais e nas proximas fases.
+                        Disponível para novas designações.
                       </p>
                     </button>
                     <button
@@ -345,16 +359,16 @@ export function ThemesPage() {
                     >
                       <p className="font-medium text-foreground">Inativo</p>
                       <p className="mt-1 leading-6">
-                        Sai da operacao atual, mas continua acessivel para historico e reativacao.
+                        Sai da operação atual, mas continua acessível para histórico e reativação.
                       </p>
                     </button>
                   </div>
                 </div>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Observacoes</span>
+                  <span className="text-sm font-medium text-foreground">Observações</span>
                   <Textarea
-                    placeholder="Anote detalhes operacionais sobre o uso do tema."
+                    placeholder="Anote detalhes úteis sobre o uso deste tema."
                     {...register('notes')}
                   />
                   {errors.notes ? (
@@ -380,10 +394,10 @@ export function ThemesPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-muted-foreground">
                   {editingTheme
-                    ? `Ultima atualizacao em ${formatUpdatedAt(
+                    ? `Última atualização em ${formatUpdatedAt(
                         editingTheme.updatedAt.toDate(),
                       )}.`
-                    : 'Cada alteracao gera auditoria e atualiza a base real do Firestore.'}
+                    : 'Os temas inativos continuam preservados para consultas futuras.'}
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
@@ -396,7 +410,7 @@ export function ThemesPage() {
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
                     <Plus className="size-4" />
-                    {editingTheme ? 'Salvar alteracoes' : 'Cadastrar tema'}
+                    {editingTheme ? 'Salvar alterações' : 'Salvar tema'}
                   </Button>
                 </div>
               </div>
@@ -408,14 +422,14 @@ export function ThemesPage() {
           <CardHeader className="gap-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <CardTitle className="text-2xl">Catalogo oficial</CardTitle>
+                <CardTitle className="text-2xl">Catálogo oficial</CardTitle>
                 <CardDescription>
-                  Lista administrativa completa, ordenada por numero e pronta para busca rapida.
+                  Lista completa, ordenada por número e pronta para busca rápida.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
-                <span>Ordenacao</span>
-                <span className="font-medium text-foreground">Numero ascendente</span>
+                <span>Ordenação</span>
+                <span className="font-medium text-foreground">Número ascendente</span>
               </div>
             </div>
 
@@ -424,7 +438,7 @@ export function ThemesPage() {
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-11"
-                  placeholder="Buscar por numero, titulo ou observacao..."
+                  placeholder="Buscar por número, título ou observação..."
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
@@ -450,11 +464,18 @@ export function ThemesPage() {
             {!themesQuery.isLoading &&
             !themesQuery.isError &&
             filteredThemes.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-border/80 bg-background px-5 py-8 text-sm leading-6 text-muted-foreground">
-                {totalThemes > 0
-                  ? 'Nenhum tema corresponde aos termos informados.'
-                  : 'Nenhum tema encontrado ainda na base do Firestore.'}
-              </div>
+              <EmptyState
+                title={
+                  totalThemes > 0
+                    ? 'Nenhum tema encontrado'
+                    : 'Ainda não há temas cadastrados'
+                }
+                description={
+                  totalThemes > 0
+                    ? 'Ajuste a busca para localizar o tema desejado.'
+                    : 'Cadastre o primeiro tema para começar a montar o catálogo.'
+                }
+              />
             ) : null}
 
             {!themesQuery.isLoading &&
@@ -484,7 +505,7 @@ export function ThemesPage() {
                             {theme.title}
                           </h3>
                           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                            {theme.notes || 'Sem observacoes cadastradas.'}
+                            {theme.notes || 'Sem observações cadastradas.'}
                           </p>
                           <p className="mt-4 text-xs text-muted-foreground">
                             Atualizado em {formatUpdatedAt(theme.updatedAt.toDate())}

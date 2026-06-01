@@ -80,7 +80,7 @@ async function requestAdminUsers(
   const user = firebaseAuth.currentUser
 
   if (!user) {
-    throw new AdminAccessRequiredError('Sessao administrativa ausente.')
+    throw new AdminAccessRequiredError('Sessão administrativa ausente.')
   }
 
   const response = await fetch(buildWorkerUrl('/api/admin/users'), {

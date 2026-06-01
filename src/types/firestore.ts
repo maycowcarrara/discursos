@@ -100,7 +100,6 @@ export const appSettingsSchema = baseDocumentSchema.extend({
   organizationName: z.string(),
   defaultYear: z.number().int(),
   locale: z.string(),
-  timezone: z.string(),
 })
 
 export const calendarSettingsSchema = baseDocumentSchema
@@ -125,6 +124,7 @@ export const congregationSchema = managedDocumentSchema.extend({
   mapsUrl: z.string(),
   meetingDay: z.string(),
   meetingTime: z.string(),
+  publicTalkCoordinatorContact: z.string().optional().default(''),
   notes: z.string(),
   isLocal: z.boolean(),
 })

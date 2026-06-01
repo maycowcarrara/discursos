@@ -35,6 +35,13 @@
 
 * Executar o checklist operacional de lançamento V1
 
+## Frente ativa de qualidade do lançamento
+
+* saneamento completo de PT-BR com correção de acentuação, consistência editorial e mensagens mais claras
+* redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
+* reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
+* validação visual em larguras desktop e mobile antes do aceite final do lançamento
+
 ## Entregas já realizadas
 
 ### Infra e base
@@ -211,6 +218,7 @@ Regra de manutenção desta documentação:
 
 * sempre atualizar esta seção quando uma fase for concluída
 * sempre deixar explícitas a fase atual e a próxima fase obrigatória
+* durante o fechamento da V1, manter explícita a frente ativa de qualidade visual e textual até o checklist final ser concluído
 
 ---
 
@@ -420,12 +428,14 @@ Campos:
 * mapsUrl
 * meetingDay
 * meetingTime
+* publicTalkCoordinatorContact
 * observações
 * isLocal
 
 Critérios:
 
-* Cadastro
+* Cadastro fixo da congregação local
+* Cadastro separado de congregações externas
 * Edição
 * Exclusão
 * Busca
@@ -434,9 +444,12 @@ Critérios:
 Entregas realizadas:
 
 * formulário completo com validação estrita
+* área fixa para a única congregação local ativa, com contato do coordenador de discursos
+* formulário de externas/parceiras salvando `isLocal = false` automaticamente, sem seletor manual de tipo
 * listagem com busca local e paginação
 * edição em tela
-* exclusão lógica com remoção da base ativa
+* exclusão lógica com remoção da base ativa apenas para congregações externas
+* proteção contra exclusão ou conversão da congregação local fixa
 * bloqueio de exclusão quando houver oradores vinculados
 * geração de auditoria para create, update e delete
 

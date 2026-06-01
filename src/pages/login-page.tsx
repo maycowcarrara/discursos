@@ -1,26 +1,15 @@
-import { useState } from 'react'
 import { type AuthError } from 'firebase/auth'
-import {
-  CalendarDays,
-  LoaderCircle,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  currentDeliveredPhaseLabel,
-  nextRequiredStepLabel,
-} from '@/config/project-status'
-import { annualPlanningMonths } from '@/data/mock-operations'
 import { adminAccessRequiredErrorCode } from '@/services/auth/admin-access-service'
 import { loginWithGoogle } from '@/services/auth/auth-service'
 
 function getFirebaseErrorMessage(error: unknown) {
-  const fallbackMessage = 'Nao foi possivel entrar agora. Tente novamente.'
+  const fallbackMessage = 'Não foi possível entrar agora. Tente novamente.'
 
   if (!error || typeof error !== 'object' || !('code' in error)) {
     return fallbackMessage
@@ -28,15 +17,15 @@ function getFirebaseErrorMessage(error: unknown) {
 
   switch ((error as AuthError).code) {
     case adminAccessRequiredErrorCode:
-      return 'Esta conta nao possui acesso administrativo ao painel.'
+      return 'Esta conta ainda não possui acesso administrativo ao painel.'
     case 'auth/too-many-requests':
       return 'Muitas tentativas seguidas. Aguarde um pouco e tente novamente.'
     case 'auth/popup-closed-by-user':
-      return 'O login com Google foi fechado antes de concluir.'
+      return 'A janela do Google foi fechada antes da conclusão do login.'
     case 'auth/popup-blocked':
-      return 'O navegador bloqueou a janela de login. Libere popups e tente de novo.'
+      return 'O navegador bloqueou a janela de login. Libere pop-ups e tente de novo.'
     case 'auth/operation-not-allowed':
-      return 'Este metodo de login ainda nao esta habilitado no Firebase.'
+      return 'O login com Google ainda não está habilitado neste ambiente.'
     default:
       return fallbackMessage
   }
@@ -56,6 +45,35 @@ function getRedirectPath(state: unknown) {
   }
 
   return '/'
+}
+
+function GoogleMark() {
+  return (
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_8px_18px_-10px_rgba(15,23,42,0.45)]">
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className="size-4.5 shrink-0"
+      >
+        <path
+          fill="#4285F4"
+          d="M21.6 12.23c0-.68-.06-1.33-.17-1.95H12v3.69h5.39a4.61 4.61 0 0 1-2 3.03v2.51h3.24c1.9-1.75 2.97-4.33 2.97-7.28Z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 22c2.7 0 4.96-.89 6.61-2.41l-3.24-2.51c-.89.6-2.03.96-3.37.96-2.59 0-4.78-1.75-5.56-4.1H3.09v2.59A9.99 9.99 0 0 0 12 22Z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M6.44 13.94A5.99 5.99 0 0 1 6.13 12c0-.67.11-1.32.31-1.94V7.47H3.09A9.99 9.99 0 0 0 2 12c0 1.61.39 3.13 1.09 4.53l3.35-2.59Z"
+        />
+        <path
+          fill="#EA4335"
+          d="M12 5.96c1.47 0 2.79.51 3.83 1.5l2.87-2.87C16.95 2.96 14.7 2 12 2A9.99 9.99 0 0 0 3.09 7.47l3.35 2.59c.78-2.35 2.97-4.1 5.56-4.1Z"
+        />
+      </svg>
+    </span>
+  )
 }
 
 export function LoginPage() {
@@ -80,119 +98,54 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-8 md:px-8">
-      <div className="grid w-full max-w-7xl gap-5 xl:grid-cols-[1.08fr_0.92fr]">
-        <section className="overflow-hidden rounded-[30px] border border-sidebar-border/80 bg-[linear-gradient(180deg,rgba(11,26,60,0.98),rgba(8,21,49,0.99))] p-6 text-white shadow-[0_30px_80px_-44px_rgba(8,18,43,0.95)] md:p-8">
-          <Badge className="border-white/10 bg-white/10 text-white">
-            {currentDeliveredPhaseLabel} concluida
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(29,78,216,0.14),transparent_34%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(239,244,255,0.92))] px-4 py-8 dark:bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_30%),linear-gradient(180deg,rgba(2,6,23,0.96),rgba(9,15,32,0.98))]">
+      <section className="w-full max-w-md overflow-hidden rounded-[30px] border border-slate-200/80 bg-[rgba(255,255,255,0.88)] shadow-[0_32px_80px_-42px_rgba(15,23,42,0.3)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(15,23,42,0.72)]">
+        <div className="border-b border-sidebar-border/70 bg-[linear-gradient(180deg,#0a1d43,#102754_42%,#0c1c3f)] px-6 py-6 text-white">
+          <Badge className="rounded-full border-white/10 bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/10">
+            Painel administrativo
           </Badge>
-          <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
-            Acesso ao painel operacional de discursos com agenda real e leitura rapida.
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-white/74">
-            O login continua sustentando a sessao do app, enquanto a base ja
-            entrega calendario, designacoes e dashboard operacional com foco em
-            uso frequente no desktop e no mobile.
-          </p>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="space-y-3">
-              {[
-                {
-                  title: 'Sessao persistente',
-                  detail: 'Firebase Auth restaura a sessao automaticamente.',
-                  icon: ShieldCheck,
-                },
-                {
-                  title: 'Dashboard operacional',
-                  detail: 'Proximos 8 sabados, pendencias e eventos especiais em leitura real.',
-                  icon: CalendarDays,
-                },
-                {
-                  title: 'Proxima fase obrigatoria',
-                  detail: `${nextRequiredStepLabel} com validacao operacional antes da abertura ao uso.`,
-                  icon: Sparkles,
-                },
-              ].map((item) => {
-                const Icon = item.icon
-
-                return (
-                  <div
-                    key={item.title}
-                    className="rounded-[22px] border border-white/8 bg-white/6 px-4 py-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-2xl bg-white/10 text-white">
-                        <Icon className="size-4" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-white">{item.title}</p>
-                        <p className="mt-1 text-sm leading-6 text-white/68">
-                          {item.detail}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="rounded-[24px] border border-white/8 bg-white/6 p-4">
-              <p className="text-sm font-medium text-white/82">
-                Amostra do planejamento anual
-              </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {annualPlanningMonths.slice(0, 4).map((month) => (
-                  <div
-                    key={month.month}
-                    className="rounded-[18px] border border-white/8 bg-white/6 px-3 py-3"
-                  >
-                    <p className="text-sm font-medium text-white">{month.month}</p>
-                    <div className="mt-3 space-y-2 text-sm text-white/70">
-                      {month.entries.slice(0, 2).map((entry) => (
-                        <p key={`${month.month}-${entry.day}`}>{`${entry.day} - ${entry.label}`}</p>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="mt-4 space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-white">
+              Entrar
+            </h1>
+            <p className="text-sm leading-6 text-white/74">
+              Use a conta Google aprovada para acessar o sistema.
+            </p>
           </div>
-        </section>
+        </div>
 
-        <section className="rounded-[30px] border border-border/80 bg-background/92 p-6 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.22)] md:p-8">
-          <Card className="border-0 bg-transparent shadow-none">
-            <CardHeader className="px-0 pt-0">
-              <CardTitle className="text-3xl">Entrar</CardTitle>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Use sua conta Google aprovada para acessar o painel.
-              </p>
-            </CardHeader>
-            <CardContent className="px-0 pb-0">
-              {authError ? (
-                <div className="mb-5 rounded-[18px] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                  {authError}
-                </div>
-              ) : null}
+        {authError ? (
+          <div className="mx-5 mt-5 rounded-[20px] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {authError}
+          </div>
+        ) : null}
 
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full justify-center"
-                disabled={isGoogleLoading}
-                onClick={handleGoogleLogin}
-              >
-                {isGoogleLoading ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Sparkles className="size-4" />
-                )}
+        <div className="space-y-4 px-5 pb-5 pt-5">
+          <Button
+            size="lg"
+            className="h-14 w-full justify-center rounded-[18px] border border-blue-400/70 bg-[linear-gradient(180deg,#4f95ff,#2563eb)] text-base font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_18px_36px_-22px_rgba(37,99,235,0.9)] transition-[transform,box-shadow,filter] hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.34),0_22px_42px_-22px_rgba(37,99,235,0.95)] active:translate-y-0"
+            disabled={isGoogleLoading}
+            onClick={handleGoogleLogin}
+          >
+            {isGoogleLoading ? (
+              <>
+                <LoaderCircle className="size-4 animate-spin" />
+                Entrando...
+              </>
+            ) : (
+              <>
+                <GoogleMark />
                 Entrar com Google
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
-      </div>
+              </>
+            )}
+          </Button>
+
+          <p className="pt-1 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
+            O acesso é restrito aos administradores aprovados.
+          </p>
+        </div>
+      </section>
     </div>
   )
 }

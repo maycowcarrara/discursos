@@ -303,7 +303,7 @@ export const themeCards = [
 export const settingsCards = [
   {
     title: 'Aplicacao',
-    detail: 'Ano base configuravel, locale pt-BR e timezone America/Sao_Paulo.',
+    detail: 'Ano base configuravel e locale pt-BR.',
   },
   {
     title: 'Notificacoes',

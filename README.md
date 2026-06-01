@@ -90,8 +90,10 @@ Próxima etapa obrigatória:
 
 * CRUD completo de `congregations` na UI
 * formulário validado com React Hook Form + Zod
+* congregação local tratada como cadastro fixo e único, com contato do coordenador de discursos
+* cadastro separado para congregações externas, salvando o tipo automaticamente
 * busca local e paginação sobre a base ativa
-* exclusão lógica via `isActive`
+* exclusão lógica via `isActive` apenas para congregações externas
 * auditoria de create, update e delete em `auditLogs`
 
 ### Fechamento da Fase 5

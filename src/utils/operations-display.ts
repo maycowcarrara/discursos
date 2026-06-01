@@ -9,7 +9,7 @@ import type {
 export const notificationTypeLabels: Record<NotificationType, string> = {
   reminder7d: 'Lembrete 7 dias',
   reminder1d: 'Lembrete 1 dia',
-  confirmation: 'Confirmacao',
+  confirmation: 'Confirmação',
   manual: 'Manual',
 }
 
@@ -22,25 +22,25 @@ export const notificationStatusLabels: Record<NotificationStatus, string> = {
 
 export const notificationProviderLabels: Record<NotificationProvider, string> = {
   emailjs: 'EmailJS',
-  worker: 'Worker',
+  worker: 'Automação',
 }
 
 export const auditEntityTypeLabels: Record<AuditEntityType, string> = {
-  congregation: 'Congregacao',
+  congregation: 'Congregação',
   speaker: 'Orador',
   theme: 'Tema',
   calendarEvent: 'Evento',
-  assignment: 'Designacao',
-  settings: 'Configuracao',
-  notification: 'Notificacao',
+  assignment: 'Designação',
+  settings: 'Configuração',
+  notification: 'Notificação',
 }
 
 export const auditActionLabels: Record<AuditAction, string> = {
-  create: 'Criacao',
-  update: 'Atualizacao',
-  delete: 'Exclusao',
-  statusChange: 'Mudanca de status',
-  sync: 'Sincronizacao',
+  create: 'Criação',
+  update: 'Atualização',
+  delete: 'Exclusão',
+  statusChange: 'Mudança de status',
+  sync: 'Sincronização',
 }
 
 export function getNotificationStatusClassName(status: NotificationStatus) {

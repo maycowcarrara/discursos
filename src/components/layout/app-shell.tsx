@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 
+import { PageHeaderProvider } from '@/components/app/page-header-provider'
 import { AppMobileNav } from '@/components/layout/app-mobile-nav'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { AppTopbar } from '@/components/layout/app-topbar'
@@ -8,28 +9,36 @@ import { cn } from '@/lib/utils'
 
 export function AppShell() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const location = useLocation()
 
   return (
-    <div className="min-h-screen bg-transparent">
-      <div className="mx-auto grid min-h-screen w-full max-w-[1560px] gap-4 p-3 md:grid-cols-[272px_minmax(0,1fr)] md:gap-5 md:p-5">
-        <div className="hidden md:block">
+    <div className="min-h-screen bg-transparent lg:h-screen lg:overflow-hidden">
+      <div className="grid min-h-screen w-full grid-cols-1 lg:h-full lg:min-h-0 lg:grid-cols-[272px_minmax(0,1fr)] lg:gap-3 lg:p-3">
+        <div className="hidden lg:block lg:h-full lg:min-h-0">
           <AppSidebar />
         </div>
 
-        <div className="relative min-w-0 overflow-hidden rounded-[30px] border border-border/80 bg-background/88 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.35)] backdrop-blur dark:bg-[linear-gradient(180deg,rgba(12,20,36,0.92),rgba(10,16,30,0.88))] dark:shadow-[0_32px_90px_-48px_rgba(2,8,23,0.95)]">
-          <AppTopbar onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
+        <PageHeaderProvider>
+          <div className="app-surface relative min-w-0 overflow-hidden border border-border/75 shadow-[0_30px_70px_-42px_rgba(15,23,42,0.18)] lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:rounded-[30px]">
+            <AppTopbar onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
 
-          <main className="px-4 py-5 pb-28 md:px-6 md:py-6 md:pb-6">
-            <Outlet />
-          </main>
-        </div>
+            <main className="px-3 py-4 pb-28 md:px-5 md:py-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5 lg:pb-6">
+              <div
+                key={`${location.pathname}${location.search}`}
+                className="route-transition"
+              >
+                <Outlet />
+              </div>
+            </main>
+          </div>
+        </PageHeaderProvider>
       </div>
 
       <AppMobileNav onOpenMenu={() => setIsMobileMenuOpen(true)} />
 
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-background/70 p-4 backdrop-blur-sm transition dark:bg-slate-950/72 md:hidden',
+          'fixed inset-0 z-40 bg-background/74 p-4 backdrop-blur-sm transition dark:bg-slate-950/80 lg:hidden',
           isMobileMenuOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0',

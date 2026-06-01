@@ -14,7 +14,7 @@ const primaryMobileItems = navigationItems.filter((item) =>
 
 export function AppMobileNav({ onOpenMenu }: AppMobileNavProps) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/96 px-3 py-3 backdrop-blur dark:bg-slate-950/64 md:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/96 px-3 py-3 backdrop-blur dark:bg-slate-950/64 lg:hidden">
       <div className="mx-auto flex max-w-xl items-center justify-between gap-2 rounded-[22px] border border-border/80 bg-card px-2 py-2 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.3)] dark:bg-card/88 dark:shadow-[0_22px_56px_-34px_rgba(2,8,23,0.95)]">
         {primaryMobileItems.map((item) => {
           const Icon = item.icon

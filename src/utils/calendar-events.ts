@@ -27,7 +27,7 @@ const fullDateFormatter = new Intl.DateTimeFormat('pt-BR', {
 })
 
 export const calendarEventTypeLabels: Record<CalendarEventType, string> = {
-  publicTalk: 'Discurso publico',
+  publicTalk: 'Discurso público',
   congress: 'Congresso',
   assembly: 'Assembleia',
   visit: 'Visita',
@@ -35,7 +35,7 @@ export const calendarEventTypeLabels: Record<CalendarEventType, string> = {
 }
 
 export const calendarEventDefaultTitles: Record<CalendarEventType, string> = {
-  publicTalk: 'Discurso publico',
+  publicTalk: 'Discurso público',
   congress: 'Congresso',
   assembly: 'Assembleia',
   visit: 'Visita',
@@ -47,7 +47,7 @@ export const assignmentStatusLabels: Record<AssignmentStatus, string> = {
   confirmed: 'Confirmado',
   declined: 'Recusado',
   cancelled: 'Cancelado',
-  replaced: 'Substituido',
+  replaced: 'Substituído',
 }
 
 export function groupCalendarEventsByMonth(
@@ -162,7 +162,7 @@ export function parseDateInputValue(value: string) {
     !Number.isInteger(month) ||
     !Number.isInteger(day)
   ) {
-    throw new Error('Informe uma data valida para o calendario.')
+    throw new Error('Informe uma data válida para o calendário.')
   }
 
   const parsedDate = new Date(year, month - 1, day, 12, 0, 0, 0)
@@ -172,7 +172,7 @@ export function parseDateInputValue(value: string) {
     parsedDate.getMonth() !== month - 1 ||
     parsedDate.getDate() !== day
   ) {
-    throw new Error('Informe uma data valida para o calendario.')
+    throw new Error('Informe uma data válida para o calendário.')
   }
 
   return parsedDate

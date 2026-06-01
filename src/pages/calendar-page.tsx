@@ -13,6 +13,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
+import { EmptyState } from '@/components/app/empty-state'
+import { PageHeader } from '@/components/app/page-header'
+import { SummaryStat } from '@/components/app/summary-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -69,7 +72,7 @@ const calendarEventFormSchema = z.object({
   date: z
     .string()
     .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe uma data valida.')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe uma data válida.')
     .refine(
       (value) => {
         try {
@@ -79,10 +82,10 @@ const calendarEventFormSchema = z.object({
           return false
         }
       },
-      'Informe uma data valida.',
+      'Informe uma data válida.',
     ),
   type: calendarEventTypeSchema,
-  title: z.string().trim().min(3, 'Informe um titulo claro para o evento.'),
+  title: z.string().trim().min(3, 'Informe um título claro para o evento.'),
   description: z.string().trim(),
   congregationId: z.string(),
   isActive: z.boolean(),
@@ -100,7 +103,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Nao foi possivel concluir a operacao no calendario.'
+  return 'Não foi possível concluir a operação no calendário.'
 }
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
@@ -370,7 +373,7 @@ export function CalendarPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -425,7 +428,7 @@ export function CalendarPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -442,14 +445,14 @@ export function CalendarPage() {
       if (result.createdCount === 0) {
         setFeedback({
           tone: 'success',
-          message: `Todos os ${result.skippedCount} sabados de ${activeYear} ja possuem evento ativo.`,
+          message: `Todos os ${result.skippedCount} sábados de ${activeYear} já possuem evento ativo.`,
         })
         return
       }
 
       setFeedback({
         tone: 'success',
-        message: `${result.createdCount} sabado(s) foram gerados automaticamente para ${activeYear}. ${result.skippedCount} ja existiam.`,
+        message: `${result.createdCount} sábado(s) foram gerados automaticamente para ${activeYear}. ${result.skippedCount} já existiam.`,
       })
       reset(
         buildCreateModeFormValues(
@@ -472,13 +475,13 @@ export function CalendarPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
 
     const confirmed = window.confirm(
-      `Arquivar o evento "${title}" da agenda ativa? Ele continuara no historico administrativo do ano.`,
+      `Arquivar o evento "${title}" da agenda ativa? Ele continuará no histórico administrativo do ano.`,
     )
 
     if (!confirmed) {
@@ -524,7 +527,7 @@ export function CalendarPage() {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
@@ -539,7 +542,7 @@ export function CalendarPage() {
       })
       setFeedback({
         tone: 'success',
-        message: 'O evento voltou para a fila do Google Calendar.',
+        message: 'O evento voltou para a fila de sincronização da agenda.',
       })
     } catch (error) {
       setFeedback({
@@ -575,24 +578,19 @@ export function CalendarPage() {
   }
 
   const typeHelperText = getBlocksAssignmentsForEventType(watchedType)
-    ? 'Congresso e assembleia bloqueiam designacoes automaticamente pela regra oficial.'
+    ? 'Congresso e assembleia bloqueiam designações automaticamente.'
     : watchedType === 'publicTalk'
-      ? 'Use para os sabados regulares que podem receber designacoes.'
-      : 'Evento especial sem bloqueio automatico de designacoes nesta fase.'
+      ? 'Use para os sábados regulares que podem receber designações.'
+      : 'Use para visitas e outros eventos que precisam aparecer no planejamento.'
 
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <CardTitle className="text-3xl">Calendario inteligente</CardTitle>
-            <CardDescription className="mt-2 text-base">
-              A Fase 7 entrega geracao automatica de sabados, calendario anual
-              operacional e controle real dos tipos de evento em `calendarEvents`.
-            </CardDescription>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+      <PageHeader
+        eyebrow="Planejamento"
+        title="Planejamento anual"
+        description="Visualize o ano inteiro, encontre sábados sem cobertura e mantenha a agenda organizada sem excesso de informação técnica."
+        actions={
+          <>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -608,81 +606,76 @@ export function CalendarPage() {
               <Button
                 variant="outline"
                 size="icon"
-                aria-label="Proximo ano"
+                aria-label="Próximo ano"
                 onClick={() => handleChangeYear(activeYear + 1)}
               >
                 <ChevronRight className="size-4" />
               </Button>
             </div>
-
-            <Button
-              variant="outline"
-              onClick={() => handleChangeYear(currentYear)}
-            >
+            <Button variant="outline" onClick={() => handleChangeYear(currentYear)}>
               Hoje
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleGenerateYear}
-              disabled={isSubmitting}
-            >
+            <Button variant="outline" onClick={handleGenerateYear} disabled={isSubmitting}>
               <Sparkles className="size-4" />
-              Gerar sabados do ano
+              Gerar sábados
             </Button>
             <Button onClick={handleStartCreate} disabled={isSubmitting}>
               <Plus className="size-4" />
               Novo evento
             </Button>
-          </div>
-        </CardHeader>
+          </>
+        }
+      />
 
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Eventos ativos</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.total}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Bloqueios oficiais</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.blocked}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Discursos publicos</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.publicTalks}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Ja designados</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.assignedPublicTalks}
-              </p>
-            </div>
-            <div className="rounded-[22px] border border-border/70 bg-background px-4 py-4">
-              <p className="text-sm text-muted-foreground">Sabados sem evento</p>
-              <p className="mt-2 text-3xl font-semibold text-foreground">
-                {stats.missingSaturdayCount}
-              </p>
-            </div>
-          </div>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <SummaryStat
+          label="Eventos ativos"
+          value={String(stats.total)}
+          detail="Tudo o que já está visível na agenda do ano."
+          icon={CalendarDays}
+          tone="blue"
+        />
+        <SummaryStat
+          label="Bloqueios"
+          value={String(stats.blocked)}
+          detail="Congressos e assembleias que travam designações."
+          icon={ShieldBan}
+          tone="amber"
+        />
+        <SummaryStat
+          label="Discursos públicos"
+          value={String(stats.publicTalks)}
+          detail="Datas regulares planejadas no ano."
+          icon={CalendarDays}
+          tone="slate"
+        />
+        <SummaryStat
+          label="Já cobertos"
+          value={String(stats.assignedPublicTalks)}
+          detail="Sábados que já possuem designação ativa."
+          icon={PencilLine}
+          tone="green"
+        />
+        <SummaryStat
+          label="Sem evento"
+          value={String(stats.missingSaturdayCount)}
+          detail="Sábados ainda livres para completar."
+          icon={Sparkles}
+          tone="amber"
+        />
+      </section>
 
-          {feedback ? (
-            <div className={getFeedbackContainerClassName(feedback.tone)}>
-              {feedback.message}
-            </div>
-          ) : null}
+      {feedback ? (
+        <div className={getFeedbackContainerClassName(feedback.tone)}>
+          {feedback.message}
+        </div>
+      ) : null}
 
-          {totalQueryErrors.length > 0 ? (
-            <div className={getFeedbackContainerClassName('error')}>
-              {getErrorMessage(totalQueryErrors[0])}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      {totalQueryErrors.length > 0 ? (
+        <div className={getFeedbackContainerClassName('error')}>
+          {getErrorMessage(totalQueryErrors[0])}
+        </div>
+      ) : null}
 
       <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <Card>
@@ -692,8 +685,8 @@ export function CalendarPage() {
                 <CardTitle className="text-2xl">{formModeLabel}</CardTitle>
                 <CardDescription>
                   {editingEvent
-                    ? 'Atualize o evento mantendo a agenda coerente com as regras oficiais.'
-                    : 'Cadastre congresso, assembleia, visita ou outro evento do calendario anual.'}
+                    ? 'Atualize a data mantendo o planejamento do ano coerente.'
+                    : 'Cadastre congresso, assembleia, visita ou outro evento importante do calendário.'}
                 </CardDescription>
               </div>
 
@@ -703,7 +696,7 @@ export function CalendarPage() {
                   onClick={handleStartCreate}
                   disabled={isSubmitting}
                 >
-                  Cancelar edicao
+                  Cancelar edição
                 </Button>
               ) : null}
             </div>
@@ -767,7 +760,7 @@ export function CalendarPage() {
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Titulo</span>
+                  <span className="text-sm font-medium text-foreground">Título</span>
                   <Input
                     placeholder="Ex.: Congresso regional"
                     {...register('title')}
@@ -781,10 +774,10 @@ export function CalendarPage() {
 
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">
-                    Congregacao vinculada
+                    Congregação vinculada
                   </span>
                   <select className={selectClassName} {...register('congregationId')}>
-                    <option value="">Sem vinculacao</option>
+                    <option value="">Sem vinculação</option>
                     {(congregationsQuery.data ?? []).map((congregation) => (
                       <option key={congregation.id} value={congregation.id}>
                         {congregation.name}
@@ -812,7 +805,7 @@ export function CalendarPage() {
                     >
                       <p className="font-medium text-foreground">Ativo</p>
                       <p className="mt-1 leading-6">
-                        Permanece na agenda anual e nas proximas designacoes.
+                        Permanece na agenda anual e nas próximas designações.
                       </p>
                     </button>
                     <button
@@ -831,7 +824,7 @@ export function CalendarPage() {
                     >
                       <p className="font-medium text-foreground">Arquivado</p>
                       <p className="mt-1 leading-6">
-                        Sai da operacao atual, mas continua disponivel para revisao.
+                        Sai da agenda principal, mas continua disponível para revisão.
                       </p>
                     </button>
                   </div>
@@ -839,10 +832,10 @@ export function CalendarPage() {
 
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">
-                    Observacoes
+                    Observações
                   </span>
                   <Textarea
-                    placeholder="Anote detalhes operacionais do evento anual."
+                    placeholder="Anote detalhes úteis sobre esta data."
                     {...register('description')}
                   />
                 </label>
@@ -850,19 +843,17 @@ export function CalendarPage() {
 
               {editingEventHasLinkedAssignments ? (
                 <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                  Este evento ja possui designacoes vinculadas no historico. Data,
-                  tipo, status e arquivamento ficam bloqueados nesta fase para
-                  preservar a integridade operacional.
+                  Este evento já possui designações vinculadas. Data, tipo e arquivamento ficam protegidos para preservar o histórico.
                 </div>
               ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-muted-foreground">
                   {editingEvent
-                    ? `Ultima atualizacao em ${formatUpdatedAt(
+                    ? `Última atualização em ${formatUpdatedAt(
                         editingEvent.updatedAt.toDate(),
                       )}.`
-                    : 'Congressos e assembleias ativam bloqueio de designacao automaticamente.'}
+                    : 'Congressos e assembleias bloqueiam designações automaticamente.'}
                 </p>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -876,39 +867,11 @@ export function CalendarPage() {
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
                     <Plus className="size-4" />
-                    {editingEvent ? 'Salvar alteracoes' : 'Cadastrar evento'}
+                    {editingEvent ? 'Salvar alterações' : 'Salvar evento'}
                   </Button>
                 </div>
               </div>
             </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Regras aplicadas agora</CardTitle>
-            <CardDescription className="mt-2">
-              A Fase 7 prepara a base anual sem antecipar o CRUD completo de
-              designacoes da Fase 8.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm leading-6 text-muted-foreground">
-            <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-              RN002 e RN003: congresso e assembleia sao salvos com
-              `blocksAssignments = true` automaticamente.
-            </div>
-            <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-              Geracao anual cria apenas sabados sem evento ativo, evitando
-              duplicidades no mesmo dia.
-            </div>
-            <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-              Eventos com designacoes vinculadas nao podem mudar data, tipo ou ser
-              arquivados nesta fase.
-            </div>
-            <div className="rounded-[18px] border border-border/70 bg-background px-4 py-4">
-              Toda criacao, edicao, geracao automatica e arquivamento gera auditoria
-              em `auditLogs`.
-            </div>
           </CardContent>
         </Card>
       </section>
@@ -917,15 +880,14 @@ export function CalendarPage() {
         <CardHeader className="gap-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <CardTitle className="text-2xl">Visao anual</CardTitle>
+              <CardTitle className="text-2xl">Visão anual</CardTitle>
               <CardDescription>
-                Calendario completo por mes, cruzando `calendarEvents` com
-                `assignments` para destacar sabados ja cobertos.
+                Acompanhe mês a mês quais datas já estão cobertas e quais ainda precisam de atenção.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
-                {stats.assignedPublicTalks} com designacao
+                {stats.assignedPublicTalks} com designação
               </Badge>
               <Badge className="bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">
                 {stats.blocked} bloqueios
@@ -949,10 +911,10 @@ export function CalendarPage() {
           {!calendarEventsQuery.isLoading &&
           !calendarEventsQuery.isError &&
           activeEvents.length === 0 ? (
-            <div className="rounded-[22px] border border-dashed border-border/80 bg-background px-5 py-8 text-sm leading-6 text-muted-foreground">
-              Nenhum evento ativo encontrado para {activeYear}. Gere os sabados do
-              ano ou cadastre um evento manual para iniciar a agenda.
-            </div>
+            <EmptyState
+              title={`Nenhum evento ativo em ${activeYear}`}
+              description="Gere os sábados do ano ou cadastre um evento manual para começar o planejamento."
+            />
           ) : null}
 
           {!calendarEventsQuery.isLoading &&
@@ -1035,7 +997,7 @@ export function CalendarPage() {
                             {event.blocksAssignments ? (
                               <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                                 <ShieldBan className="size-3.5" />
-                                Bloqueia designacoes
+                                Bloqueia designações
                               </div>
                             ) : null}
 
@@ -1060,7 +1022,7 @@ export function CalendarPage() {
                               </div>
                             ) : event.type === 'publicTalk' ? (
                               <div className="mt-3 rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                                Sem designacao ativa no momento.
+                                Sem designação ativa no momento.
                               </div>
                             ) : null}
 
@@ -1068,7 +1030,7 @@ export function CalendarPage() {
                               <div className="mt-3 rounded-[16px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                                 <p>
                                   {event.googleCalendarSyncError ||
-                                    'A ultima sincronizacao com o Google Calendar falhou.'}
+                                    'A última sincronização com a agenda falhou.'}
                                 </p>
                                 <Button
                                   variant="outline"
@@ -1078,7 +1040,7 @@ export function CalendarPage() {
                                   }
                                   disabled={isSubmitting}
                                 >
-                                  Tentar sincronizar agenda
+                                  Tentar novamente
                                 </Button>
                               </div>
                             ) : null}
@@ -1123,8 +1085,7 @@ export function CalendarPage() {
           <CardHeader>
             <CardTitle className="text-2xl">Eventos arquivados do ano</CardTitle>
             <CardDescription className="mt-2">
-              Itens fora da agenda ativa, mas ainda acessiveis para revisao e
-              reativacao por edicao.
+              Itens fora da agenda ativa, mas ainda acessíveis para revisão.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -1155,7 +1116,7 @@ export function CalendarPage() {
                       {event.title}
                     </h3>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {event.description || 'Sem observacoes cadastradas.'}
+                      {event.description || 'Sem observações cadastradas.'}
                     </p>
                   </div>
 

@@ -144,7 +144,7 @@ export function AdminUsersCard() {
                       {adminUser.displayName ?? adminUser.email}
                     </p>
                     {isCurrentUser ? (
-                      <Badge className="bg-primary/10 text-primary">Voce</Badge>
+                      <Badge className="bg-primary/10 text-primary">Você</Badge>
                     ) : null}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{adminUser.email}</p>

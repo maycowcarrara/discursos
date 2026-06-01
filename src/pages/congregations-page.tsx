@@ -2,16 +2,22 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import {
   ChevronLeft,
   ChevronRight,
+  Home,
   MapPinned,
   PencilLine,
   Plus,
+  Save,
   Search,
   Trash2,
+  Users,
 } from 'lucide-react'
-import { useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
+import { EmptyState } from '@/components/app/empty-state'
+import { PageHeader } from '@/components/app/page-header'
+import { SummaryStat } from '@/components/app/summary-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,9 +42,17 @@ import {
   type CongregationFormValues,
 } from '@/services/firestore/congregations-service'
 
-const congregationFormSchema = z.object({
-  name: z.string().trim().min(3, 'Informe o nome da congregacao.'),
-  address: z.string().trim().min(5, 'Informe o endereco completo.'),
+type LocalCongregationFormValues = CongregationFormValues & {
+  isLocal: true
+}
+
+type ExternalCongregationFormValues = CongregationFormValues & {
+  isLocal: false
+}
+
+const commonCongregationFormFields = {
+  name: z.string().trim().min(3, 'Informe o nome da congregação.'),
+  address: z.string().trim().min(5, 'Informe o endereço completo.'),
   city: z.string().trim().min(2, 'Informe a cidade.'),
   state: z
     .string()
@@ -47,20 +61,83 @@ const congregationFormSchema = z.object({
   zipCode: z
     .string()
     .trim()
-    .regex(/^\d{5}-?\d{3}$/, 'Informe um CEP valido.'),
-  mapsUrl: z.string().trim().url('Informe uma URL valida do Google Maps.'),
-  meetingDay: z.string().trim().min(3, 'Informe o dia da reuniao.'),
+    .regex(/^\d{5}-?\d{3}$/, 'Informe um CEP válido.'),
+  mapsUrl: z.string().trim().url('Informe uma URL válida do Google Maps.'),
+  meetingDay: z.string().trim().min(3, 'Informe o dia da reunião.'),
   meetingTime: z
     .string()
     .trim()
-    .regex(/^\d{2}:\d{2}$/, 'Informe o horario no formato HH:MM.'),
+    .regex(/^\d{2}:\d{2}$/, 'Informe o horário no formato HH:MM.'),
+  publicTalkCoordinatorContact: z.string().trim(),
   notes: z.string().trim(),
-  isLocal: z.boolean(),
+}
+
+const localCongregationFormSchema = z.object({
+  ...commonCongregationFormFields,
+  publicTalkCoordinatorContact: z
+    .string()
+    .trim()
+    .min(3, 'Informe o contato do coordenador de discursos.'),
+  isLocal: z.literal(true),
+})
+
+const externalCongregationFormSchema = z.object({
+  ...commonCongregationFormFields,
+  isLocal: z.literal(false),
 })
 
 const pageSize = 6
 const selectClassName =
   'flex h-11 w-full rounded-2xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring'
+const brazilStateOptions = [
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
+] as const
+const meetingDayOptions = [
+  'Segunda-feira',
+  'Terça-feira',
+  'Quarta-feira',
+  'Quinta-feira',
+  'Sexta-feira',
+  'Sábado',
+  'Domingo',
+] as const
+
+const defaultLocalCongregationFormValues: LocalCongregationFormValues = {
+  ...defaultCongregationFormValues,
+  isLocal: true,
+}
+
+const defaultExternalCongregationFormValues: ExternalCongregationFormValues = {
+  ...defaultCongregationFormValues,
+  publicTalkCoordinatorContact: '',
+  isLocal: false,
+}
 
 type FeedbackState =
   | {
@@ -74,7 +151,7 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Nao foi possivel concluir a operacao em congregacoes.'
+  return 'Não foi possível concluir a operação em congregações.'
 }
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
@@ -92,11 +169,34 @@ function formatUpdatedAt(value: Date) {
   })
 }
 
+function toLocalCongregationFormValues(
+  congregation: Parameters<typeof toCongregationFormValues>[0],
+): LocalCongregationFormValues {
+  if (!congregation) {
+    return defaultLocalCongregationFormValues
+  }
+
+  return {
+    ...toCongregationFormValues(congregation),
+    isLocal: true,
+  }
+}
+
+function toExternalCongregationFormValues(
+  congregation: Parameters<typeof toCongregationFormValues>[0],
+): ExternalCongregationFormValues {
+  return {
+    ...toCongregationFormValues(congregation),
+    publicTalkCoordinatorContact: '',
+    isLocal: false,
+  }
+}
+
 export function CongregationsPage() {
   const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingExternalId, setEditingExternalId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
 
   const congregationsQuery = useCongregationsQuery()
@@ -104,23 +204,40 @@ export function CongregationsPage() {
   const updateCongregationMutation = useUpdateCongregationMutation()
   const deleteCongregationMutation = useDeleteCongregationMutation()
 
-  const editingCongregation =
-    congregationsQuery.data?.find((item) => item.id === editingId) ?? null
+  const activeCongregations = congregationsQuery.data ?? []
+  const localCongregations = activeCongregations.filter((item) => item.isLocal)
+  const localCongregation = localCongregations[0] ?? null
+  const externalCongregations = activeCongregations.filter((item) => !item.isLocal)
+  const editingExternalCongregation =
+    externalCongregations.find((item) => item.id === editingExternalId) ?? null
+
+  const localFormValues = useMemo(
+    () => toLocalCongregationFormValues(localCongregation),
+    [localCongregation],
+  )
 
   const {
-    formState: { errors, isDirty },
-    handleSubmit,
-    register,
-    reset,
-    setValue,
-    control,
-  } = useForm<CongregationFormValues>({
-    resolver: zodResolver(congregationFormSchema),
-    defaultValues: defaultCongregationFormValues,
+    formState: { errors: localErrors, isDirty: isLocalFormDirty },
+    handleSubmit: handleLocalSubmit,
+    register: registerLocal,
+    reset: resetLocalForm,
+  } = useForm<LocalCongregationFormValues>({
+    resolver: zodResolver(localCongregationFormSchema),
+    values: localFormValues,
+  })
+
+  const {
+    formState: { errors: externalErrors, isDirty: isExternalFormDirty },
+    handleSubmit: handleExternalSubmit,
+    register: registerExternal,
+    reset: resetExternalForm,
+  } = useForm<ExternalCongregationFormValues>({
+    resolver: zodResolver(externalCongregationFormSchema),
+    defaultValues: defaultExternalCongregationFormValues,
   })
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
-  const filteredCongregations = (congregationsQuery.data ?? []).filter((item) => {
+  const filteredExternalCongregations = externalCongregations.filter((item) => {
     if (normalizedSearch.length === 0) {
       return true
     }
@@ -138,68 +255,114 @@ export function CongregationsPage() {
     return searchableContent.includes(normalizedSearch)
   })
 
-  const totalPages = Math.max(1, Math.ceil(filteredCongregations.length / pageSize))
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredExternalCongregations.length / pageSize),
+  )
   const visiblePage = Math.min(currentPage, totalPages)
   const pageStartIndex = (visiblePage - 1) * pageSize
-  const paginatedCongregations = filteredCongregations.slice(
+  const paginatedExternalCongregations = filteredExternalCongregations.slice(
     pageStartIndex,
     pageStartIndex + pageSize,
   )
-  const totalCongregations = congregationsQuery.data?.length ?? 0
-  const localCongregationsCount =
-    congregationsQuery.data?.filter((item) => item.isLocal).length ?? 0
-  const partnerCongregationsCount = totalCongregations - localCongregationsCount
+  const totalCongregations = activeCongregations.length
+  const totalExternalCongregations = externalCongregations.length
   const isSubmitting =
     createCongregationMutation.isPending ||
     updateCongregationMutation.isPending ||
     deleteCongregationMutation.isPending
-  const formModeLabel = editingCongregation ? 'Editar congregacao' : 'Nova congregacao'
   const actorName = user?.displayName ?? user?.email ?? null
-  const isLocal =
-    useWatch({
-      control,
-      name: 'isLocal',
-    }) ?? false
 
-  const submitHandler = handleSubmit(async (values) => {
+  const submitLocalHandler = handleLocalSubmit(async (values) => {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
+    }
+
+    const localValues: LocalCongregationFormValues = {
+      ...values,
+      isLocal: true,
     }
 
     setFeedback(null)
 
     try {
-      if (editingCongregation) {
+      if (localCongregation) {
         await updateCongregationMutation.mutateAsync({
-          id: editingCongregation.id,
-          ...values,
+          id: localCongregation.id,
+          ...localValues,
           actorUid: user.uid,
           actorName,
-        })
-
-        setFeedback({
-          tone: 'success',
-          message: 'Congregacao atualizada com sucesso.',
         })
       } else {
         await createCongregationMutation.mutateAsync({
-          ...values,
+          ...localValues,
+          actorUid: user.uid,
+          actorName,
+        })
+      }
+
+      resetLocalForm(localValues)
+      setFeedback({
+        tone: 'success',
+        message: 'Congregação local salva com sucesso.',
+      })
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: getErrorMessage(error),
+      })
+    }
+  })
+
+  const submitExternalHandler = handleExternalSubmit(async (values) => {
+    if (!user) {
+      setFeedback({
+        tone: 'error',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
+      })
+      return
+    }
+
+    const externalValues: ExternalCongregationFormValues = {
+      ...values,
+      publicTalkCoordinatorContact: '',
+      isLocal: false,
+    }
+
+    setFeedback(null)
+
+    try {
+      if (editingExternalCongregation) {
+        await updateCongregationMutation.mutateAsync({
+          id: editingExternalCongregation.id,
+          ...externalValues,
           actorUid: user.uid,
           actorName,
         })
 
         setFeedback({
           tone: 'success',
-          message: 'Congregacao criada com sucesso.',
+          message: 'Congregação externa atualizada com sucesso.',
+        })
+      } else {
+        await createCongregationMutation.mutateAsync({
+          ...externalValues,
+          actorUid: user.uid,
+          actorName,
+        })
+
+        setFeedback({
+          tone: 'success',
+          message: 'Congregação externa criada com sucesso.',
         })
       }
 
-      setEditingId(null)
-      reset(defaultCongregationFormValues)
+      setEditingExternalId(null)
+      resetExternalForm(defaultExternalCongregationFormValues)
       setCurrentPage(1)
     } catch (error) {
       setFeedback({
@@ -209,17 +372,17 @@ export function CongregationsPage() {
     }
   })
 
-  async function handleDelete(id: string, name: string) {
+  async function handleDeleteExternal(id: string, name: string) {
     if (!user) {
       setFeedback({
         tone: 'error',
-        message: 'Sua sessao expirou. Entre novamente para continuar.',
+        message: 'Sua sessão expirou. Entre novamente para continuar.',
       })
       return
     }
 
     const confirmed = window.confirm(
-      `Excluir ${name} da base ativa? A congregacao sera removida apenas das listagens ativas.`,
+      `Excluir ${name} da base ativa? A congregação externa será removida apenas das listagens ativas.`,
     )
 
     if (!confirmed) {
@@ -235,14 +398,14 @@ export function CongregationsPage() {
         actorName,
       })
 
-      if (editingId === id) {
-        setEditingId(null)
-        reset(defaultCongregationFormValues)
+      if (editingExternalId === id) {
+        setEditingExternalId(null)
+        resetExternalForm(defaultExternalCongregationFormValues)
       }
 
       setFeedback({
         tone: 'success',
-        message: 'Congregacao excluida da base ativa com sucesso.',
+        message: 'Congregação externa excluída da base ativa com sucesso.',
       })
     } catch (error) {
       setFeedback({
@@ -252,97 +415,112 @@ export function CongregationsPage() {
     }
   }
 
-  function handleStartCreate() {
-    setEditingId(null)
+  function handleStartCreateExternal() {
+    setEditingExternalId(null)
     setFeedback(null)
-    reset(defaultCongregationFormValues)
+    resetExternalForm(defaultExternalCongregationFormValues)
   }
 
-  function handleStartEdit(id: string) {
-    const congregation = congregationsQuery.data?.find((item) => item.id === id)
+  function handleStartEditExternal(id: string) {
+    const congregation = externalCongregations.find((item) => item.id === id)
 
-    setEditingId(id)
+    setEditingExternalId(id)
     setFeedback(null)
 
     if (congregation) {
-      reset(toCongregationFormValues(congregation))
+      resetExternalForm(toExternalCongregationFormValues(congregation))
     }
   }
 
   return (
     <div className="space-y-5">
+      <PageHeader
+        eyebrow="Cadastro"
+        title="Congregações"
+        description="Mantenha a base local fixa e cadastre separadamente as congregações externas usadas na operação."
+        actions={
+          <Button onClick={handleStartCreateExternal} disabled={isSubmitting}>
+            <Plus className="size-4" />
+            Nova externa
+          </Button>
+        }
+      />
+
+      <section className="grid gap-4 sm:grid-cols-3">
+        <SummaryStat
+          label="Base local"
+          value={localCongregation ? 'Configurada' : 'Pendente'}
+          detail="Única congregação da própria agenda."
+          icon={Home}
+          tone="green"
+        />
+        <SummaryStat
+          label="Externas"
+          value={String(totalExternalCongregations)}
+          detail="Parceiras usadas para visitantes e saídas."
+          icon={Users}
+          tone="blue"
+        />
+        <SummaryStat
+          label="Ativas"
+          value={String(totalCongregations)}
+          detail="Total disponível na base atual."
+          icon={MapPinned}
+          tone="slate"
+        />
+      </section>
+
+      {feedback ? (
+        <div className={getFeedbackContainerClassName(feedback.tone)}>
+          {feedback.message}
+        </div>
+      ) : null}
+
+      {congregationsQuery.isError ? (
+        <div className={getFeedbackContainerClassName('error')}>
+          {getErrorMessage(congregationsQuery.error)}
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader className="gap-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <CardTitle className="text-3xl">Congregacoes</CardTitle>
-              <CardDescription className="mt-2 text-base">
-                A Fase 4 entrega o CRUD completo de `congregations` com busca,
-                paginacao local economica e exclusao segura via `isActive`.
+              <CardTitle className="text-2xl">Congregação local</CardTitle>
+              <CardDescription>
+                Cadastro fixo da congregação que recebe a agenda principal.
               </CardDescription>
             </div>
-            <Button onClick={handleStartCreate} disabled={isSubmitting}>
-              <Plus className="size-4" />
-              Nova congregacao
-            </Button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <Badge className="bg-primary/10 text-primary">
-              {totalCongregations} ativas
-            </Badge>
-            <Badge variant="outline">{localCongregationsCount} locais</Badge>
-            <Badge variant="outline">{partnerCongregationsCount} parceiras</Badge>
-            <span>Busca e paginacao acontecem no cliente para evitar leituras extras.</span>
+            <Badge>{localCongregation ? 'Base local ativa' : 'Cadastro necessário'}</Badge>
           </div>
         </CardHeader>
-      </Card>
 
-      <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-        <Card>
-          <CardHeader className="gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-2xl">{formModeLabel}</CardTitle>
-                <CardDescription>
-                  {editingCongregation
-                    ? 'Atualize os dados oficiais da congregacao sem sair do schema aprovado.'
-                    : 'Cadastre uma nova congregacao com os campos oficiais da Fase 4.'}
-                </CardDescription>
-              </div>
-              {editingCongregation ? (
-                <Button variant="outline" onClick={handleStartCreate} disabled={isSubmitting}>
-                  Cancelar edicao
-                </Button>
-              ) : null}
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            <form className="space-y-5" onSubmit={submitHandler}>
+        <CardContent>
+          <form className="space-y-5" onSubmit={submitLocalHandler}>
+            <div className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
               <div className="grid gap-4">
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Nome</span>
                   <Input
-                    placeholder="Ex.: Congregacao Central"
-                    {...register('name')}
+                    placeholder="Ex.: Congregação Central"
+                    {...registerLocal('name')}
                   />
-                  {errors.name ? (
+                  {localErrors.name ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {errors.name.message}
+                      {localErrors.name.message}
                     </p>
                   ) : null}
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Endereco</span>
+                  <span className="text-sm font-medium text-foreground">Endereço</span>
                   <Input
-                    placeholder="Rua, numero e bairro"
-                    {...register('address')}
+                    placeholder="Rua, número e bairro"
+                    {...registerLocal('address')}
                   />
-                  {errors.address ? (
+                  {localErrors.address ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {errors.address.message}
+                      {localErrors.address.message}
                     </p>
                   ) : null}
                 </label>
@@ -350,25 +528,27 @@ export function CongregationsPage() {
                 <div className="grid gap-4 sm:grid-cols-[1.2fr_110px_150px]">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">Cidade</span>
-                    <Input placeholder="Palmas" {...register('city')} />
-                    {errors.city ? (
+                    <Input placeholder="Palmas" {...registerLocal('city')} />
+                    {localErrors.city ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {errors.city.message}
+                        {localErrors.city.message}
                       </p>
                     ) : null}
                   </label>
 
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">UF</span>
-                    <Input
-                      maxLength={2}
-                      placeholder="TO"
-                      className="uppercase"
-                      {...register('state')}
-                    />
-                    {errors.state ? (
+                    <select className={selectClassName} {...registerLocal('state')}>
+                      <option value="">Selecione</option>
+                      {brazilStateOptions.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </select>
+                    {localErrors.state ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {errors.state.message}
+                        {localErrors.state.message}
                       </p>
                     ) : null}
                   </label>
@@ -378,11 +558,11 @@ export function CongregationsPage() {
                     <Input
                       inputMode="numeric"
                       placeholder="77000-000"
-                      {...register('zipCode')}
+                      {...registerLocal('zipCode')}
                     />
-                    {errors.zipCode ? (
+                    {localErrors.zipCode ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {errors.zipCode.message}
+                        {localErrors.zipCode.message}
                       </p>
                     ) : null}
                   </label>
@@ -394,11 +574,216 @@ export function CongregationsPage() {
                   </span>
                   <Input
                     placeholder="https://maps.google.com/..."
-                    {...register('mapsUrl')}
+                    {...registerLocal('mapsUrl')}
                   />
-                  {errors.mapsUrl ? (
+                  {localErrors.mapsUrl ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {errors.mapsUrl.message}
+                      {localErrors.mapsUrl.message}
+                    </p>
+                  ) : null}
+                </label>
+              </div>
+
+              <div className="grid content-start gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">
+                      Dia da reunião
+                    </span>
+                    <select className={selectClassName} {...registerLocal('meetingDay')}>
+                      <option value="">Selecione</option>
+                      {meetingDayOptions.map((meetingDay) => (
+                        <option key={meetingDay} value={meetingDay}>
+                          {meetingDay}
+                        </option>
+                      ))}
+                    </select>
+                    {localErrors.meetingDay ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {localErrors.meetingDay.message}
+                      </p>
+                    ) : null}
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">Horário</span>
+                    <Input type="time" {...registerLocal('meetingTime')} />
+                    {localErrors.meetingTime ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {localErrors.meetingTime.message}
+                      </p>
+                    ) : null}
+                  </label>
+                </div>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Contato do coordenador de discursos
+                  </span>
+                  <Input
+                    placeholder="Nome, telefone ou e-mail"
+                    {...registerLocal('publicTalkCoordinatorContact')}
+                  />
+                  {localErrors.publicTalkCoordinatorContact ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {localErrors.publicTalkCoordinatorContact.message}
+                    </p>
+                  ) : null}
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">Observações</span>
+                  <Textarea
+                    placeholder="Anote detalhes fixos da base local."
+                    {...registerLocal('notes')}
+                  />
+                  {localErrors.notes ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {localErrors.notes.message}
+                    </p>
+                  ) : null}
+                </label>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-muted-foreground">
+                {localCongregation
+                  ? `Última atualização em ${formatUpdatedAt(
+                      localCongregation.updatedAt.toDate(),
+                    )}.`
+                  : 'Preencha estes dados para criar a base local fixa da agenda.'}
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  variant="outline"
+                  type="button"
+                  disabled={isSubmitting || !isLocalFormDirty}
+                  onClick={() => resetLocalForm(localFormValues)}
+                >
+                  Restaurar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  <Save className="size-4" />
+                  Salvar base local
+                </Button>
+              </div>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
+        <Card>
+          <CardHeader className="gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-2xl">
+                  {editingExternalCongregation
+                    ? 'Editar congregação externa'
+                    : 'Nova congregação externa'}
+                </CardTitle>
+                <CardDescription>
+                  {editingExternalCongregation
+                    ? 'Atualize os dados da congregação externa sem mudar o tipo.'
+                    : 'Cadastre apenas congregações parceiras ou externas usadas em visitantes e saídas.'}
+                </CardDescription>
+              </div>
+              {editingExternalCongregation ? (
+                <Button
+                  variant="outline"
+                  onClick={handleStartCreateExternal}
+                  disabled={isSubmitting}
+                >
+                  Cancelar edição
+                </Button>
+              ) : null}
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            <form className="space-y-5" onSubmit={submitExternalHandler}>
+              <div className="grid gap-4">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">Nome</span>
+                  <Input
+                    placeholder="Ex.: Congregação Aureny"
+                    {...registerExternal('name')}
+                  />
+                  {externalErrors.name ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {externalErrors.name.message}
+                    </p>
+                  ) : null}
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">Endereço</span>
+                  <Input
+                    placeholder="Rua, número e bairro"
+                    {...registerExternal('address')}
+                  />
+                  {externalErrors.address ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {externalErrors.address.message}
+                    </p>
+                  ) : null}
+                </label>
+
+                <div className="grid gap-4 sm:grid-cols-[1.2fr_110px_150px]">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">Cidade</span>
+                    <Input placeholder="Palmas" {...registerExternal('city')} />
+                    {externalErrors.city ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {externalErrors.city.message}
+                      </p>
+                    ) : null}
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">UF</span>
+                    <select className={selectClassName} {...registerExternal('state')}>
+                      <option value="">Selecione</option>
+                      {brazilStateOptions.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </select>
+                    {externalErrors.state ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {externalErrors.state.message}
+                      </p>
+                    ) : null}
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-foreground">CEP</span>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="77000-000"
+                      {...registerExternal('zipCode')}
+                    />
+                    {externalErrors.zipCode ? (
+                      <p className="text-sm text-rose-600 dark:text-rose-300">
+                        {externalErrors.zipCode.message}
+                      </p>
+                    ) : null}
+                  </label>
+                </div>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Link do Google Maps
+                  </span>
+                  <Input
+                    placeholder="https://maps.google.com/..."
+                    {...registerExternal('mapsUrl')}
+                  />
+                  {externalErrors.mapsUrl ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {externalErrors.mapsUrl.message}
                     </p>
                   ) : null}
                 </label>
@@ -406,113 +791,74 @@ export function CongregationsPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Dia da reuniao
+                      Dia da reunião
                     </span>
-                    <Input placeholder="Sabado" {...register('meetingDay')} />
-                    {errors.meetingDay ? (
+                    <select className={selectClassName} {...registerExternal('meetingDay')}>
+                      <option value="">Selecione</option>
+                      {meetingDayOptions.map((meetingDay) => (
+                        <option key={meetingDay} value={meetingDay}>
+                          {meetingDay}
+                        </option>
+                      ))}
+                    </select>
+                    {externalErrors.meetingDay ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {errors.meetingDay.message}
+                        {externalErrors.meetingDay.message}
                       </p>
                     ) : null}
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">Horario</span>
-                    <Input type="time" {...register('meetingTime')} />
-                    {errors.meetingTime ? (
+                    <span className="text-sm font-medium text-foreground">Horário</span>
+                    <Input type="time" {...registerExternal('meetingTime')} />
+                    {externalErrors.meetingTime ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {errors.meetingTime.message}
+                        {externalErrors.meetingTime.message}
                       </p>
                     ) : null}
                   </label>
                 </div>
 
-                <div className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">
-                    Tipo da congregacao
-                  </span>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
-                        isLocal
-                          ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                          : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
-                      }`}
-                      onClick={() =>
-                        setValue('isLocal', true, {
-                          shouldDirty: true,
-                        })
-                      }
-                    >
-                      <p className="font-medium text-foreground">Local</p>
-                      <p className="mt-1 leading-6">Faz parte da propria agenda.</p>
-                    </button>
-                    <button
-                      type="button"
-                      className={`rounded-[20px] border px-4 py-4 text-left text-sm transition ${
-                        !isLocal
-                          ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                          : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
-                      }`}
-                      onClick={() =>
-                        setValue('isLocal', false, {
-                          shouldDirty: true,
-                        })
-                      }
-                    >
-                      <p className="font-medium text-foreground">Parceira</p>
-                      <p className="mt-1 leading-6">Usada para visitantes e trocas.</p>
-                    </button>
-                  </div>
-                </div>
-
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Observacoes</span>
+                  <span className="text-sm font-medium text-foreground">Observações</span>
                   <Textarea
-                    placeholder="Anote detalhes operacionais relevantes."
-                    {...register('notes')}
+                    placeholder="Anote detalhes úteis para visitantes e trocas."
+                    {...registerExternal('notes')}
                   />
-                  {errors.notes ? (
+                  {externalErrors.notes ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {errors.notes.message}
+                      {externalErrors.notes.message}
                     </p>
                   ) : null}
                 </label>
               </div>
 
-              {feedback ? (
-                <div className={getFeedbackContainerClassName(feedback.tone)}>
-                  {feedback.message}
-                </div>
-              ) : null}
-
-              {congregationsQuery.isError ? (
-                <div className={getFeedbackContainerClassName('error')}>
-                  {getErrorMessage(congregationsQuery.error)}
-                </div>
-              ) : null}
-
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-muted-foreground">
-                  {editingCongregation
-                    ? `Ultima atualizacao em ${formatUpdatedAt(
-                        editingCongregation.updatedAt.toDate(),
+                  {editingExternalCongregation
+                    ? `Última atualização em ${formatUpdatedAt(
+                        editingExternalCongregation.updatedAt.toDate(),
                       )}.`
-                    : 'Os dados salvos entram imediatamente na base ativa do Firestore.'}
+                    : 'O cadastro será salvo automaticamente como congregação externa.'}
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button
                     variant="outline"
                     type="button"
-                    disabled={isSubmitting || !isDirty}
-                    onClick={() => reset(toCongregationFormValues(editingCongregation))}
+                    disabled={isSubmitting || !isExternalFormDirty}
+                    onClick={() =>
+                      resetExternalForm(
+                        toExternalCongregationFormValues(editingExternalCongregation),
+                      )
+                    }
                   >
                     Restaurar
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
                     <Plus className="size-4" />
-                    {editingCongregation ? 'Salvar alteracoes' : 'Cadastrar congregacao'}
+                    {editingExternalCongregation
+                      ? 'Salvar alterações'
+                      : 'Salvar externa'}
                   </Button>
                 </div>
               </div>
@@ -524,13 +870,13 @@ export function CongregationsPage() {
           <CardHeader className="gap-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <CardTitle className="text-2xl">Base ativa</CardTitle>
+                <CardTitle className="text-2xl">Congregações externas</CardTitle>
                 <CardDescription>
-                  Lista oficial das congregacoes ativas, com busca local e pagina atual.
+                  Lista das parceiras ativas, com busca local e paginação simples.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
-                <span>Pagina</span>
+                <span>Página</span>
                 <span className="font-medium text-foreground">
                   {visiblePage}/{totalPages}
                 </span>
@@ -552,7 +898,8 @@ export function CongregationsPage() {
               </div>
               <div className={selectClassName}>
                 <span>
-                  {filteredCongregations.length} resultado(s) de {totalCongregations}
+                  {filteredExternalCongregations.length} resultado(s) de{' '}
+                  {totalExternalCongregations}
                 </span>
               </div>
             </div>
@@ -572,19 +919,26 @@ export function CongregationsPage() {
 
             {!congregationsQuery.isLoading &&
             !congregationsQuery.isError &&
-            filteredCongregations.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-border/80 bg-background px-5 py-8 text-sm leading-6 text-muted-foreground">
-                {totalCongregations > 0
-                  ? 'Nenhuma congregacao corresponde aos filtros aplicados.'
-                  : 'Nenhuma congregacao ativa encontrada ainda no Firestore.'}
-              </div>
+            filteredExternalCongregations.length === 0 ? (
+              <EmptyState
+                title={
+                  totalExternalCongregations > 0
+                    ? 'Nenhuma congregação externa encontrada'
+                    : 'Ainda não há congregações externas'
+                }
+                description={
+                  totalExternalCongregations > 0
+                    ? 'Ajuste a busca para localizar a congregação desejada.'
+                    : 'Cadastre a primeira externa para liberar visitantes e saídas.'
+                }
+              />
             ) : null}
 
             {!congregationsQuery.isLoading &&
             !congregationsQuery.isError &&
-            paginatedCongregations.length > 0 ? (
+            paginatedExternalCongregations.length > 0 ? (
               <div className="space-y-3">
-                {paginatedCongregations.map((item) => (
+                {paginatedExternalCongregations.map((item) => (
                   <div
                     key={item.id}
                     className="rounded-[22px] border border-border/70 bg-background p-5"
@@ -599,7 +953,7 @@ export function CongregationsPage() {
                             <h3 className="text-xl font-semibold text-foreground">
                               {item.name}
                             </h3>
-                            <Badge>{item.isLocal ? 'Local' : 'Parceira'}</Badge>
+                            <Badge>Externa</Badge>
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
                             {item.city}/{item.state} • {item.zipCode}
@@ -634,7 +988,7 @@ export function CongregationsPage() {
                       <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
                         <Button
                           variant="outline"
-                          onClick={() => handleStartEdit(item.id)}
+                          onClick={() => handleStartEditExternal(item.id)}
                           disabled={isSubmitting}
                         >
                           <PencilLine className="size-4" />
@@ -642,7 +996,7 @@ export function CongregationsPage() {
                         </Button>
                         <Button
                           variant="outline"
-                          onClick={() => handleDelete(item.id, item.name)}
+                          onClick={() => handleDeleteExternal(item.id, item.name)}
                           disabled={isSubmitting}
                         >
                           <Trash2 className="size-4" />
@@ -657,7 +1011,7 @@ export function CongregationsPage() {
 
             <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                Exibindo {paginatedCongregations.length} item(ns) nesta pagina.
+                Exibindo {paginatedExternalCongregations.length} item(ns) nesta página.
               </p>
               <div className="flex gap-2 self-start sm:self-auto">
                 <Button
@@ -675,7 +1029,7 @@ export function CongregationsPage() {
                     setCurrentPage((page) => Math.min(totalPages, page + 1))
                   }
                 >
-                  Proxima
+                  Próxima
                   <ChevronRight className="size-4" />
                 </Button>
               </div>
