@@ -57,7 +57,7 @@ export const navigationItems: NavigationItem[] = [
   {
     href: '/historico',
     label: 'Historico',
-    description: 'Linha do tempo e auditoria',
+    description: 'Linha do tempo e filtros do historico',
     icon: History,
   },
   {

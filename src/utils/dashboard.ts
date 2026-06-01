@@ -1,13 +1,10 @@
 import type {
   AssignmentDocument,
+  AssignmentStatus,
   CalendarEventDocument,
+  CalendarEventType,
   FirestoreRecord,
-} from '@/types/firestore'
-import {
-  buildOperationalAssignmentMapByCalendarEventId,
-  listSaturdayDateValuesForYear,
-  toLocalDateKey,
-} from '@/utils/calendar-events'
+} from '../types/firestore.js'
 
 export type DashboardSaturdayEntry = {
   event: FirestoreRecord<CalendarEventDocument>
@@ -28,18 +25,104 @@ export type DashboardSpecialEventEntry = {
   assignment: FirestoreRecord<AssignmentDocument> | null
 }
 
+type DateLike = Date | { toDate(): Date }
+
+type MillisecondsLike = DateLike & {
+  toMillis?: () => number
+}
+
+function toJsDate(value: DateLike) {
+  return value instanceof Date ? value : value.toDate()
+}
+
+function toMillis(value: MillisecondsLike) {
+  if (typeof value.toMillis === 'function') {
+    return value.toMillis()
+  }
+
+  return toJsDate(value).getTime()
+}
+
+export function toLocalDateKey(value: DateLike) {
+  const date = toJsDate(value)
+
+  return [
+    String(date.getFullYear()),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+export function listSaturdayDateValuesForYear(year: number) {
+  const firstDayOfYear = new Date(year, 0, 1, 12, 0, 0, 0)
+  const firstSaturdayOffset = (6 - firstDayOfYear.getDay() + 7) % 7
+  const cursor = new Date(year, 0, 1 + firstSaturdayOffset, 12, 0, 0, 0)
+  const saturdayDates: string[] = []
+
+  while (cursor.getFullYear() === year) {
+    saturdayDates.push(toLocalDateKey(cursor))
+    cursor.setDate(cursor.getDate() + 7)
+  }
+
+  return saturdayDates
+}
+
+function isAssignmentCoveringCalendarSlot(status: AssignmentStatus) {
+  return status === 'pending' || status === 'confirmed'
+}
+
+function buildOperationalAssignmentMapByCalendarEventId(
+  assignments: Array<FirestoreRecord<AssignmentDocument>>,
+) {
+  const operationalAssignments = assignments.filter((assignment) =>
+    isAssignmentCoveringCalendarSlot(assignment.status),
+  )
+
+  operationalAssignments.sort((left, right) => {
+    const updatedAtDifference = toMillis(right.updatedAt) - toMillis(left.updatedAt)
+
+    if (updatedAtDifference !== 0) {
+      return updatedAtDifference
+    }
+
+    return toMillis(right.createdAt) - toMillis(left.createdAt)
+  })
+
+  return operationalAssignments.reduce((assignmentMap, assignment) => {
+    if (!assignmentMap.has(assignment.calendarEventId)) {
+      assignmentMap.set(assignment.calendarEventId, assignment)
+    }
+
+    return assignmentMap
+  }, new Map<string, FirestoreRecord<AssignmentDocument>>())
+}
+
 function isUpcomingEvent(
   event: FirestoreRecord<CalendarEventDocument>,
   referenceDate: Date,
 ) {
-  return event.date.toDate().getTime() >= referenceDate.getTime()
+  return toJsDate(event.date).getTime() >= referenceDate.getTime()
+}
+
+export function isSaturdayDate(date: Date) {
+  return date.getDay() === 6
+}
+
+export function isSaturdayCalendarEvent(
+  event: FirestoreRecord<CalendarEventDocument>,
+) {
+  return isSaturdayDate(toJsDate(event.date))
+}
+
+export function isSpecialCalendarEventType(type: CalendarEventType) {
+  return type !== 'publicTalk'
 }
 
 function sortCalendarEventsAscending(
   left: FirestoreRecord<CalendarEventDocument>,
   right: FirestoreRecord<CalendarEventDocument>,
 ) {
-  return left.date.toMillis() - right.date.toMillis()
+  return toMillis(left.date) - toMillis(right.date)
 }
 
 export function countRemainingSaturdaySlots(referenceDate: Date) {
@@ -48,6 +131,40 @@ export function countRemainingSaturdaySlots(referenceDate: Date) {
   return listSaturdayDateValuesForYear(referenceDate.getFullYear()).filter(
     (dateValue) => dateValue >= referenceDateKey,
   ).length
+}
+
+export function selectUpcomingSaturdayEvents(
+  calendarEvents: Array<FirestoreRecord<CalendarEventDocument>>,
+  referenceDate: Date,
+  maxItems = 8,
+) {
+  return [...calendarEvents]
+    .filter(
+      (event) =>
+        isUpcomingEvent(event, referenceDate) && isSaturdayCalendarEvent(event),
+    )
+    .sort(sortCalendarEventsAscending)
+    .slice(0, maxItems)
+}
+
+export function selectUpcomingSpecialCalendarEvents(
+  calendarEvents: Array<FirestoreRecord<CalendarEventDocument>>,
+  referenceDate: Date,
+  maxItems?: number,
+) {
+  const specialEvents = [...calendarEvents]
+    .filter(
+      (event) =>
+        isUpcomingEvent(event, referenceDate) &&
+        isSpecialCalendarEventType(event.type),
+    )
+    .sort(sortCalendarEventsAscending)
+
+  if (typeof maxItems === 'number') {
+    return specialEvents.slice(0, maxItems)
+  }
+
+  return specialEvents
 }
 
 export function buildDashboardSaturdayEntries(
@@ -59,10 +176,7 @@ export function buildDashboardSaturdayEntries(
   const operationalAssignmentMap =
     buildOperationalAssignmentMapByCalendarEventId(assignments)
 
-  return [...calendarEvents]
-    .filter((event) => isUpcomingEvent(event, referenceDate))
-    .sort(sortCalendarEventsAscending)
-    .slice(0, maxItems)
+  return selectUpcomingSaturdayEvents(calendarEvents, referenceDate, maxItems)
     .map((event) => {
       const assignment = operationalAssignmentMap.get(event.id) ?? null
 
@@ -78,7 +192,7 @@ export function buildDashboardSaturdayEntries(
 export function buildDashboardPendingItems(
   saturdayEntries: DashboardSaturdayEntry[],
 ): DashboardPendingItem[] {
-  return saturdayEntries.flatMap((entry) => {
+  return saturdayEntries.flatMap<DashboardPendingItem>((entry) => {
     if (entry.isUnassigned) {
       return [
         {
@@ -113,12 +227,7 @@ export function listUpcomingSpecialEvents(
   const operationalAssignmentMap =
     buildOperationalAssignmentMapByCalendarEventId(assignments)
 
-  return [...calendarEvents]
-    .filter(
-      (event) =>
-        isUpcomingEvent(event, referenceDate) && event.type !== 'publicTalk',
-    )
-    .sort(sortCalendarEventsAscending)
+  return selectUpcomingSpecialCalendarEvents(calendarEvents, referenceDate)
     .map((event) => ({
       event,
       assignment: operationalAssignmentMap.get(event.id) ?? null,

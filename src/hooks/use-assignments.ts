@@ -1,13 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 
 import {
   confirmAssignment,
   createAssignment,
+  listAssignmentHistoryPage,
   listAssignmentsByYear,
   listRecentAssignments,
   updateAssignment,
+  type AssignmentHistoryCursor,
   type ConfirmAssignmentInput,
   type CreateAssignmentInput,
+  type ListAssignmentHistoryInput,
   type UpdateAssignmentInput,
 } from '@/services/firestore/assignments-service'
 
@@ -24,6 +32,33 @@ export function useRecentAssignmentsQuery(maxItems: number) {
     queryKey: ['firestore', 'assignments', 'recent', maxItems],
     queryFn: () => listRecentAssignments(maxItems),
     enabled: maxItems > 0,
+  })
+}
+
+export function useAssignmentHistoryInfiniteQuery(
+  filters: ListAssignmentHistoryInput,
+  pageSize = 40,
+  enabled = true,
+) {
+  return useInfiniteQuery({
+    queryKey: [
+      'firestore',
+      'assignments',
+      'history',
+      filters.periodStart ?? null,
+      filters.periodEnd ?? null,
+      pageSize,
+    ],
+    initialPageParam: null as AssignmentHistoryCursor | null,
+    queryFn: ({ pageParam }) =>
+      listAssignmentHistoryPage({
+        ...filters,
+        cursor: pageParam,
+        pageSize,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? lastPage.nextCursor : undefined,
+    enabled,
   })
 }
 

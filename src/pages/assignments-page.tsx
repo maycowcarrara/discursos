@@ -55,6 +55,11 @@ import type {
   SpeakerType,
 } from '@/types/firestore'
 import {
+  getAssignmentMovementLabel,
+  inferAssignmentMovementType,
+  type AssignmentMovementType,
+} from '@/utils/assignment-history'
+import {
   assignmentStatusLabels,
   buildOperationalAssignmentMapByCalendarEventId,
   calendarEventTypeLabels,
@@ -86,7 +91,7 @@ type FeedbackState =
     }
   | null
 
-type MovementType = 'incoming' | 'outgoing' | 'local'
+type MovementType = AssignmentMovementType
 
 const movementOptions: Array<{
   value: MovementType
@@ -200,23 +205,6 @@ function getPreferredMovementType(options: {
   return 'local'
 }
 
-function inferMovementType(
-  assignment: FirestoreRecord<AssignmentDocument>,
-  congregationsById: Map<string, FirestoreRecord<CongregationDocument>>,
-): MovementType {
-  const localCongregation = congregationsById.get(assignment.localCongregationId)
-
-  if (assignment.speakerType === 'visitor' && localCongregation?.isLocal) {
-    return 'incoming'
-  }
-
-  if (assignment.speakerType === 'local' && localCongregation && !localCongregation.isLocal) {
-    return 'outgoing'
-  }
-
-  return 'local'
-}
-
 function getSpeakerTypeForMovement(movementType: MovementType): SpeakerType {
   return movementType === 'incoming' ? 'visitor' : 'local'
 }
@@ -225,17 +213,9 @@ function getMovementLabel(
   assignment: FirestoreRecord<AssignmentDocument>,
   congregationsById: Map<string, FirestoreRecord<CongregationDocument>>,
 ) {
-  const movementType = inferMovementType(assignment, congregationsById)
-
-  if (movementType === 'incoming') {
-    return 'Entrada de visitante'
-  }
-
-  if (movementType === 'outgoing') {
-    return 'Saida local'
-  }
-
-  return 'Designacao local'
+  return getAssignmentMovementLabel(
+    inferAssignmentMovementType(assignment, congregationsById),
+  )
 }
 
 function buildCreateFormValues(
@@ -496,7 +476,7 @@ export function AssignmentsPage() {
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
   const filteredAssignments = assignments.filter((assignment) => {
-    const movement = inferMovementType(assignment, congregationsById)
+    const movement = inferAssignmentMovementType(assignment, congregationsById)
     const matchesMovement = movementFilter === 'all' || movementFilter === movement
     const matchesStatus = statusFilter === 'all' || assignment.status === statusFilter
     const searchableContent = [
@@ -519,7 +499,8 @@ export function AssignmentsPage() {
     const pending = assignments.filter((assignment) => assignment.status === 'pending').length
     const confirmed = assignments.filter((assignment) => assignment.status === 'confirmed').length
     const outgoing = assignments.filter(
-      (assignment) => inferMovementType(assignment, congregationsById) === 'outgoing',
+      (assignment) =>
+        inferAssignmentMovementType(assignment, congregationsById) === 'outgoing',
     ).length
     const openSlots = eligibleEvents.filter((event) => !operationalAssignmentMap.has(event.id)).length
 
@@ -690,12 +671,17 @@ export function AssignmentsPage() {
 
     setEditingId(id)
     setFeedback(null)
-    setMovementTypeOverride(inferMovementType(assignment, congregationsById))
+    setMovementTypeOverride(
+      inferAssignmentMovementType(assignment, congregationsById),
+    )
     reset(toAssignmentFormValues(assignment))
   }
 
   function handleStartReplacement(assignment: FirestoreRecord<AssignmentDocument>) {
-    const nextMovementType = inferMovementType(assignment, congregationsById)
+    const nextMovementType = inferAssignmentMovementType(
+      assignment,
+      congregationsById,
+    )
 
     setEditingId(null)
     setFeedback(null)
@@ -1464,8 +1450,9 @@ export function AssignmentsPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Regras aplicadas nesta fase</CardTitle>
           <CardDescription className="mt-2">
-            A Fase 8 libera a operacao sem antecipar EmailJS, links de
-            confirmacao automatica ou filtros completos de historico.
+            A Fase 8 libera a operacao principal sem antecipar EmailJS nem
+            links automaticos de confirmacao; o historico completo agora vive
+            na tela de Historico.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -11,9 +11,8 @@ import {
 import { MetricCard } from '@/components/app/metric-card'
 import { StatusPill } from '@/components/app/status-pill'
 import { useAppSettingsQuery } from '@/hooks/use-app-settings'
-import { useAssignmentsByYearQuery } from '@/hooks/use-assignments'
-import { useCalendarEventsQuery } from '@/hooks/use-calendar-events'
 import { useCongregationsQuery } from '@/hooks/use-congregations'
+import { useDashboardSnapshotQuery } from '@/hooks/use-dashboard'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -30,7 +29,6 @@ import {
 import {
   buildDashboardPendingItems,
   buildDashboardSaturdayEntries,
-  countRemainingSaturdaySlots,
   listUpcomingSpecialEvents,
 } from '@/utils/dashboard'
 
@@ -99,29 +97,13 @@ export function DashboardPage() {
   today.setHours(0, 0, 0, 0)
 
   const currentYear = today.getFullYear()
-  const shouldLoadNextYear = countRemainingSaturdaySlots(today) < 8
 
   const appSettingsQuery = useAppSettingsQuery()
   const congregationsQuery = useCongregationsQuery()
-  const calendarEventsCurrentYearQuery = useCalendarEventsQuery(currentYear)
-  const assignmentsCurrentYearQuery = useAssignmentsByYearQuery(currentYear)
-  const calendarEventsNextYearQuery = useCalendarEventsQuery(
-    currentYear + 1,
-    shouldLoadNextYear,
-  )
-  const assignmentsNextYearQuery = useAssignmentsByYearQuery(
-    currentYear + 1,
-    shouldLoadNextYear,
-  )
+  const dashboardSnapshotQuery = useDashboardSnapshotQuery(today)
 
-  const calendarEvents = [
-    ...(calendarEventsCurrentYearQuery.data ?? []),
-    ...(shouldLoadNextYear ? calendarEventsNextYearQuery.data ?? [] : []),
-  ].sort((left, right) => left.date.toMillis() - right.date.toMillis())
-  const assignments = [
-    ...(assignmentsCurrentYearQuery.data ?? []),
-    ...(shouldLoadNextYear ? assignmentsNextYearQuery.data ?? [] : []),
-  ].sort((left, right) => left.eventDate.toMillis() - right.eventDate.toMillis())
+  const calendarEvents = dashboardSnapshotQuery.data?.calendarEvents ?? []
+  const assignments = dashboardSnapshotQuery.data?.assignments ?? []
   const localCongregation =
     congregationsQuery.data?.find((congregation) => congregation.isLocal) ?? null
   const organizationName =
@@ -150,18 +132,12 @@ export function DashboardPage() {
   const combinedError =
     appSettingsQuery.error ??
     congregationsQuery.error ??
-    calendarEventsCurrentYearQuery.error ??
-    assignmentsCurrentYearQuery.error ??
-    (shouldLoadNextYear ? calendarEventsNextYearQuery.error : null) ??
-    (shouldLoadNextYear ? assignmentsNextYearQuery.error : null)
+    dashboardSnapshotQuery.error
 
   const isLoading =
     appSettingsQuery.isLoading ||
     congregationsQuery.isLoading ||
-    calendarEventsCurrentYearQuery.isLoading ||
-    assignmentsCurrentYearQuery.isLoading ||
-    (shouldLoadNextYear &&
-      (calendarEventsNextYearQuery.isLoading || assignmentsNextYearQuery.isLoading))
+    dashboardSnapshotQuery.isLoading
 
   const nextSaturdayStatus: 'confirmed' | 'pending' | 'event' = nextSaturdayEntry
     ? nextSaturdayEntry.event.blocksAssignments

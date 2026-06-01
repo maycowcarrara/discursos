@@ -282,8 +282,8 @@ export function SettingsPage() {
                 <div>
                   <CardTitle className="text-2xl">{currentDeliveredPhaseLabel}</CardTitle>
                   <CardDescription>
-                    O dashboard agora usa leituras reais de agenda e designacoes
-                    para destacar a janela operacional imediata.
+                    O historico agora consulta `assignments` por periodo e
+                    organiza a trilha permanente em linha do tempo.
                   </CardDescription>
                 </div>
               </div>
@@ -291,13 +291,13 @@ export function SettingsPage() {
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
               <p>
                 A base da Fase 3 continua cobrindo `notifications` e `auditLogs`
-                em leitura real, enquanto a Fase 9 passa a resumir os proximos
-                sabados, pendencias e eventos especiais.
+                em leitura real, enquanto a Fase 10 reaproveita `assignments`
+                como historico oficial sem criar colecoes paralelas.
               </p>
               <p>
                 O proximo passo obrigatorio do plano passa a ser
                 <span className="font-medium text-foreground"> {nextRequiredPhaseLabel}</span>
-                , com filtros e linha do tempo do historico permanente.
+                , com lembretes automaticos, cron e confirmacao por e-mail.
               </p>
               <p>
                 `settings/notifications` e `settings/calendar` seguem reservados,

@@ -430,6 +430,7 @@ Os índices abaixo devem ser tratados como base inicial da V1.
 
 ### `calendarEvents`
 
+* `isActive ASC, date ASC`
 * `year ASC, date ASC`
 * `type ASC, date ASC`
 * `blocksAssignments ASC, date ASC`

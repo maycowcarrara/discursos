@@ -1,11 +1,17 @@
 import {
   Timestamp,
+  getDocs,
+  type DocumentData,
+  type QueryDocumentSnapshot,
+  type QueryConstraint,
   type Transaction,
   runTransaction,
   collection,
   doc,
   limit,
+  orderBy,
   query,
+  startAfter,
   where,
   writeBatch,
 } from 'firebase/firestore'
@@ -57,6 +63,26 @@ export type ConfirmAssignmentInput = {
   actorName?: string | null
 }
 
+export type ListAssignmentHistoryInput = {
+  periodStart?: string | null
+  periodEnd?: string | null
+}
+
+export type AssignmentHistoryCursor = QueryDocumentSnapshot<DocumentData>
+
+export type ListAssignmentHistoryPageInput = ListAssignmentHistoryInput & {
+  cursor?: AssignmentHistoryCursor | null
+  pageSize?: number
+}
+
+export type AssignmentHistoryPage = {
+  items: Array<FirestoreRecord<AssignmentDocument>>
+  nextCursor: AssignmentHistoryCursor | null
+  hasMore: boolean
+}
+
+const defaultAssignmentHistoryPageSize = 40
+
 export const defaultAssignmentFormValues: AssignmentFormValues = {
   calendarEventId: '',
   localCongregationId: '',
@@ -84,6 +110,65 @@ function getAssignmentRef(id: string) {
 
 function getCalendarEventRef(id: string) {
   return doc(firebaseDb, 'calendarEvents', id)
+}
+
+function parseDateBoundaryValue(value: string) {
+  const [yearValue, monthValue, dayValue] = value.split('-')
+  const year = Number.parseInt(yearValue ?? '', 10)
+  const month = Number.parseInt(monthValue ?? '', 10)
+  const day = Number.parseInt(dayValue ?? '', 10)
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
+    throw new Error('Informe um periodo valido para consultar o historico.')
+  }
+
+  const parsedDate = new Date(year, month - 1, day, 12, 0, 0, 0)
+
+  if (
+    parsedDate.getFullYear() !== year ||
+    parsedDate.getMonth() !== month - 1 ||
+    parsedDate.getDate() !== day
+  ) {
+    throw new Error('Informe um periodo valido para consultar o historico.')
+  }
+
+  return parsedDate
+}
+
+function toPeriodStartTimestamp(value: string) {
+  const parsedDate = parseDateBoundaryValue(value)
+
+  return Timestamp.fromDate(
+    new Date(
+      parsedDate.getFullYear(),
+      parsedDate.getMonth(),
+      parsedDate.getDate(),
+      0,
+      0,
+      0,
+      0,
+    ),
+  )
+}
+
+function toPeriodEndExclusiveTimestamp(value: string) {
+  const parsedDate = parseDateBoundaryValue(value)
+
+  return Timestamp.fromDate(
+    new Date(
+      parsedDate.getFullYear(),
+      parsedDate.getMonth(),
+      parsedDate.getDate() + 1,
+      0,
+      0,
+      0,
+      0,
+    ),
+  )
 }
 
 function stripRecordId(
@@ -439,6 +524,94 @@ export async function listRecentAssignments(
   )
 
   return getTypedCollection(recentAssignmentsQuery, assignmentSchema)
+}
+
+export async function listAssignmentsByCalendarEventIds(
+  calendarEventIds: string[],
+): Promise<Array<FirestoreRecord<AssignmentDocument>>> {
+  const normalizedIds = Array.from(
+    new Set(calendarEventIds.map((item) => item.trim()).filter(Boolean)),
+  )
+
+  if (normalizedIds.length === 0) {
+    return []
+  }
+
+  const assignments: Array<FirestoreRecord<AssignmentDocument>> = []
+
+  for (let index = 0; index < normalizedIds.length; index += 10) {
+    const currentChunk = normalizedIds.slice(index, index + 10)
+    const assignmentsQuery = query(
+      getAssignmentsCollection(),
+      where('calendarEventId', 'in', currentChunk),
+    )
+
+    const chunkAssignments = await getTypedCollection(assignmentsQuery, assignmentSchema)
+    assignments.push(...chunkAssignments)
+  }
+
+  return assignments.sort((left, right) => left.eventDate.toMillis() - right.eventDate.toMillis())
+}
+
+export async function listAssignmentHistory({
+  periodStart,
+  periodEnd,
+}: ListAssignmentHistoryInput): Promise<Array<FirestoreRecord<AssignmentDocument>>> {
+  const constraints: QueryConstraint[] = [orderBy('eventDate', 'desc')]
+
+  if (periodStart) {
+    constraints.unshift(where('eventDate', '>=', toPeriodStartTimestamp(periodStart)))
+  }
+
+  if (periodEnd) {
+    constraints.unshift(where('eventDate', '<', toPeriodEndExclusiveTimestamp(periodEnd)))
+  }
+
+  const historyQuery = query(getAssignmentsCollection(), ...constraints)
+
+  return getTypedCollection(historyQuery, assignmentSchema)
+}
+
+export async function listAssignmentHistoryPage({
+  cursor,
+  pageSize = defaultAssignmentHistoryPageSize,
+  periodStart,
+  periodEnd,
+}: ListAssignmentHistoryPageInput): Promise<AssignmentHistoryPage> {
+  const sanitizedPageSize = Math.max(1, Math.min(pageSize, 100))
+  const constraints: QueryConstraint[] = [orderBy('eventDate', 'desc')]
+
+  if (periodStart) {
+    constraints.unshift(where('eventDate', '>=', toPeriodStartTimestamp(periodStart)))
+  }
+
+  if (periodEnd) {
+    constraints.unshift(where('eventDate', '<', toPeriodEndExclusiveTimestamp(periodEnd)))
+  }
+
+  if (cursor) {
+    constraints.push(startAfter(cursor))
+  }
+
+  constraints.push(limit(sanitizedPageSize))
+
+  const historyQuery = query(getAssignmentsCollection(), ...constraints)
+  const snapshot = await getDocs(historyQuery)
+  const items = snapshot.docs.map((documentSnapshot) => {
+    const parsedAssignment = assignmentSchema.parse(documentSnapshot.data())
+
+    return {
+      id: documentSnapshot.id,
+      ...parsedAssignment,
+    }
+  })
+  const nextCursor = snapshot.docs.at(-1) ?? null
+
+  return {
+    items,
+    nextCursor,
+    hasMore: snapshot.docs.length === sanitizedPageSize,
+  }
 }
 
 export async function createAssignment({

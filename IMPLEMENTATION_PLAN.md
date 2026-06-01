@@ -19,14 +19,15 @@
 * FASE 7 — Calendário Inteligente
 * FASE 8 — Designações
 * FASE 9 — Dashboard
+* FASE 10 — Histórico
 
 ## Fase atual concluída
 
-* FASE 9 — Dashboard
+* FASE 10 — Histórico
 
 ## Próxima etapa obrigatória
 
-* FASE 10 — Histórico
+* FASE 11 — EmailJS
 
 ## Entregas já realizadas
 
@@ -140,6 +141,14 @@
 * destaque do próximo sábado com status, tipo de evento, orador, congregação e tema quando houver cobertura
 * painel de pendências priorizando lacunas de designação e confirmações ainda em aberto
 * listagem dos próximos eventos especiais, congressos, assembleias e visitas futuras
+
+### Histórico — fechamento da Fase 10
+
+* tela de histórico conectada a `assignments` com consulta real por período
+* filtros administrativos por tema, orador e congregação sem coleção paralela
+* linha do tempo agrupada por mês para leitura rápida em desktop e mobile
+* atalho para ano atual e carregamento progressivo do histórico permanente
+* resumo operacional dos registros carregados, confirmados, pendentes e congregações envolvidas
 
 Regra de manutenção desta documentação:
 
@@ -555,7 +564,7 @@ Entregas realizadas:
 
 Status atual:
 
-* Próxima fase obrigatória
+* Concluída
 
 Implementar filtros:
 
@@ -569,13 +578,20 @@ Implementar:
 * linha do tempo
 * histórico permanente
 
+Entregas realizadas:
+
+* consulta real de `assignments` por período, com carregamento progressivo do histórico permanente
+* filtros por tema, orador e congregação aplicados sobre a resposta oficial do Firestore
+* linha do tempo agrupada por mês com status, tipo de movimentação e notas preservadas
+* resumo visual dos registros carregados, confirmados, pendentes e congregações envolvidas
+
 ---
 
 ## FASE 11 — EmailJS
 
 Status atual:
 
-* Pendente
+* Próxima fase obrigatória
 
 Implementar:
 

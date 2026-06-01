@@ -7,6 +7,8 @@
     "dev": "node scripts/bump-version.mjs && vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test:history": "tsc -p tsconfig.history-test.json && node --test %cd%/node_modules/.tmp/history-tests/utils/assignment-history.test.js",
+    "test:dashboard": "tsc -p tsconfig.dashboard-test.json && node --test %cd%/node_modules/.tmp/dashboard-tests/utils/dashboard.test.js",
     "preview": "vite preview",
     "deploy:firestore": "node scripts/bump-version.mjs && firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:hosting": "node scripts/bump-version.mjs && npm run build && firebase deploy --only hosting",

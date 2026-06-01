@@ -144,7 +144,7 @@ export function LoginPage() {
                 },
                 {
                   title: 'Proxima fase obrigatoria',
-                  detail: `${nextRequiredPhaseLabel} com filtros e linha do tempo permanente.`,
+                  detail: `${nextRequiredPhaseLabel} com lembretes automaticos e confirmacao por e-mail.`,
                   icon: Sparkles,
                 },
               ].map((item) => {

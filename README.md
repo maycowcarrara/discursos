@@ -15,14 +15,15 @@ Fases concluídas:
 * `FASE 7 — Calendário Inteligente`
 * `FASE 8 — Designações`
 * `FASE 9 — Dashboard`
+* `FASE 10 — Histórico`
 
 Fase atual concluída:
 
-* `FASE 9 — Dashboard`
+* `FASE 10 — Histórico`
 
 Próxima etapa obrigatória:
 
-* `FASE 10 — Histórico`
+* `FASE 11 — EmailJS`
 
 ## O que já foi entregue
 
@@ -135,20 +136,26 @@ Próxima etapa obrigatória:
 * painel de pendências priorizando lacunas de designação e confirmações abertas
 * listagem dos próximos eventos especiais, congressos, assembleias e visitas futuras
 
+### Fechamento da Fase 10
+
+* histórico permanente ligado a `assignments` com consulta real por período
+* filtros por tema, orador e congregação sem criar coleção paralela
+* linha do tempo agrupada por mês, pronta para leitura rápida em desktop e mobile
+* atalho para ano atual e carregamento progressivo do histórico
+* métricas dos registros carregados, confirmados, pendentes e congregações envolvidas
+
 ## Próxima fase
 
-### `FASE 10 — Histórico`
+### `FASE 11 — EmailJS`
 
 Implementar:
 
-* filtros por tema
-* filtros por orador
-* filtros por congregação
-* filtros por período
-* linha do tempo
-* histórico permanente
+* envio automático
+* lembrete 7 dias
+* lembrete 1 dia
+* confirmação via link
 
-Entregue até a Fase 9:
+Entregue até a Fase 10:
 
 * `settings/app` com persistência real
 * CRUD completo de `congregations`
@@ -159,10 +166,11 @@ Entregue até a Fase 9:
 * leitura real de `assignments`, `notifications` e `auditLogs`
 * operação real de designações com confirmações, substituições e auditoria
 * dashboard operacional com próximos 8 sábados, pendências e eventos especiais
+* histórico permanente com filtros por período, tema, orador e congregação
 
 Próximo subpasso obrigatório:
 
-* iniciar a `FASE 10 — Histórico`
+* iniciar a `FASE 11 — EmailJS`
 
 ## Diretriz de UI e UX
 

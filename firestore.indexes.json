@@ -62,6 +62,14 @@
       "collectionGroup": "calendarEvents",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "calendarEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "year", "order": "ASCENDING" },
         { "fieldPath": "date", "order": "ASCENDING" }
       ]
