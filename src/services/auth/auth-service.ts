@@ -1,5 +1,5 @@
 import {
-  signInWithEmailAndPassword,
+  type User,
   signInWithPopup,
   signOut,
 } from 'firebase/auth'
@@ -8,26 +8,39 @@ import {
   ensureAuthPersistence,
   firebaseAuth,
   googleProvider,
-} from '@/lib/firebase'
+} from '@/lib/firebase-auth'
+import {
+  AdminAccessRequiredError,
+  reconcileAdminAccess,
+} from '@/services/auth/admin-access-service'
 
-export type LoginCredentials = {
-  email: string
-  password: string
+export async function hasAdminAccess(user: User) {
+  const tokenResult = await user.getIdTokenResult()
+
+  return tokenResult.claims.admin === true
 }
 
-export async function loginWithEmail({
-  email,
-  password,
-}: LoginCredentials) {
-  await ensureAuthPersistence()
+async function assertAdminAccess(user: User) {
+  if (await hasAdminAccess(user)) {
+    return
+  }
 
-  return signInWithEmailAndPassword(firebaseAuth, email.trim(), password)
+  await signOut(firebaseAuth).catch(() => undefined)
+
+  throw new AdminAccessRequiredError(
+    'A conta autenticada nao possui acesso administrativo.',
+  )
 }
 
 export async function loginWithGoogle() {
   await ensureAuthPersistence()
 
-  return signInWithPopup(firebaseAuth, googleProvider)
+  const credential = await signInWithPopup(firebaseAuth, googleProvider)
+
+  await reconcileAdminAccess(credential.user)
+  await assertAdminAccess(credential.user)
+
+  return credential
 }
 
 export async function logout() {

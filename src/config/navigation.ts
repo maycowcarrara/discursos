@@ -17,13 +17,15 @@ export type NavigationItem = {
   icon: LucideIcon
 }
 
+const dashboardNavigationItem: NavigationItem = {
+  href: '/',
+  label: 'Dashboard',
+  description: 'Visao geral da operacao',
+  icon: LayoutDashboard,
+}
+
 export const navigationItems: NavigationItem[] = [
-  {
-    href: '/',
-    label: 'Dashboard',
-    description: 'Visao geral da operacao',
-    icon: LayoutDashboard,
-  },
+  dashboardNavigationItem,
   {
     href: '/agenda',
     label: 'Agenda',
@@ -74,6 +76,6 @@ export function getNavigationItem(pathname: string) {
       item.href === '/'
         ? pathname === '/'
         : pathname === item.href || pathname.startsWith(`${item.href}/`),
-    ) ?? navigationItems[0]
+    ) ?? dashboardNavigationItem
   )
 }

@@ -6,48 +6,55 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.admin == true
+        && request.auth.token.email is string
+        && request.auth.token.email in get(/databases/$(database)/documents/settings/adminAccess).data.adminEmails;
+    }
+
     function isSettingsDocAllowed(settingId) {
       return settingId in ['app', 'notifications', 'calendar'];
     }
 
     match /settings/{settingId} {
-      allow read: if isSignedIn() && isSettingsDocAllowed(settingId);
-      allow create, update: if isSignedIn() && isSettingsDocAllowed(settingId);
+      allow read: if isAdmin() && isSettingsDocAllowed(settingId);
+      allow create, update: if isAdmin() && isSettingsDocAllowed(settingId);
       allow delete: if false;
     }
 
     match /congregations/{documentId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /speakers/{documentId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /themes/{documentId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /themeNumbers/{documentId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /calendarEvents/{documentId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /assignments/{documentId} {
-      allow read, create, update: if isSignedIn();
+      allow read, create, update: if isAdmin();
       allow delete: if false;
     }
 
     match /notifications/{documentId} {
-      allow read, create, update: if isSignedIn();
+      allow read, create, update: if isAdmin();
       allow delete: if false;
     }
 
     match /auditLogs/{documentId} {
-      allow read, create: if isSignedIn();
+      allow read, create: if isAdmin();
       allow update, delete: if false;
     }
 

@@ -318,33 +318,23 @@ function getAssignmentGoogleCalendarSyncState(options: {
   isLatestAssignmentForEvent: boolean
   movementType: MovementType
 }): GoogleCalendarSyncState | null {
-  if (
-    !isGoogleCalendarCandidateMovement(options.movementType) ||
-    !options.isLatestAssignmentForEvent
-  ) {
+  if (!options.isLatestAssignmentForEvent) {
     return null
   }
 
-  if (!options.calendarSettingsEnabled) {
-    return {
-      canRequestSync: false,
-      canShowAction: true,
-      description: 'Ative a integracao em Configuracoes antes de publicar este item no Google Calendar.',
-      label: 'Integracao desligada',
-      tone: 'warning',
-    }
-  }
-
   if (!options.calendarEvent) {
-    return {
-      canRequestSync: false,
-      canShowAction: false,
-      description: 'O evento da agenda nao foi encontrado para esta designacao.',
-      label: 'Evento indisponivel',
-      tone: 'error',
-    }
+    return isGoogleCalendarCandidateMovement(options.movementType)
+      ? {
+          canRequestSync: false,
+          canShowAction: false,
+          description: 'O evento da agenda nao foi encontrado para esta designacao.',
+          label: 'Evento indisponivel',
+          tone: 'error',
+        }
+      : null
   }
 
+  const isCandidateMovement = isGoogleCalendarCandidateMovement(options.movementType)
   const syncStatus = options.calendarEvent.googleCalendarSyncStatus ?? 'synced'
   const hasRemoteEvent = Boolean(
     options.calendarEvent.googleCalendarEventId &&
@@ -361,8 +351,28 @@ function getAssignmentGoogleCalendarSyncState(options: {
   const hasFreshManualRequest = manualRequestAt >= lastRelevantChangeAt
   const isOperational = isAssignmentCoveringCalendarSlot(options.assignment.status)
   const hasUnsyncedLocalChanges = !hasFreshManualRequest || lastRelevantChangeAt > lastSyncAt
-  const needsManualPublish = isOperational && (!hasRemoteEvent || hasUnsyncedLocalChanges)
-  const needsManualRemoval = !isOperational && hasRemoteEvent && hasUnsyncedLocalChanges
+  const needsManualPublish =
+    isCandidateMovement &&
+    isOperational &&
+    (!hasRemoteEvent || hasUnsyncedLocalChanges)
+  const needsManualRemoval =
+    (!isOperational || !isCandidateMovement) &&
+    hasRemoteEvent &&
+    hasUnsyncedLocalChanges
+
+  if (!isCandidateMovement && !hasRemoteEvent) {
+    return null
+  }
+
+  if (!options.calendarSettingsEnabled) {
+    return {
+      canRequestSync: false,
+      canShowAction: true,
+      description: 'Ative a integracao em Configuracoes antes de publicar ou remover este item no Google Calendar.',
+      label: 'Integracao desligada',
+      tone: 'warning',
+    }
+  }
 
   if (hasFreshManualRequest && syncStatus === 'pending') {
     return {

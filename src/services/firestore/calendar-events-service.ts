@@ -10,7 +10,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 
-import { firebaseDb } from '@/lib/firebase'
+import { firebaseDb } from '@/lib/firebase-db'
 import {
   assignmentSchema,
   calendarEventSchema,
@@ -118,6 +118,15 @@ function toAuditSnapshot(
   return documentData
 }
 
+function stripRecordId(
+  calendarEvent: FirestoreRecord<CalendarEventDocument>,
+): CalendarEventDocument {
+  const { id, ...documentData } = calendarEvent
+  void id
+
+  return documentData
+}
+
 async function resolveCongregationSnapshot(congregationId: string) {
   const trimmedCongregationId = congregationId.trim()
 
@@ -219,8 +228,12 @@ function buildCalendarEventPayload(
   return payload
 }
 
-function buildCalendarEventGoogleSyncFields(isActive: boolean, now: Timestamp) {
-  if (isActive) {
+function buildCalendarEventGoogleSyncFields(
+  type: CalendarEventType,
+  isActive: boolean,
+  now: Timestamp,
+) {
+  if (isActive && type === 'special') {
     return {
       googleCalendarEventId: null,
       googleCalendarCalendarId: null,
@@ -233,6 +246,28 @@ function buildCalendarEventGoogleSyncFields(isActive: boolean, now: Timestamp) {
     googleCalendarCalendarId: null,
     ...buildSyncedGoogleCalendarSyncFields(now),
   }
+}
+
+function buildUpdatedCalendarEventGoogleSyncFields(
+  existingCalendarEvent: FirestoreRecord<CalendarEventDocument>,
+  nextType: CalendarEventType,
+  isActive: boolean,
+  now: Timestamp,
+) {
+  const hasRemoteEvent = Boolean(
+    existingCalendarEvent.googleCalendarEventId &&
+      existingCalendarEvent.googleCalendarCalendarId,
+  )
+  const requiresTechnicalSync =
+    (isActive && nextType === 'special') ||
+    (hasRemoteEvent &&
+      (!isActive ||
+        existingCalendarEvent.type !== 'publicTalk' ||
+        nextType !== 'publicTalk'))
+
+  return requiresTechnicalSync
+    ? buildPendingGoogleCalendarSyncFields(now)
+    : buildSyncedGoogleCalendarSyncFields(now)
 }
 
 export function toCalendarEventFormValues(
@@ -288,7 +323,7 @@ export async function createCalendarEvent({
     : doc(getCalendarEventsCollection())
   const calendarEventDocument: CalendarEventDocument = {
     ...payload,
-    ...buildCalendarEventGoogleSyncFields(payload.isActive, now),
+    ...buildCalendarEventGoogleSyncFields(payload.type, payload.isActive, now),
     createdAt: now,
     updatedAt: now,
     createdBy: actorUid,
@@ -409,7 +444,12 @@ export async function updateCalendarEvent({
   const updatedCalendarEvent: CalendarEventDocument = {
     ...stripRecordId(existingCalendarEvent),
     ...payload,
-    ...buildPendingGoogleCalendarSyncFields(now),
+    ...buildUpdatedCalendarEventGoogleSyncFields(
+      existingCalendarEvent,
+      payload.type,
+      payload.isActive,
+      now,
+    ),
     updatedAt: now,
     updatedBy: actorUid,
   }
@@ -500,7 +540,9 @@ export async function deleteCalendarEvent({
   const archivedCalendarEvent: CalendarEventDocument = {
     ...stripRecordId(existingCalendarEvent),
     isActive: false,
-    ...buildPendingGoogleCalendarSyncFields(now),
+    ...(existingCalendarEvent.googleCalendarEventId
+      ? buildPendingGoogleCalendarSyncFields(now)
+      : buildSyncedGoogleCalendarSyncFields(now)),
     updatedAt: now,
     updatedBy: actorUid,
   }
@@ -568,7 +610,7 @@ export async function generateCalendarYear({
         isActive: true,
         googleCalendarEventId: null,
         googleCalendarCalendarId: null,
-        ...buildPendingGoogleCalendarSyncFields(now),
+        ...buildSyncedGoogleCalendarSyncFields(now),
         createdAt: now,
         updatedAt: now,
         createdBy: actorUid,

@@ -8,7 +8,7 @@ import {
   where,
 } from 'firebase/firestore'
 
-import { firebaseDb } from '@/lib/firebase'
+import { firebaseDb } from '@/lib/firebase-db'
 import {
   calendarEventSchema,
   type AssignmentDocument,

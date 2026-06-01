@@ -10,7 +10,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 
-import { firebaseDb } from '@/lib/firebase'
+import { firebaseDb } from '@/lib/firebase-db'
 import {
   congregationSchema,
   speakerSchema,
@@ -109,9 +109,9 @@ function formatDateInput(date: Date) {
 
 function parseDateInput(value: string) {
   const [yearString, monthString, dayString] = value.split('-')
-  const year = Number.parseInt(yearString, 10)
-  const month = Number.parseInt(monthString, 10)
-  const day = Number.parseInt(dayString, 10)
+  const year = Number.parseInt(yearString ?? '', 10)
+  const month = Number.parseInt(monthString ?? '', 10)
+  const day = Number.parseInt(dayString ?? '', 10)
 
   return Timestamp.fromDate(new Date(year, month - 1, day, 0, 0, 0, 0))
 }

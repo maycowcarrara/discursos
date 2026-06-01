@@ -1,3 +1,9 @@
+import {
+  buildGoogleCalendarEventIdFromDigest,
+  resolveCalendarRetryDecision,
+  shouldPublishStandaloneCalendarEvent,
+} from './google-calendar-sync.js'
+
 type ExecutionContext = {
   waitUntil(promise: Promise<unknown>): void
 }
@@ -125,6 +131,24 @@ type SettingsRecord = {
   timezone: string
 }
 
+type AdminAccessSettingsRecord = {
+  adminEmails: string[]
+  createdAt: Date | null
+  createdBy: string | null
+  documentUpdateTime: string | null
+}
+
+type FirebaseAuthUserRecord = {
+  customAttributes?: string
+  displayName?: string
+  email?: string
+  localId: string
+}
+
+type IdentityToolkitUsersResponse = {
+  users?: FirebaseAuthUserRecord[]
+}
+
 type CalendarSettingsRecord = {
   calendarId: string
   configurationUpdatedAt: Date | null
@@ -143,9 +167,13 @@ type CalendarEventRecord = {
   description: string | null
   documentUpdateTime: string | null
   googleCalendarCalendarId: string | null
+  googleCalendarClaimedAt: Date | null
+  googleCalendarClaimId: string | null
   googleCalendarEventId: string | null
   googleCalendarManualSyncRequestedAt: Date | null
+  googleCalendarRetryCount: number
   googleCalendarSyncError: string | null
+  googleCalendarSyncScheduledFor: Date | null
   googleCalendarSyncStatus: GoogleCalendarSyncStatus
   id: string
   isActive: boolean
@@ -217,9 +245,12 @@ const firestoreBaseUrl = 'https://firestore.googleapis.com/v1'
 const emailJsSendUrl = 'https://api.emailjs.com/api/v1.0/email/send'
 const googleCalendarBaseUrl = 'https://www.googleapis.com/calendar/v3'
 const googleOauthTokenUrl = 'https://oauth2.googleapis.com/token'
+const identityToolkitBaseUrl = 'https://identitytoolkit.googleapis.com/v1'
 const googleDatastoreScope = 'https://www.googleapis.com/auth/datastore'
 const googleCalendarScope = 'https://www.googleapis.com/auth/calendar'
-const googleWorkerScopes = `${googleDatastoreScope} ${googleCalendarScope}`
+const googleIdentityToolkitScope = 'https://www.googleapis.com/auth/identitytoolkit'
+const googleWorkerScopes =
+  `${googleDatastoreScope} ${googleCalendarScope} ${googleIdentityToolkitScope}`
 const defaultBatchSize = 10
 const defaultCalendarSyncBatchSize = 10
 const maxRetryCount = 3
@@ -286,6 +317,27 @@ export default {
       const summary = await processingPromise
 
       return jsonResponse(summary)
+    }
+
+    if (
+      requestUrl.pathname === '/api/public/admin-access/reconcile' &&
+      request.method === 'POST'
+    ) {
+      return handleAdminAccessReconcile(request, env)
+    }
+
+    if (requestUrl.pathname === '/api/admin/users') {
+      if (request.method === 'GET') {
+        return handleListAdminUsers(request, env)
+      }
+
+      if (request.method === 'POST') {
+        return handleAddAdminUser(request, env)
+      }
+
+      if (request.method === 'DELETE') {
+        return handleRemoveAdminUser(request, env)
+      }
     }
 
     if (requestUrl.pathname === '/api/internal/process-calendar-sync') {
@@ -664,13 +716,22 @@ async function processPendingCalendarSync(env: Env) {
       continue
     }
 
+    const claimedCalendarEvent = await claimCalendarEventForProcessing(
+      env,
+      calendarEvent,
+    )
+
+    if (!claimedCalendarEvent) {
+      continue
+    }
+
     summary.processed += 1
 
     const result = await processSingleCalendarEventSync(
       env,
       settings,
       calendarSettings,
-      calendarEvent,
+      claimedCalendarEvent,
       congregationCache,
       speakerCache,
     )
@@ -846,6 +907,7 @@ async function processSingleCalendarEventSync(
       const createdEventId = await createGoogleCalendarEvent(
         env,
         calendarSettings.calendarId,
+        await buildDeterministicGoogleCalendarEventId(calendarEvent.id),
         eventPayload,
       )
 
@@ -886,6 +948,7 @@ async function processSingleCalendarEventSync(
     const createdEventId = await createGoogleCalendarEvent(
       env,
       calendarSettings.calendarId,
+      await buildDeterministicGoogleCalendarEventId(calendarEvent.id),
       eventPayload,
     )
 
@@ -988,7 +1051,7 @@ async function resolveCalendarSyncEntry(
   congregationCache: Map<string, CongregationRecord | null>,
   speakerCache: Map<string, SpeakerRecord | null>,
 ): Promise<CalendarSyncEntry | null> {
-  if (calendarEvent.type !== 'publicTalk') {
+  if (shouldPublishStandaloneCalendarEvent(calendarEvent.type)) {
     const congregation = await resolveCalendarSyncCongregation(
       env,
       calendarEvent.congregationId,
@@ -1002,6 +1065,10 @@ async function resolveCalendarSyncEntry(
       congregation,
       kind: 'specialEvent',
     }
+  }
+
+  if (calendarEvent.type !== 'publicTalk') {
+    return null
   }
 
   if (!assignment) {
@@ -1077,6 +1144,10 @@ function shouldProcessOperationalCalendarSync(
 
   if (!syncEntry && !hasRemoteEvent) {
     return false
+  }
+
+  if (!syncEntry && hasRemoteEvent && !assignmentContext.latestAssignment) {
+    return true
   }
 
   const requestedAt = calendarEvent.googleCalendarManualSyncRequestedAt?.getTime() ?? 0
@@ -1276,6 +1347,7 @@ function buildLocalDateTimeString(date: Date, totalMinutes: number) {
 async function createGoogleCalendarEvent(
   env: Env,
   calendarId: string,
+  eventId: string,
   payload: JsonObject,
 ) {
   const response = await fetch(
@@ -1283,9 +1355,18 @@ async function createGoogleCalendarEvent(
     {
       method: 'POST',
       headers: await buildGoogleApiHeaders(env),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        id: eventId,
+      }),
     },
   )
+
+  if (response.status === 409) {
+    await updateGoogleCalendarEvent(env, calendarId, eventId, payload)
+
+    return eventId
+  }
 
   if (!response.ok) {
     const errorText = await response.text()
@@ -1300,6 +1381,15 @@ async function createGoogleCalendarEvent(
   }
 
   return responsePayload.id
+}
+
+async function buildDeterministicGoogleCalendarEventId(calendarEventId: string) {
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(calendarEventId),
+  )
+
+  return buildGoogleCalendarEventIdFromDigest(digest)
 }
 
 async function updateGoogleCalendarEvent(
@@ -1471,13 +1561,49 @@ async function listDueNotifications(env: Env) {
 }
 
 async function listPendingCalendarEvents(env: Env) {
-  const rows = await runQuery(env, {
+  const now = new Date()
+  const batchSize = resolveCalendarSyncBatchSize(env)
+  const [scheduledRows, compatibilityRows] = await Promise.all([
+    runQuery(env, {
+      from: [
+        {
+          collectionId: 'calendarEvents',
+        },
+      ],
+      limit: batchSize,
+      orderBy: [
+        {
+          direction: 'ASCENDING',
+          field: {
+            fieldPath: 'googleCalendarSyncScheduledFor',
+          },
+        },
+      ],
+      where: {
+        compositeFilter: {
+          filters: [
+            buildFieldFilter(
+              'googleCalendarSyncStatus',
+              'EQUAL',
+              toStringValue('pending'),
+            ),
+            buildFieldFilter(
+              'googleCalendarSyncScheduledFor',
+              'LESS_THAN_OR_EQUAL',
+              toTimestampValue(now),
+            ),
+          ],
+          op: 'AND',
+        },
+      },
+    }),
+    runQuery(env, {
     from: [
       {
         collectionId: 'calendarEvents',
       },
     ],
-    limit: resolveCalendarSyncBatchSize(env),
+    limit: batchSize * 3,
     orderBy: [
       {
         direction: 'ASCENDING',
@@ -1491,12 +1617,78 @@ async function listPendingCalendarEvents(env: Env) {
       'EQUAL',
       toStringValue('pending'),
     ),
-  })
+    }),
+  ])
+  const documentsByName = new Map<string, FirestoreDocument>()
 
-  return rows
-    .map((row) => row.document)
-    .filter((document): document is FirestoreDocument => Boolean(document))
+  for (const row of [...scheduledRows, ...compatibilityRows]) {
+    if (row.document) {
+      documentsByName.set(row.document.name, row.document)
+    }
+  }
+
+  return [...documentsByName.values()]
     .map(parseCalendarEventDocument)
+    .filter(
+      (calendarEvent) =>
+        !calendarEvent.googleCalendarSyncScheduledFor ||
+        calendarEvent.googleCalendarSyncScheduledFor.getTime() <= now.getTime(),
+    )
+    .slice(0, batchSize)
+}
+
+async function claimCalendarEventForProcessing(
+  env: Env,
+  calendarEvent: CalendarEventRecord,
+) {
+  const now = new Date()
+  const claimedAt = calendarEvent.googleCalendarClaimedAt?.getTime() ?? 0
+  const leaseStartedAfter =
+    now.getTime() - processingLeaseMinutes * 60_000
+
+  if (claimedAt > leaseStartedAfter) {
+    return null
+  }
+
+  const claimId = crypto.randomUUID()
+
+  try {
+    await commitWrites(env, [
+      buildUpdateWrite(
+        `calendarEvents/${calendarEvent.id}`,
+        {
+          googleCalendarClaimedAt: toTimestampValue(now),
+          googleCalendarClaimId: toStringValue(claimId),
+        },
+        undefined,
+        calendarEvent.documentUpdateTime
+          ? {
+              exists: true,
+              updateTime: calendarEvent.documentUpdateTime,
+            }
+          : true,
+        env,
+      ),
+    ])
+  } catch (error) {
+    if (isFirestorePreconditionError(error)) {
+      return null
+    }
+
+    throw error
+  }
+
+  const claimedDocument = await getDocument(env, `calendarEvents/${calendarEvent.id}`)
+
+  if (!claimedDocument) {
+    return null
+  }
+
+  const claimedCalendarEvent = parseCalendarEventDocument(claimedDocument)
+
+  return claimedCalendarEvent.googleCalendarClaimId === claimId
+    ? claimedCalendarEvent
+    : null
 }
 
 async function findConflictingOperationalAssignment(
@@ -1723,11 +1915,13 @@ async function markCalendarEventSyncSuccess(
         googleCalendarEventId: result.eventId
           ? toStringValue(result.eventId)
           : toNullValue(),
+        googleCalendarClaimedAt: toNullValue(),
+        googleCalendarClaimId: toNullValue(),
+        googleCalendarRetryCount: toIntegerValue(0),
         googleCalendarSyncError: toNullValue(),
+        googleCalendarSyncScheduledFor: toNullValue(),
         googleCalendarSyncStatus: toStringValue('synced'),
         googleCalendarSyncUpdatedAt: toTimestampValue(now),
-        updatedAt: toTimestampValue(now),
-        updatedBy: toStringValue(resolveWorkerActorUid(env)),
       },
       undefined,
       calendarEvent.documentUpdateTime
@@ -1753,32 +1947,53 @@ async function markCalendarEventSyncFailure(
   reason: string,
 ) {
   const now = new Date()
+  const retryDecision = resolveCalendarRetryDecision(
+    calendarEvent.googleCalendarRetryCount,
+    now,
+  )
 
-  await commitWrites(env, [
-    buildUpdateWrite(
-      `calendarEvents/${calendarEvent.id}`,
-      {
-        googleCalendarSyncError: toStringValue(reason),
-        googleCalendarSyncStatus: toStringValue('error'),
-        googleCalendarSyncUpdatedAt: toTimestampValue(now),
-        updatedAt: toTimestampValue(now),
-        updatedBy: toStringValue(resolveWorkerActorUid(env)),
-      },
-      undefined,
-      calendarEvent.documentUpdateTime
-        ? {
-            exists: true,
-            updateTime: calendarEvent.documentUpdateTime,
-          }
-        : true,
-      env,
-    ),
-    buildCalendarEventSyncAuditWrite(env, calendarEvent.id, 'failed', now, {
-      reason,
-      googleCalendarCalendarId: calendarEvent.googleCalendarCalendarId,
-      googleCalendarEventId: calendarEvent.googleCalendarEventId,
-    }),
-  ])
+  try {
+    await commitWrites(env, [
+      buildUpdateWrite(
+        `calendarEvents/${calendarEvent.id}`,
+        {
+          googleCalendarClaimedAt: toNullValue(),
+          googleCalendarClaimId: toNullValue(),
+          googleCalendarRetryCount: toIntegerValue(retryDecision.nextRetryCount),
+          googleCalendarSyncError: toStringValue(reason),
+          googleCalendarSyncScheduledFor: retryDecision.scheduledFor
+            ? toTimestampValue(retryDecision.scheduledFor)
+            : toNullValue(),
+          googleCalendarSyncStatus: toStringValue(retryDecision.status),
+          googleCalendarSyncUpdatedAt: toTimestampValue(now),
+        },
+        undefined,
+        calendarEvent.documentUpdateTime
+          ? {
+              exists: true,
+              updateTime: calendarEvent.documentUpdateTime,
+            }
+          : true,
+        env,
+      ),
+      buildCalendarEventSyncAuditWrite(
+        env,
+        calendarEvent.id,
+        retryDecision.status === 'pending' ? 'requeued' : 'failed',
+        now,
+        {
+          reason,
+          googleCalendarCalendarId: calendarEvent.googleCalendarCalendarId,
+          googleCalendarEventId: calendarEvent.googleCalendarEventId,
+          googleCalendarRetryCount: retryDecision.nextRetryCount,
+        },
+      ),
+    ])
+  } catch (error) {
+    if (!isFirestorePreconditionError(error)) {
+      throw error
+    }
+  }
 }
 
 function buildCalendarEventSyncAuditWrite(
@@ -2004,6 +2219,8 @@ function parseCalendarEventDocument(document: FirestoreDocument): CalendarEventR
       document,
       'googleCalendarCalendarId',
     ),
+    googleCalendarClaimedAt: getTimestampField(document, 'googleCalendarClaimedAt'),
+    googleCalendarClaimId: getNullableStringField(document, 'googleCalendarClaimId'),
     googleCalendarEventId: getNullableStringField(document, 'googleCalendarEventId'),
     googleCalendarManualSyncRequestedAt: getTimestampField(
       document,
@@ -2012,6 +2229,11 @@ function parseCalendarEventDocument(document: FirestoreDocument): CalendarEventR
     googleCalendarSyncError: getNullableStringField(
       document,
       'googleCalendarSyncError',
+    ),
+    googleCalendarRetryCount: getIntegerField(document, 'googleCalendarRetryCount') ?? 0,
+    googleCalendarSyncScheduledFor: getTimestampField(
+      document,
+      'googleCalendarSyncScheduledFor',
     ),
     googleCalendarSyncStatus:
       (getStringField(document, 'googleCalendarSyncStatus') as GoogleCalendarSyncStatus | null) ??
@@ -2065,6 +2287,468 @@ function normalizeEmailValue(email: string | null) {
   const normalizedEmail = email?.trim().toLowerCase() ?? ''
 
   return normalizedEmail ? normalizedEmail : null
+}
+
+async function handleAdminAccessReconcile(request: Request, env: Env) {
+  const caller = await getFirebaseUserFromRequest(request, env)
+  const callerEmail = normalizeEmailValue(caller?.email ?? null)
+
+  if (!caller || !callerEmail) {
+    return jsonResponse(
+      {
+        authorized: false,
+        message: 'Sessao Google invalida.',
+      },
+      401,
+    )
+  }
+
+  const settings = await getAdminAccessSettingsRecord(env)
+
+  if (!settings.adminEmails.includes(callerEmail)) {
+    return jsonResponse(
+      {
+        authorized: false,
+        message: 'Este e-mail nao possui acesso administrativo.',
+      },
+      403,
+    )
+  }
+
+  const tokenRefreshRequired = !hasFirebaseAdminClaim(caller)
+
+  if (tokenRefreshRequired) {
+    await setFirebaseAdminClaim(env, caller, true)
+  }
+
+  return jsonResponse({
+    authorized: true,
+    email: callerEmail,
+    tokenRefreshRequired,
+  })
+}
+
+async function handleListAdminUsers(request: Request, env: Env) {
+  const caller = await getAuthorizedAdminCaller(request, env)
+
+  if (!caller) {
+    return buildUnauthorizedAdminResponse()
+  }
+
+  return jsonResponse(await buildAdminUsersResponse(env))
+}
+
+async function handleAddAdminUser(request: Request, env: Env) {
+  const caller = await getAuthorizedAdminCaller(request, env)
+
+  if (!caller) {
+    return buildUnauthorizedAdminResponse()
+  }
+
+  const callerEmail = normalizeEmailValue(caller.email ?? null)
+  const email = await readAdminEmailFromRequest(request)
+
+  if (!callerEmail || !email) {
+    return jsonResponse(
+      {
+        error: 'invalid_email',
+        message: 'Informe um e-mail valido.',
+      },
+      400,
+    )
+  }
+
+  const settings = await getAdminAccessSettingsRecord(env)
+
+  if (!settings.adminEmails.includes(email)) {
+    await saveAdminAccessSettings(env, settings, {
+      action: 'add',
+      actorEmail: callerEmail,
+      adminEmails: [...settings.adminEmails, email].sort(),
+      targetEmail: email,
+    })
+  }
+
+  return jsonResponse(await buildAdminUsersResponse(env))
+}
+
+async function handleRemoveAdminUser(request: Request, env: Env) {
+  const caller = await getAuthorizedAdminCaller(request, env)
+
+  if (!caller) {
+    return buildUnauthorizedAdminResponse()
+  }
+
+  const callerEmail = normalizeEmailValue(caller.email ?? null)
+  const email = await readAdminEmailFromRequest(request)
+
+  if (!callerEmail || !email) {
+    return jsonResponse(
+      {
+        error: 'invalid_email',
+        message: 'Informe um e-mail valido.',
+      },
+      400,
+    )
+  }
+
+  if (callerEmail === email) {
+    return jsonResponse(
+      {
+        error: 'self_removal_not_allowed',
+        message: 'Voce nao pode remover o proprio acesso administrativo.',
+      },
+      400,
+    )
+  }
+
+  const settings = await getAdminAccessSettingsRecord(env)
+  const nextAdminEmails = settings.adminEmails.filter(
+    (adminEmail) => adminEmail !== email,
+  )
+
+  if (nextAdminEmails.length === 0) {
+    return jsonResponse(
+      {
+        error: 'last_admin_removal_not_allowed',
+        message: 'O sistema precisa manter pelo menos um administrador.',
+      },
+      400,
+    )
+  }
+
+  if (nextAdminEmails.length !== settings.adminEmails.length) {
+    await saveAdminAccessSettings(env, settings, {
+      action: 'remove',
+      actorEmail: callerEmail,
+      adminEmails: nextAdminEmails,
+      targetEmail: email,
+    })
+  }
+
+  const targetUser = await lookupFirebaseUserByEmail(env, email)
+
+  if (targetUser && hasFirebaseAdminClaim(targetUser)) {
+    await setFirebaseAdminClaim(env, targetUser, false)
+  }
+
+  return jsonResponse(await buildAdminUsersResponse(env))
+}
+
+function buildUnauthorizedAdminResponse() {
+  return jsonResponse(
+    {
+      error: 'unauthorized',
+      message: 'Sessao administrativa ausente ou invalida.',
+    },
+    401,
+  )
+}
+
+async function getAuthorizedAdminCaller(request: Request, env: Env) {
+  const caller = await getFirebaseUserFromRequest(request, env)
+  const callerEmail = normalizeEmailValue(caller?.email ?? null)
+
+  if (!caller || !callerEmail || !hasFirebaseAdminClaim(caller)) {
+    return null
+  }
+
+  const settings = await getAdminAccessSettingsRecord(env)
+
+  if (!settings.adminEmails.includes(callerEmail)) {
+    return null
+  }
+
+  return caller
+}
+
+async function getFirebaseUserFromRequest(request: Request, env: Env) {
+  const idToken = getBearerToken(request)
+
+  if (!idToken) {
+    return null
+  }
+
+  try {
+    const response = await callIdentityToolkit<IdentityToolkitUsersResponse>(
+      env,
+      `/projects/${env.FIREBASE_PROJECT_ID}/accounts:lookup`,
+      {
+        idToken,
+      },
+    )
+
+    return response.users?.[0] ?? null
+  } catch (error) {
+    if (
+      error instanceof IdentityToolkitRequestError &&
+      (error.status === 400 || error.status === 401)
+    ) {
+      return null
+    }
+
+    throw error
+  }
+}
+
+function getBearerToken(request: Request) {
+  const authorization = request.headers.get('Authorization')?.trim() ?? ''
+
+  return authorization.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length).trim()
+    : ''
+}
+
+async function readAdminEmailFromRequest(request: Request) {
+  const payload = (await request.json().catch(() => null)) as unknown
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('email' in payload) ||
+    typeof payload.email !== 'string'
+  ) {
+    return null
+  }
+
+  const email = normalizeEmailValue(payload.email)
+
+  return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null
+}
+
+async function getAdminAccessSettingsRecord(
+  env: Env,
+): Promise<AdminAccessSettingsRecord> {
+  const document = await getDocument(env, 'settings/adminAccess')
+
+  if (!document) {
+    return {
+      adminEmails: [],
+      createdAt: null,
+      createdBy: null,
+      documentUpdateTime: null,
+    }
+  }
+
+  return {
+    adminEmails: getStringArrayField(document, 'adminEmails')
+      .map((email) => normalizeEmailValue(email))
+      .filter((email): email is string => Boolean(email)),
+    createdAt: getTimestampField(document, 'createdAt'),
+    createdBy: getStringField(document, 'createdBy'),
+    documentUpdateTime: document.updateTime ?? null,
+  }
+}
+
+async function saveAdminAccessSettings(
+  env: Env,
+  settings: AdminAccessSettingsRecord,
+  input: {
+    action: 'add' | 'remove'
+    actorEmail: string
+    adminEmails: string[]
+    targetEmail: string
+  },
+) {
+  const now = new Date()
+  const normalizedAdminEmails = Array.from(new Set(input.adminEmails)).sort()
+
+  await commitWrites(env, [
+    buildUpdateWrite(
+      'settings/adminAccess',
+      {
+        adminEmails: toJsonValue(normalizedAdminEmails),
+        createdAt: toTimestampValue(settings.createdAt ?? now),
+        createdBy: toStringValue(settings.createdBy ?? input.actorEmail),
+        updatedAt: toTimestampValue(now),
+        updatedBy: toStringValue(input.actorEmail),
+      },
+      undefined,
+      settings.documentUpdateTime
+        ? {
+            exists: true,
+            updateTime: settings.documentUpdateTime,
+          }
+        : false,
+      env,
+    ),
+    buildUpdateWrite(
+      `auditLogs/${crypto.randomUUID()}`,
+      {
+        action: toStringValue('update'),
+        actorName: toStringValue(input.actorEmail),
+        actorUid: toStringValue(input.actorEmail),
+        after: toJsonValue({
+          adminEmails: normalizedAdminEmails,
+        }),
+        before: toJsonValue({
+          adminEmails: settings.adminEmails,
+        }),
+        createdAt: toTimestampValue(now),
+        entityId: toStringValue('adminAccess'),
+        entityType: toStringValue('settings'),
+        metadata: toJsonValue({
+          action: input.action,
+          source: 'admin-access-panel',
+          targetEmail: input.targetEmail,
+        }),
+      },
+      undefined,
+      false,
+      env,
+    ),
+  ])
+}
+
+async function buildAdminUsersResponse(env: Env) {
+  const settings = await getAdminAccessSettingsRecord(env)
+  const users = await lookupFirebaseUsersByEmail(env, settings.adminEmails)
+  const usersByEmail = new Map(
+    users.flatMap((user) => {
+      const email = normalizeEmailValue(user.email ?? null)
+
+      return email ? [[email, user] as const] : []
+    }),
+  )
+
+  return {
+    users: settings.adminEmails.map((email) => {
+      const user = usersByEmail.get(email)
+
+      return {
+        displayName: user?.displayName ?? null,
+        email,
+        hasAdminClaim: user ? hasFirebaseAdminClaim(user) : false,
+        hasFirebaseAccount: Boolean(user),
+      }
+    }),
+  }
+}
+
+async function lookupFirebaseUserByEmail(env: Env, email: string) {
+  const users = await lookupFirebaseUsersByEmail(env, [email])
+
+  return users[0] ?? null
+}
+
+async function lookupFirebaseUsersByEmail(env: Env, emails: string[]) {
+  if (emails.length === 0) {
+    return []
+  }
+
+  const response = await callIdentityToolkit<IdentityToolkitUsersResponse>(
+    env,
+    `/projects/${env.FIREBASE_PROJECT_ID}/accounts:lookup`,
+    {
+      email: emails,
+    },
+  )
+
+  return response.users ?? []
+}
+
+function hasFirebaseAdminClaim(user: FirebaseAuthUserRecord) {
+  return parseFirebaseCustomAttributes(user.customAttributes).admin === true
+}
+
+async function setFirebaseAdminClaim(
+  env: Env,
+  user: FirebaseAuthUserRecord,
+  isAdmin: boolean,
+) {
+  const customAttributes = parseFirebaseCustomAttributes(user.customAttributes)
+
+  if (isAdmin) {
+    customAttributes.admin = true
+  } else {
+    delete customAttributes.admin
+  }
+
+  await callIdentityToolkit(
+    env,
+    `/projects/${env.FIREBASE_PROJECT_ID}/accounts:update`,
+    {
+      customAttributes: JSON.stringify(customAttributes),
+      localId: user.localId,
+      validSince: String(Math.floor(Date.now() / 1000)),
+    },
+  )
+}
+
+function parseFirebaseCustomAttributes(customAttributes?: string): JsonObject {
+  if (!customAttributes) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(customAttributes) as unknown
+
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed) ||
+      !isJsonValue(parsed)
+    ) {
+      return {}
+    }
+
+    return parsed as JsonObject
+  } catch {
+    return {}
+  }
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (
+    value === null ||
+    typeof value === 'boolean' ||
+    typeof value === 'number' ||
+    typeof value === 'string'
+  ) {
+    return true
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((entry) => isJsonValue(entry))
+  }
+
+  if (typeof value === 'object') {
+    return Object.values(value).every((entry) => isJsonValue(entry))
+  }
+
+  return false
+}
+
+class IdentityToolkitRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+async function callIdentityToolkit<T = JsonObject>(
+  env: Env,
+  path: string,
+  body: JsonObject,
+) {
+  const response = await fetch(`${identityToolkitBaseUrl}${path}`, {
+    method: 'POST',
+    headers: await buildGoogleApiHeaders(env),
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+
+    throw new IdentityToolkitRequestError(
+      response.status,
+      `Falha ao consultar Firebase Auth: ${errorText}`,
+    )
+  }
+
+  return (await response.json()) as T
 }
 
 async function getDocument(env: Env, path: string) {
@@ -2347,17 +3031,17 @@ function resolveCalendarSyncBatchSize(env: Env) {
 }
 
 function resolveWorkerActorUid(env: Env) {
-  return env.WORKER_ACTOR_UID?.trim() || 'worker-emailjs'
+  return env.WORKER_ACTOR_UID?.trim() || 'worker-automations'
 }
 
 function resolveWorkerActorName(env: Env) {
-  return env.WORKER_ACTOR_NAME?.trim() || 'Worker EmailJS'
+  return env.WORKER_ACTOR_NAME?.trim() || 'Worker Automacoes'
 }
 
 function buildCorsHeaders() {
   return {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'DELETE, GET, POST, OPTIONS',
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
   }
@@ -2485,6 +3169,20 @@ function getStringField(document: FirestoreDocument, fieldName: string) {
   }
 
   return null
+}
+
+function getStringArrayField(document: FirestoreDocument, fieldName: string) {
+  const field = getField(document, fieldName)
+
+  if (!field || !('arrayValue' in field)) {
+    return []
+  }
+
+  return (
+    field.arrayValue.values
+      ?.flatMap((value) => ('stringValue' in value ? [value.stringValue] : [])) ??
+    []
+  )
 }
 
 function getIntegerField(document: FirestoreDocument, fieldName: string) {

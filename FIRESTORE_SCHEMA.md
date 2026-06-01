@@ -31,6 +31,17 @@ Se houver conflito entre código, prompts e documentação, este arquivo deve se
 * Nunca criar coleção nova sem atualizar este arquivo antes
 * Nunca criar campo parecido com outro já existente apenas por preferência de naming
 
+### Autorização administrativa
+
+* o painel administrativo deve exigir usuário autenticado com custom claim `admin = true`
+* o login administrativo da V1 deve usar somente Google Popup
+* o frontend deve solicitar ao worker a reconciliação da claim após o login Google e encerrar a sessão quando a conta não estiver aprovada
+* as regras do Firestore devem aceitar leitura e escrita administrativa apenas quando `request.auth.token.admin == true` e o e-mail autenticado continuar presente em `settings/adminAccess.adminEmails`
+* o worker continua autenticando com service account e não depende de usuário técnico do painel
+* a allowlist administrativa deve ficar em `settings/adminAccess`, sem coleção paralela de usuários
+* `settings/adminAccess` deve ser lido e alterado apenas pelo worker; o frontend usa endpoints administrativos autenticados
+* a checagem da allowlist nas regras adiciona uma leitura dependente previsível durante a autorização; o custo é aceito porque a V1 tem baixo volume e acesso restrito ao painel administrativo
+
 ### Campos base padrão
 
 Todos os documentos principais devem seguir este padrão mínimo:
@@ -103,6 +114,7 @@ Documentos previstos:
 * `settings/app`
 * `settings/notifications`
 * `settings/calendar`
+* `settings/adminAccess`
 
 Exemplo de `settings/app`:
 
@@ -142,6 +154,27 @@ Observações:
 * `configurationUpdatedAt` registra apenas a última mudança feita na configuração, sem ser sobrescrito pelos ciclos do worker
 * segredos continuam fora do frontend e do Firestore, no worker
 * a troca de `calendarId` deve preservar rastreabilidade pelo vínculo remoto salvo em `calendarEvents`
+
+Exemplo de `settings/adminAccess`:
+
+```ts
+{
+  adminEmails: string[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  createdBy?: string
+  updatedBy?: string
+}
+```
+
+Observações:
+
+* `adminEmails` guarda e-mails normalizados em minúsculas, sem duplicidade
+* a presença do e-mail autoriza o worker a reconciliar `admin = true` no Firebase Auth após login Google
+* a remoção do e-mail deve revogar a claim existente quando a conta já tiver sido criada no Firebase Auth
+* não permitir remover o último administrador nem o próprio administrador autenticado
+* o frontend não lê nem escreve este documento diretamente
+* as regras do Firestore consultam este documento para revogar imediatamente o acesso ao banco mesmo quando ainda existir token antigo válido
 
 ### 2. `congregations`
 
@@ -282,6 +315,10 @@ Campos:
   googleCalendarSyncStatus?: "pending" | "synced" | "error"
   googleCalendarSyncError?: string | null
   googleCalendarManualSyncRequestedAt?: Timestamp | null
+  googleCalendarClaimId?: string | null
+  googleCalendarClaimedAt?: Timestamp | null
+  googleCalendarRetryCount?: number
+  googleCalendarSyncScheduledFor?: Timestamp | null
   googleCalendarSyncUpdatedAt?: Timestamp | null
   createdAt: Timestamp
   updatedAt: Timestamp
@@ -299,6 +336,10 @@ Observações:
 * `googleCalendarCalendarId` registra em qual calendário remoto o vínculo foi criado, permitindo migração segura de `calendarId`
 * `googleCalendarSyncStatus` controla a fila leve da Fase 12 sem criar nova coleção, inclusive quando a solicitação parte do botão manual `Sincronizar com agenda`
 * `googleCalendarManualSyncRequestedAt` registra a última aprovação manual para publicar, atualizar ou remover o item operacional no Google Calendar
+* `googleCalendarClaimId` e `googleCalendarClaimedAt` implementam lease temporário para impedir processamento concorrente do mesmo item
+* `googleCalendarRetryCount` e `googleCalendarSyncScheduledFor` controlam retentativas sem perder a pendência após falha transitória
+* o ID enviado ao Google Calendar deve ser determinístico a partir de `calendarEvents/{id}`, para que uma retomada após falha não duplique o evento remoto
+* campos técnicos de sincronização não devem sobrescrever `updatedAt`, que continua representando mudança real feita no calendário administrativo
 * slots vazios de `publicTalk` podem existir no Firestore para planejamento anual sem precisarem existir no Google Calendar
 * quando houver publicação de `orador visitante` ou `discurso fora`, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e adicionar o orador como convidado no Google Calendar
 * não criar coleção paralela como `events`, `schedules` ou `annualCalendar`
@@ -476,6 +517,7 @@ Os índices abaixo devem ser tratados como base inicial da V1.
 * `type ASC, date ASC`
 * `blocksAssignments ASC, date ASC`
 * `googleCalendarSyncStatus ASC, date ASC`
+* `googleCalendarSyncStatus ASC, googleCalendarSyncScheduledFor ASC`
 
 ### `assignments`
 

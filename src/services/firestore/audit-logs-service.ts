@@ -11,7 +11,7 @@ import {
   type WriteBatch,
 } from 'firebase/firestore'
 
-import { firebaseDb } from '@/lib/firebase'
+import { firebaseDb } from '@/lib/firebase-db'
 import {
   auditLogSchema,
   type AuditLogDocument,

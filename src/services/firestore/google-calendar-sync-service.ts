@@ -1,6 +1,6 @@
 import { Timestamp, doc, writeBatch } from 'firebase/firestore'
 
-import { firebaseDb } from '@/lib/firebase'
+import { firebaseDb } from '@/lib/firebase-db'
 import { calendarEventSchema } from '@/types/firestore'
 import type { CalendarEventDocument } from '@/types/firestore'
 
@@ -11,9 +11,13 @@ type CalendarEventGoogleSyncFields = Pick<
   CalendarEventDocument,
   | 'googleCalendarSyncError'
   | 'googleCalendarSyncStatus'
-  | 'googleCalendarSyncUpdatedAt'
   | 'googleCalendarManualSyncRequestedAt'
->
+  | 'googleCalendarClaimId'
+  | 'googleCalendarClaimedAt'
+  | 'googleCalendarRetryCount'
+  | 'googleCalendarSyncScheduledFor'
+> &
+  Partial<Pick<CalendarEventDocument, 'googleCalendarSyncUpdatedAt'>>
 
 export type RequestManualGoogleCalendarSyncInput = {
   actorName?: string | null
@@ -28,7 +32,10 @@ export function buildPendingGoogleCalendarSyncFields(
     googleCalendarSyncError: null,
     googleCalendarManualSyncRequestedAt: null,
     googleCalendarSyncStatus: 'pending',
-    googleCalendarSyncUpdatedAt: now,
+    googleCalendarClaimId: null,
+    googleCalendarClaimedAt: null,
+    googleCalendarRetryCount: 0,
+    googleCalendarSyncScheduledFor: now,
   }
 }
 
@@ -39,6 +46,10 @@ export function buildSyncedGoogleCalendarSyncFields(
     googleCalendarSyncError: null,
     googleCalendarManualSyncRequestedAt: null,
     googleCalendarSyncStatus: 'synced',
+    googleCalendarClaimId: null,
+    googleCalendarClaimedAt: null,
+    googleCalendarRetryCount: 0,
+    googleCalendarSyncScheduledFor: null,
     googleCalendarSyncUpdatedAt: now,
   }
 }
@@ -73,7 +84,10 @@ export async function requestManualGoogleCalendarSync({
       googleCalendarManualSyncRequestedAt: now,
       googleCalendarSyncError: null,
       googleCalendarSyncStatus: 'pending',
-      googleCalendarSyncUpdatedAt: now,
+      googleCalendarClaimId: null,
+      googleCalendarClaimedAt: null,
+      googleCalendarRetryCount: 0,
+      googleCalendarSyncScheduledFor: now,
     },
     {
       merge: true,

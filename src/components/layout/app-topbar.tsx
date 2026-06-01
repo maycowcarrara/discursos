@@ -7,6 +7,7 @@ import { AvatarBadge } from '@/components/app/avatar-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getNavigationItem } from '@/config/navigation'
+import { useAppSettingsQuery } from '@/hooks/use-app-settings'
 import { logout } from '@/services/auth/auth-service'
 
 type AppTopbarProps = {
@@ -17,6 +18,8 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
   const location = useLocation()
   const currentItem = getNavigationItem(location.pathname)
   const { user } = useAuth()
+  const appSettingsQuery = useAppSettingsQuery()
+  const baseYear = appSettingsQuery.data?.defaultYear ?? new Date().getFullYear()
   const todayLabel = new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
     month: 'long',
@@ -55,11 +58,11 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
         </div>
         <Badge className="hidden bg-primary/10 text-primary sm:inline-flex">
           <CalendarClock className="mr-2 size-3.5" />
-          Ano base 2026
+          Ano base {baseYear}
         </Badge>
         <Badge className="hidden md:inline-flex">
           <BellDot className="mr-2 size-3.5" />
-          Sem automacoes ativas
+          Automacoes por worker
         </Badge>
         <div className="hidden items-center gap-2 rounded-[18px] border border-border/70 bg-card px-2 py-2 shadow-sm dark:bg-card/75 sm:flex">
           <AvatarBadge name={user?.displayName ?? 'Administrador'} size="sm" />

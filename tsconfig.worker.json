@@ -12,5 +12,6 @@
     "noFallthroughCasesInSwitch": true,
     "types": []
   },
-  "include": ["workers/email-automation/src/**/*.ts"]
+  "include": ["workers/email-automation/src/**/*.ts"],
+  "exclude": ["workers/email-automation/src/**/*.test.ts"]
 }

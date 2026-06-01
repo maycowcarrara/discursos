@@ -168,6 +168,10 @@ export const calendarEventSchema = managedDocumentSchema.extend({
   googleCalendarSyncStatus: googleCalendarSyncStatusSchema.optional(),
   googleCalendarSyncError: z.string().nullable().optional(),
   googleCalendarManualSyncRequestedAt: timestampSchema.nullable().optional(),
+  googleCalendarClaimId: z.string().nullable().optional(),
+  googleCalendarClaimedAt: timestampSchema.nullable().optional(),
+  googleCalendarRetryCount: z.number().int().nonnegative().optional(),
+  googleCalendarSyncScheduledFor: timestampSchema.nullable().optional(),
   googleCalendarSyncUpdatedAt: timestampSchema.nullable().optional(),
 })
 

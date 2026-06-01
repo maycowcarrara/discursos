@@ -1,23 +1,31 @@
+import { Suspense, type ReactNode } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 
+import { RouteLoadingScreen } from '@/components/app/route-loading-screen'
 import { GuestRoute } from '@/components/auth/guest-route'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import { AppShell } from '@/components/layout/app-shell'
-import { AssignmentsPage } from '@/pages/assignments-page'
-import { CalendarPage } from '@/pages/calendar-page'
-import { CongregationsPage } from '@/pages/congregations-page'
-import { DashboardPage } from '@/pages/dashboard-page'
-import { HistoryPage } from '@/pages/history-page'
-import { LoginPage } from '@/pages/login-page'
-import { PublicAssignmentConfirmationPage } from '@/pages/public-assignment-confirmation-page'
-import { SettingsPage } from '@/pages/settings-page'
-import { SpeakersPage } from '@/pages/speakers-page'
-import { ThemesPage } from '@/pages/themes-page'
+import {
+  AppShell,
+  AssignmentsPage,
+  CalendarPage,
+  CongregationsPage,
+  DashboardPage,
+  HistoryPage,
+  LoginPage,
+  PublicAssignmentConfirmationPage,
+  SettingsPage,
+  SpeakersPage,
+  ThemesPage,
+} from '@/router/lazy-pages'
+
+function withRouteLoadingFallback(element: ReactNode) {
+  return <Suspense fallback={<RouteLoadingScreen />}>{element}</Suspense>
+}
 
 export const appRouter = createBrowserRouter([
   {
     path: '/confirmacao/designacao',
-    element: <PublicAssignmentConfirmationPage />,
+    element: withRouteLoadingFallback(<PublicAssignmentConfirmationPage />),
   },
   {
     path: '/login',
@@ -25,7 +33,7 @@ export const appRouter = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <LoginPage />,
+        element: withRouteLoadingFallback(<LoginPage />),
       },
     ],
   },
@@ -34,39 +42,39 @@ export const appRouter = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       {
-        element: <AppShell />,
+        element: withRouteLoadingFallback(<AppShell />),
         children: [
           {
             index: true,
-            element: <DashboardPage />,
+            element: withRouteLoadingFallback(<DashboardPage />),
           },
           {
             path: 'congregacoes',
-            element: <CongregationsPage />,
+            element: withRouteLoadingFallback(<CongregationsPage />),
           },
           {
             path: 'oradores',
-            element: <SpeakersPage />,
+            element: withRouteLoadingFallback(<SpeakersPage />),
           },
           {
             path: 'temas',
-            element: <ThemesPage />,
+            element: withRouteLoadingFallback(<ThemesPage />),
           },
           {
             path: 'agenda',
-            element: <CalendarPage />,
+            element: withRouteLoadingFallback(<CalendarPage />),
           },
           {
             path: 'designacoes',
-            element: <AssignmentsPage />,
+            element: withRouteLoadingFallback(<AssignmentsPage />),
           },
           {
             path: 'historico',
-            element: <HistoryPage />,
+            element: withRouteLoadingFallback(<HistoryPage />),
           },
           {
             path: 'configuracoes',
-            element: <SettingsPage />,
+            element: withRouteLoadingFallback(<SettingsPage />),
           },
         ],
       },

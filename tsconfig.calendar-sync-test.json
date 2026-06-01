@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "outDir": "./node_modules/.tmp/calendar-sync-tests",
+    "rootDir": "./workers/email-automation/src",
+    "strict": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "types": ["node"]
+  },
+  "include": [
+    "workers/email-automation/src/google-calendar-sync.ts",
+    "workers/email-automation/src/google-calendar-sync.test.ts"
+  ]
+}

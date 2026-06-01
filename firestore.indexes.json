@@ -99,6 +99,14 @@
       ]
     },
     {
+      "collectionGroup": "calendarEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "googleCalendarSyncStatus", "order": "ASCENDING" },
+        { "fieldPath": "googleCalendarSyncScheduledFor", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "assignments",
       "queryScope": "COLLECTION",
       "fields": [

@@ -9,10 +9,12 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 
-import { firebaseDb } from '@/lib/firebase'
+import { firebaseDb } from '@/lib/firebase-db'
 import {
   appSettingsSchema,
+  calendarEventSchema,
   calendarSettingsSchema,
+  type CalendarEventDocument,
   type AppSettingsDocument,
   type CalendarSettingsDocument,
   type FirestoreRecord,
@@ -48,6 +50,7 @@ export type SaveCalendarSettingsInput = CalendarSettingsFormValues & {
 const settingsCollectionName = 'settings'
 const appSettingsDocId = 'app'
 const calendarSettingsDocId = 'calendar'
+const calendarQueueBatchSize = 450
 
 export const defaultAppSettingsValues: AppSettingsFormValues = {
   organizationName: '',
@@ -148,6 +151,26 @@ function shouldQueueFullCalendarSync(
   )
 }
 
+function shouldQueueCalendarEventForConfigurationChange(
+  calendarEvent: CalendarEventDocument,
+) {
+  return (
+    calendarEvent.type === 'special' ||
+    (calendarEvent.type !== 'publicTalk' &&
+      Boolean(calendarEvent.googleCalendarEventId))
+  )
+}
+
+function chunkItems<T>(items: T[], chunkSize: number) {
+  const chunks: T[][] = []
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize))
+  }
+
+  return chunks
+}
+
 export async function saveAppSettings({
   actorUid,
   organizationName,
@@ -209,22 +232,32 @@ export async function saveCalendarSettings({
     defaultStartTime,
     defaultDurationMinutes,
   })
-  const batch = writeBatch(firebaseDb)
-
-  batch.set(calendarSettingsRef, nextCalendarSettings)
-
+  const calendarEventsToQueue: Array<{
+    ref: ReturnType<typeof doc>
+  }> = []
   if (queueFullSync) {
     const calendarEventsSnapshot = await getDocs(collection(firebaseDb, 'calendarEvents'))
 
     calendarEventsSnapshot.docs.forEach((calendarEventSnapshot) => {
-      batch.set(
-        calendarEventSnapshot.ref,
-        buildPendingGoogleCalendarSyncFields(now),
-        { merge: true },
-      )
+      const parsedCalendarEvent = calendarEventSchema.safeParse({
+        id: calendarEventSnapshot.id,
+        ...calendarEventSnapshot.data(),
+      })
+
+      if (
+        parsedCalendarEvent.success &&
+        shouldQueueCalendarEventForConfigurationChange(parsedCalendarEvent.data)
+      ) {
+        calendarEventsToQueue.push({
+          ref: calendarEventSnapshot.ref,
+        })
+      }
     })
   }
 
+  const batch = writeBatch(firebaseDb)
+
+  batch.set(calendarSettingsRef, nextCalendarSettings)
   appendAuditLogToBatch(batch, {
     entityType: 'settings',
     entityId: calendarSettingsDocId,
@@ -236,9 +269,27 @@ export async function saveCalendarSettings({
     metadata: {
       source: 'settings-phase-12',
       queueFullSync,
+      queuedCalendarEventCount: calendarEventsToQueue.length,
     },
     createdAt: now,
   })
 
   await batch.commit()
+
+  for (const calendarEventsChunk of chunkItems(
+    calendarEventsToQueue,
+    calendarQueueBatchSize,
+  )) {
+    const calendarEventsBatch = writeBatch(firebaseDb)
+
+    calendarEventsChunk.forEach((calendarEvent) => {
+      calendarEventsBatch.set(
+        calendarEvent.ref,
+        buildPendingGoogleCalendarSyncFields(now),
+        { merge: true },
+      )
+    })
+
+    await calendarEventsBatch.commit()
+  }
 }

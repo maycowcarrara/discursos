@@ -11,6 +11,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { useAuth } from '@/components/auth/use-auth'
+import { AdminUsersCard } from '@/components/settings/admin-users-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -26,7 +27,7 @@ import { useRecentAuditLogsQuery } from '@/hooks/use-audit-logs'
 import { useNotificationsByStatusQuery } from '@/hooks/use-notifications'
 import {
   currentDeliveredPhaseLabel,
-  nextRequiredPhaseLabel,
+  nextRequiredStepLabel,
 } from '@/config/project-status'
 import {
   defaultAppSettingsValues,
@@ -55,7 +56,7 @@ const appSettingsFormSchema = z.object({
     .min(3, 'Informe o nome da organizacao.'),
   defaultYear: z
     .number({
-      invalid_type_error: 'Informe um ano valido.',
+      error: 'Informe um ano valido.',
     })
     .int('Informe um ano inteiro.')
     .min(2024, 'Use um ano a partir de 2024.')
@@ -77,7 +78,7 @@ const calendarSettingsFormSchema = z
       ),
     defaultDurationMinutes: z
       .number({
-        invalid_type_error: 'Informe a duracao em minutos.',
+        error: 'Informe a duracao em minutos.',
       })
       .int('Use minutos inteiros.')
       .min(15, 'Use pelo menos 15 minutos.')
@@ -349,6 +350,8 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
+          <AdminUsersCard />
+
           <Card>
             <CardHeader className="gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -359,7 +362,7 @@ export function SettingsPage() {
                   <div>
                     <CardTitle className="text-2xl">Google Calendar</CardTitle>
                     <CardDescription className="mt-2 text-base">
-                      Inicio operacional da Fase 12 com
+                      Integracao entregue na Fase 12 com
                       <span className="font-medium text-foreground"> settings/calendar</span>,
                       sincronizacao por worker e fila leve no proprio
                       <span className="font-medium text-foreground"> calendarEvents</span>.
@@ -553,7 +556,7 @@ export function SettingsPage() {
               <CardTitle className="text-2xl">Escopo entregue</CardTitle>
               <CardDescription>
                 A fundacao do Firestore foi concluida na Fase 3 e a Fase 12
-                agora comeca sem criar colecoes paralelas para integracao externa.
+                foi entregue sem criar colecoes paralelas para integracao externa.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
@@ -585,8 +588,7 @@ export function SettingsPage() {
                 <div>
                   <CardTitle className="text-2xl">{currentDeliveredPhaseLabel}</CardTitle>
                   <CardDescription>
-                    A Fase 11 segue como ultima entrega concluida, enquanto a
-                    Fase 12 ja opera sobre a mesma infraestrutura de worker.
+                    A Fase 12 esta concluida sobre a mesma infraestrutura de worker.
                   </CardDescription>
                 </div>
               </div>
@@ -597,10 +599,10 @@ export function SettingsPage() {
                 `notifications`, sem abrir colecoes paralelas para EmailJS.
               </p>
               <p>
-                A fase atual em andamento e
-                <span className="font-medium text-foreground"> {nextRequiredPhaseLabel}</span>
-                , agora com `settings/calendar` ativo e fila manual nas
-                designacoes publicaveis.
+                O proximo passo obrigatorio e
+                <span className="font-medium text-foreground"> {nextRequiredStepLabel}</span>,
+                com `settings/calendar` ativo e fila manual nas designacoes
+                publicaveis.
               </p>
               <p>
                 Os segredos seguem fora do frontend, enquanto o worker reutiliza

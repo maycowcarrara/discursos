@@ -17,18 +17,19 @@ Fases concluídas:
 * `FASE 9 — Dashboard`
 * `FASE 10 — Histórico`
 * `FASE 11 — EmailJS`
+* `FASE 12 — Google Calendar`
 
 Última fase concluída:
 
-* `FASE 11 — EmailJS`
-
-Fase atual em andamento:
-
 * `FASE 12 — Google Calendar`
+
+Etapa atual em andamento:
+
+* fechamento de lançamento V1
 
 Próxima etapa obrigatória:
 
-* concluir a `FASE 12 — Google Calendar`
+* executar o checklist operacional de lançamento V1
 
 ## O que já foi entregue
 
@@ -47,11 +48,13 @@ Próxima etapa obrigatória:
 ### Autenticação
 
 * Firebase Auth integrado
-* Login por e-mail e senha
-* Login com Google Popup
+* Login administrativo somente com Google Popup
 * Persistência de sessão
 * Logout
 * Rotas protegidas
+* acesso restrito à custom claim `admin = true`
+* aprovação de e-mails em `settings/adminAccess`, mediada pelo worker
+* painel em Configurações para adicionar e remover administradores
 
 ### Infraestrutura Firebase
 
@@ -162,7 +165,7 @@ Próxima etapa obrigatória:
 * ressincronização da fila preservando notificações já enviadas, falhadas ou canceladas quando a identidade de entrega continua a mesma
 * scripts e arquivos base para `deploy:worker`, `worker:deploy`, `typecheck:worker` e segredos locais do worker
 
-### Início da Fase 12
+### Fechamento da Fase 12
 
 * `settings/calendar` passa a ser documento real do Firestore para ativação da integração, `calendarId`, horário padrão e duração padrão
 * `calendarEvents` passa a guardar o vínculo remoto do Google Calendar e o estado oficial de sincronização
@@ -173,21 +176,25 @@ Próxima etapa obrigatória:
 * a tela de configurações passa a exibir a configuração e o último estado global de sincronização
 * o Google Calendar passa a publicar apenas `orador visitante`, `discurso fora` e `evento especial`, sem espelhar slots vazios
 * quando `speakers.email` existir, `orador visitante` e `discurso fora` passam a incluir o orador como convidado, com convite, atualização e cancelamento enviados pelo Google Calendar
+* fila leve protegida com `claim` temporário, retentativa persistida e ID remoto determinístico
+* regras do Firestore e frontend restritos à custom claim `admin = true`
+* ciclos técnicos do worker deixam de sobrescrever `calendarEvents.updatedAt`
+* login administrativo simplificado para Google Popup
+* `settings/adminAccess` passa a guardar a allowlist administrativa reconciliada pelo worker
 
-## Próxima fase
+## Próxima etapa
 
-### `FASE 12 — Google Calendar`
+### Checklist de lançamento V1
 
 Status atual:
 
-* em andamento
+* obrigatório antes da abertura ao uso
 
-Implementar:
+Executar:
 
-* publicação manual por botão `Sincronizar com agenda`
-* atualização manual com processamento por fila do worker
-* remoção manual com processamento por fila do worker
-* sincronização segura via cron e trigger interno
+* conceder custom claim `admin = true` às contas administrativas
+* publicar regras, índices, frontend e worker atualizados
+* validar login administrativo, fila EmailJS, confirmação pública e sincronização Google Calendar em produção
 
 Entregue até o início da Fase 12:
 
@@ -203,9 +210,9 @@ Entregue até o início da Fase 12:
 * histórico permanente com filtros por período, tema, orador e congregação
 * fila automática de notificações com EmailJS, Cloudflare Worker, cron e confirmação pública por link
 
-Próximo subpasso obrigatório:
+Próximo passo obrigatório:
 
-* concluir a `FASE 12 — Google Calendar`
+* executar o checklist operacional de lançamento V1
 
 ## Diretriz de UI e UX
 
@@ -229,8 +236,13 @@ Regra do projeto:
 * `npm run dev`
 * `npm run build`
 * `npm run lint`
+* `npm run typecheck`
+* `npm run verify`
 * `npm run test:notifications`
+* `npm run test:calendar-sync`
 * `npm run typecheck:worker`
+* `npm run admin:bootstrap -- --email administrador@exemplo.org`
+* `npm run admin:grant -- --email administrador@exemplo.org`
 * `npm run deploy:worker`
 * `npm run deploy:firestore`
 * `npm run deploy:hosting`
@@ -285,6 +297,36 @@ Fluxo operacional do worker:
 * se houver falha transitória, a notificação volta para `pending` com retentativa em 30 minutos
 * se atingir o limite de tentativas, a notificação vira `failed`
 * se a designação deixar de ser operacional ou a data do evento já tiver passado, a notificação vira `cancelled`
+
+## Operação da Fase 12
+
+Antes de publicar o acesso administrativo:
+
+* defina `GOOGLE_APPLICATION_CREDENTIALS` com o caminho do JSON da service account ou preencha `FIREBASE_SERVICE_ACCOUNT_JSON`
+* inicialize a allowlist com `npm.cmd run admin:bootstrap -- --email administrador@exemplo.org`
+* publique o worker para permitir a reconciliação da claim no primeiro login Google
+* mantenha `npm.cmd run admin:grant -- --email administrador@exemplo.org` apenas como ferramenta operacional para concessão direta a uma conta que já existe no Firebase Auth
+
+Fluxo operacional do Google Calendar:
+
+* `calendarEvents` continua sendo a fila oficial, sem coleção paralela
+* designações operacionais entram na fila apenas após o clique em `Sincronizar com agenda`
+* eventos especiais entram automaticamente na fila técnica
+* o worker faz `claim` temporário antes de processar cada item
+* falhas transitórias voltam para `pending` com novo horário; após o limite, ficam em `error`
+* o ID remoto determinístico impede duplicidade se o Google Calendar responder antes de uma falha no Firestore
+* a agenda permite retomar manualmente eventos não operacionais que terminaram em erro
+
+## Acesso administrativo
+
+* a tela de login oferece apenas `Entrar com Google`
+* `settings/adminAccess.adminEmails` guarda a allowlist operacional de administradores
+* após o login Google, o frontend pede ao worker a reconciliação da claim `admin = true`
+* o painel de Configurações lista e-mails aprovados e permite adicionar ou remover acessos
+* adicionar um e-mail antes do primeiro login é permitido; a claim será aplicada quando a pessoa entrar com Google
+* remover o próprio acesso ou o último administrador é bloqueado
+* o frontend nunca lê ou altera `settings/adminAccess` diretamente
+* as regras do Firestore exigem claim e allowlist ao mesmo tempo, revogando o acesso ao banco imediatamente após uma remoção
 
 ## Decisão atual de deploy
 

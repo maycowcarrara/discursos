@@ -6,6 +6,7 @@ export type AuthUser = {
   uid: string
   email: string | null
   displayName: string | null
+  isAdmin: true
 }
 
 export type AuthContextValue = {

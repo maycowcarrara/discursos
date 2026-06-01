@@ -16,7 +16,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 
-import { firebaseDb } from '@/lib/firebase'
+import { firebaseDb } from '@/lib/firebase-db'
 import {
   appSettingsSchema,
   assignmentSchema,

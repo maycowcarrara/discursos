@@ -14,7 +14,7 @@
     "FIREBASE_PROJECT_ID": "discursos-15891",
     "NOTIFICATION_BATCH_SIZE": "10",
     "REMINDER_SEND_HOUR_LOCAL": "9",
-    "WORKER_ACTOR_NAME": "Worker EmailJS",
-    "WORKER_ACTOR_UID": "worker-emailjs"
+    "WORKER_ACTOR_NAME": "Worker Automacoes",
+    "WORKER_ACTOR_UID": "worker-automations"
   }
 }

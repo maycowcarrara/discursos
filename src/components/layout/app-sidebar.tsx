@@ -5,7 +5,7 @@ import { AvatarBadge } from '@/components/app/avatar-badge'
 import { useAuth } from '@/components/auth/use-auth'
 import {
   currentDeliveredPhaseLabel,
-  nextRequiredPhaseLabel,
+  nextRequiredStepLabel,
 } from '@/config/project-status'
 import { navigationItems } from '@/config/navigation'
 import { cn } from '@/lib/utils'
@@ -87,7 +87,7 @@ export function AppSidebar({ mobile = false, onNavigate }: AppSidebarProps) {
         </div>
         <p className="mt-2 text-sm leading-6 text-sidebar-foreground/72">
           {currentDeliveredPhaseLabel} concluida. Proxima etapa obrigatoria:{' '}
-          {nextRequiredPhaseLabel}.
+          {nextRequiredStepLabel}.
         </p>
       </div>
 

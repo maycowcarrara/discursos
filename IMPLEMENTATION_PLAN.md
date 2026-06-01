@@ -21,18 +21,19 @@
 * FASE 9 — Dashboard
 * FASE 10 — Histórico
 * FASE 11 — EmailJS
+* FASE 12 — Google Calendar
 
 ## Última fase concluída
 
-* FASE 11 — EmailJS
-
-## Fase atual em andamento
-
 * FASE 12 — Google Calendar
+
+## Etapa atual em andamento
+
+* Fechamento de lançamento V1
 
 ## Próxima etapa obrigatória
 
-* Concluir a FASE 12 — Google Calendar
+* Executar o checklist operacional de lançamento V1
 
 ## Entregas já realizadas
 
@@ -51,11 +52,14 @@
 ### Autenticação
 
 * Firebase Auth integrado
-* Login com e-mail e senha
-* Login com Google Popup
+* Login administrativo somente com Google Popup
 * Persistência de sessão
 * Logout
 * Rotas protegidas
+* acesso restrito à custom claim `admin = true`
+* allowlist administrativa em `settings/adminAccess`, mediada pelo worker
+* reconciliação da claim no primeiro login Google de um e-mail aprovado
+* painel de Configurações para adicionar e remover administradores
 
 ### Infraestrutura Firebase
 
@@ -168,7 +172,7 @@
 * sincronização da fila preservando estado já processado quando a identidade de entrega não muda, e reabrindo o ciclo apenas quando a entrega realmente muda
 * scripts `test:notifications`, `typecheck:worker`, `deploy:worker` e `worker:deploy` adicionados para a operação da fase
 
-### Google Calendar — início da Fase 12
+### Google Calendar — fechamento da Fase 12
 
 * `settings/calendar` passa a ser documento real do Firestore para ativação da integração, `calendarId`, horário padrão e duração padrão
 * `calendarEvents` passa a armazenar o vínculo remoto com Google Calendar e o estado oficial de sincronização
@@ -185,6 +189,23 @@ Impacto técnico desta abertura de fase:
 * não foi criada coleção nova para fila paralela de calendário
 * o vínculo remoto fica no próprio `calendarEvents`, reduzindo leituras e evitando mapeamentos duplicados
 * `settings/calendar` concentra a configuração operacional e o status global da integração
+
+Fechamento técnico obrigatório da Fase 12:
+
+* painel e regras do Firestore restritos à custom claim `admin = true`
+* fila leve de `calendarEvents` processada com `claim` temporário para evitar concorrência entre cron e trigger interno
+* retentativas persistidas com novo horário em `googleCalendarSyncScheduledFor`, sem perder falhas transitórias
+* ID remoto determinístico no Google Calendar para que uma retomada não crie duplicidade
+* `calendarEvents.updatedAt` preservado para alterações administrativas reais, sem sobrescrever o campo durante ciclos internos do worker
+
+Fechamento de acesso administrativo da V1:
+
+* login simplificado para Google Popup, sem formulário de e-mail e senha no frontend
+* allowlist administrativa centralizada em `settings/adminAccess`, sem coleção paralela
+* endpoints do worker autenticados por ID token Firebase para listar, aprovar e revogar administradores
+* reconciliação da custom claim `admin = true` após login Google de e-mail previamente aprovado
+* bloqueio de remoção do próprio administrador e do último acesso ativo
+* regras do Firestore exigem claim e allowlist simultaneamente para revogar acesso imediatamente mesmo com token antigo
 
 Regra de manutenção desta documentação:
 
@@ -670,16 +691,16 @@ Não expor chaves sensíveis no frontend.
 
 Status atual:
 
-* Em andamento
+* Concluída
 
-Implementar:
+Entregue:
 
 * publicação manual por botão `Sincronizar com agenda`
 * atualização manual com processamento por fila do worker
 * remoção manual com processamento por fila do worker
 * sincronização segura via cron e trigger interno
 
-Entregas iniciadas nesta fase:
+Entregas desta fase:
 
 * `settings/calendar` com persistência real para `enabled`, `calendarId`, horário padrão e duração padrão
 * estado de sincronização do Google Calendar registrado diretamente em `calendarEvents`
@@ -688,6 +709,17 @@ Entregas iniciadas nesta fase:
 * alinhamento entre UI e worker para usar a designação operacional vigente como referência da ação manual
 * worker preparado para criar, atualizar e excluir eventos no Google Calendar por cron e trigger interno
 * calendário remoto restrito a eventos operacionais reais, sem publicar sábados vazios
+
+Fechamento técnico entregue:
+
+* autorização administrativa por custom claim `admin = true`
+* login administrativo somente com Google Popup
+* allowlist administrativa em `settings/adminAccess`, mediada por endpoints autenticados do worker
+* painel de Configurações para adicionar e remover administradores
+* `claim` temporário por item da fila leve para impedir corrida entre cron e trigger interno
+* retentativa persistida com agendamento futuro após falha transitória
+* ID remoto determinístico para manter idempotência mesmo quando o Firestore falha após a chamada ao Google Calendar
+* separação entre alteração administrativa (`updatedAt`) e atualização técnica de sincronização (`googleCalendarSyncUpdatedAt`)
 
 ---
 

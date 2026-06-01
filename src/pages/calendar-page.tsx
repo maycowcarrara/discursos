@@ -32,6 +32,7 @@ import {
   useCreateCalendarEventMutation,
   useDeleteCalendarEventMutation,
   useGenerateCalendarYearMutation,
+  useRequestManualGoogleCalendarSyncMutation,
   useUpdateCalendarEventMutation,
 } from '@/hooks/use-calendar-events'
 import { useCongregationsQuery } from '@/hooks/use-congregations'
@@ -184,6 +185,8 @@ export function CalendarPage() {
   const updateCalendarEventMutation = useUpdateCalendarEventMutation()
   const deleteCalendarEventMutation = useDeleteCalendarEventMutation()
   const generateCalendarYearMutation = useGenerateCalendarYearMutation()
+  const requestManualGoogleCalendarSyncMutation =
+    useRequestManualGoogleCalendarSyncMutation()
 
   const allEvents = useMemo(
     () => calendarEventsQuery.data ?? [],
@@ -292,7 +295,8 @@ export function CalendarPage() {
     createCalendarEventMutation.isPending ||
     updateCalendarEventMutation.isPending ||
     deleteCalendarEventMutation.isPending ||
-    generateCalendarYearMutation.isPending
+    generateCalendarYearMutation.isPending ||
+    requestManualGoogleCalendarSyncMutation.isPending
 
   const totalQueryErrors = [
     calendarEventsQuery.error,
@@ -507,6 +511,35 @@ export function CalendarPage() {
       setFeedback({
         tone: 'success',
         message: 'Evento arquivado com sucesso.',
+      })
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: getErrorMessage(error),
+      })
+    }
+  }
+
+  async function handleRetryGoogleCalendarSync(calendarEventId: string) {
+    if (!user) {
+      setFeedback({
+        tone: 'error',
+        message: 'Sua sessao expirou. Entre novamente para continuar.',
+      })
+      return
+    }
+
+    setFeedback(null)
+
+    try {
+      await requestManualGoogleCalendarSyncMutation.mutateAsync({
+        actorUid: user.uid,
+        actorName,
+        calendarEventId,
+      })
+      setFeedback({
+        tone: 'success',
+        message: 'O evento voltou para a fila do Google Calendar.',
       })
     } catch (error) {
       setFeedback({
@@ -775,7 +808,7 @@ export function CalendarPage() {
                           shouldDirty: true,
                         })
                       }
-                      disabled={editingEventHasAssignment}
+                      disabled={editingEventHasLinkedAssignments}
                     >
                       <p className="font-medium text-foreground">Ativo</p>
                       <p className="mt-1 leading-6">
@@ -794,7 +827,7 @@ export function CalendarPage() {
                           shouldDirty: true,
                         })
                       }
-                      disabled={editingEventHasAssignment}
+                      disabled={editingEventHasLinkedAssignments}
                     >
                       <p className="font-medium text-foreground">Arquivado</p>
                       <p className="mt-1 leading-6">
@@ -953,6 +986,9 @@ export function CalendarPage() {
                     <div className="mt-4 space-y-3">
                       {month.events.map((event) => {
                         const assignment = operationalAssignmentMap.get(event.id)
+                        const canRetryStandaloneGoogleCalendarSync =
+                          event.type !== 'publicTalk' &&
+                          event.googleCalendarSyncStatus === 'error'
 
                         return (
                           <div
@@ -1025,6 +1061,25 @@ export function CalendarPage() {
                             ) : event.type === 'publicTalk' ? (
                               <div className="mt-3 rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                                 Sem designacao ativa no momento.
+                              </div>
+                            ) : null}
+
+                            {canRetryStandaloneGoogleCalendarSync ? (
+                              <div className="mt-3 rounded-[16px] border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                                <p>
+                                  {event.googleCalendarSyncError ||
+                                    'A ultima sincronizacao com o Google Calendar falhou.'}
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  className="mt-3 w-full"
+                                  onClick={() =>
+                                    void handleRetryGoogleCalendarSync(event.id)
+                                  }
+                                  disabled={isSubmitting}
+                                >
+                                  Tentar sincronizar agenda
+                                </Button>
                               </div>
                             ) : null}
 

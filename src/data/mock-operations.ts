@@ -303,14 +303,14 @@ export const themeCards = [
 export const settingsCards = [
   {
     title: 'Aplicacao',
-    detail: 'Ano base 2026, locale pt-BR e timezone America/Sao_Paulo.',
+    detail: 'Ano base configuravel, locale pt-BR e timezone America/Sao_Paulo.',
   },
   {
     title: 'Notificacoes',
-    detail: 'Preparado para EmailJS e Workers, ainda sem automacoes ativas.',
+    detail: 'EmailJS e Workers ativos para confirmacoes e lembretes.',
   },
   {
     title: 'Calendario',
-    detail: 'Estrutura pronta para sincronizacao futura com Google Calendar.',
+    detail: 'Google Calendar integrado com fila leve e sincronizacao segura.',
   },
 ] as const

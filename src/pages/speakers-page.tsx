@@ -286,7 +286,10 @@ export function SpeakersPage() {
   )
   const inactiveSelectedThemes = selectedThemeIds
     .map((themeId) => themesById.get(themeId) ?? null)
-    .filter((theme) => theme !== null && !theme.isActive)
+    .filter(
+      (theme): theme is NonNullable<typeof theme> =>
+        theme !== null && !theme.isActive,
+    )
   const missingSelectedThemeIds = selectedThemeIds.filter(
     (themeId) => !themesById.has(themeId),
   )
@@ -979,8 +982,10 @@ export function SpeakersPage() {
                         : `Tema ${theme.number} (inativo)`
                     })
                     .filter((value): value is string => value !== null)
+                  const unavailableStart = speaker.unavailableStart
+                  const unavailableEnd = speaker.unavailableEnd
                   const hasUnavailableWindow =
-                    speaker.unavailableStart && speaker.unavailableEnd
+                    unavailableStart && unavailableEnd
 
                   return (
                     <div
@@ -1052,8 +1057,8 @@ export function SpeakersPage() {
                               <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                                 Periodo informado:{' '}
                                 {formatDateRange(
-                                  speaker.unavailableStart.toDate(),
-                                  speaker.unavailableEnd.toDate(),
+                                  unavailableStart.toDate(),
+                                  unavailableEnd.toDate(),
                                 )}
                               </div>
                             ) : null}
