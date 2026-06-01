@@ -16,14 +16,15 @@
 * FASE 4 — Congregações
 * FASE 5 — Temas
 * FASE 6 — Oradores
+* FASE 7 — Calendário Inteligente
 
 ## Fase atual concluída
 
-* FASE 6 — Oradores
+* FASE 7 — Calendário Inteligente
 
 ## Próxima etapa obrigatória
 
-* FASE 7 — Calendário Inteligente
+* FASE 8 — Designações
 
 ## Entregas já realizadas
 
@@ -105,6 +106,16 @@
 * controle operacional de status com indisponibilidade por período
 * exclusão lógica com saída da base ativa e preservação do cadastro
 * auditoria automática de create, update e delete em `auditLogs`
+
+### Calendário Inteligente — fechamento da Fase 7
+
+* gestão anual real de `calendarEvents` implementada na UI
+* geração automática dos sábados ausentes por ano, sem duplicar eventos ativos
+* cadastro e edição tipados para discurso, congresso, assembleia, visita e especial
+* bloqueio automático de designações para congresso e assembleia via `blocksAssignments`
+* visão anual por mês com cruzamento leve entre `calendarEvents` e `assignments`
+* arquivamento lógico com reativação por edição e auditoria para create, update e delete
+* bloqueios de integridade para não mover ou arquivar eventos já vinculados a designações
 
 Regra de manutenção desta documentação:
 
@@ -423,7 +434,7 @@ Entregas realizadas:
 
 Status atual:
 
-* Próxima fase obrigatória
+* Concluída
 
 Implementar:
 
@@ -444,13 +455,23 @@ Critérios:
 * bloquear designações em congresso
 * bloquear designações em assembleia
 
+Entregas realizadas:
+
+* geração automática dos sábados de cada ano sob demanda
+* CRUD administrativo real de `calendarEvents` com validação estrita
+* suporte aos tipos `publicTalk`, `congress`, `assembly`, `visit` e `special`
+* bloqueio automático de designações em congressos e assembleias
+* visão anual por mês com indicação de eventos já designados
+* exclusão lógica com preservação administrativa do histórico do calendário
+* auditoria para create, update e delete
+
 ---
 
 ## FASE 8 — Designações
 
 Status atual:
 
-* Pendente
+* Próxima fase obrigatória
 
 Implementar:
 

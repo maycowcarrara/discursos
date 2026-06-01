@@ -12,14 +12,15 @@ Fases concluídas:
 * `FASE 4 — Congregações`
 * `FASE 5 — Temas`
 * `FASE 6 — Oradores`
+* `FASE 7 — Calendário Inteligente`
 
 Fase atual concluída:
 
-* `FASE 6 — Oradores`
+* `FASE 7 — Calendário Inteligente`
 
 Próxima etapa obrigatória:
 
-* `FASE 7 — Calendário Inteligente`
+* `FASE 8 — Designações`
 
 ## O que já foi entregue
 
@@ -102,28 +103,40 @@ Próxima etapa obrigatória:
 * exclusão lógica com preservação do cadastro para histórico
 * auditoria de create, update e delete em `auditLogs`
 
+### Fechamento da Fase 7
+
+* gestão anual real de `calendarEvents` na UI
+* geração automática de sábados ausentes por ano
+* suporte administrativo aos tipos de evento oficiais
+* bloqueio automático de designações para congresso e assembleia
+* visão anual por mês com destaque para eventos já designados
+* arquivamento lógico e auditoria de create, update e delete
+
 ## Próxima fase
 
-### `FASE 7 — Calendário Inteligente`
+### `FASE 8 — Designações`
 
 Implementar:
 
-* geração automática de sábados
-* calendário anual
-* tipos de evento
+* entrada de visitantes
+* saída de locais
+* status
+* observações
+* confirmação
 
-Entregue até a Fase 5:
+Entregue até a Fase 7:
 
 * `settings/app` com persistência real
 * CRUD completo de `congregations`
 * CRUD completo de `themes`
 * CRUD completo de `speakers`
-* agenda anual real com `calendarEvents`
+* calendário inteligente com geração automática de sábados
+* gestão anual real de `calendarEvents`
 * leitura real de `assignments`, `notifications` e `auditLogs`
 
 Próximo subpasso obrigatório:
 
-* iniciar a `FASE 7 — Calendário Inteligente`
+* iniciar a `FASE 8 — Designações`
 
 ## Diretriz de UI e UX
 
