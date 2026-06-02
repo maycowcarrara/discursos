@@ -9,13 +9,13 @@ type AppMobileNavProps = {
 }
 
 const primaryMobileItems = navigationItems.filter((item) =>
-  ['/', '/agenda', '/designacoes', '/oradores'].includes(item.href),
+  ['/', '/designacoes', '/oradores', '/temas'].includes(item.href),
 )
 
 export function AppMobileNav({ onOpenMenu }: AppMobileNavProps) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/96 px-3 py-3 backdrop-blur dark:bg-slate-950/64 lg:hidden">
-      <div className="mx-auto flex max-w-xl items-center justify-between gap-2 rounded-[18px] border border-border/80 bg-card px-2 py-2 shadow-[0_12px_28px_-20px_rgba(15,23,42,0.22)] dark:bg-card/88 dark:shadow-[0_16px_34px_-24px_rgba(2,8,23,0.88)]">
+    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-white px-2 py-2 shadow-sm dark:bg-card lg:hidden">
+      <div className="mx-auto flex max-w-xl items-center justify-between gap-1.5">
         {primaryMobileItems.map((item) => {
           const Icon = item.icon
 
@@ -26,15 +26,15 @@ export function AppMobileNav({ onOpenMenu }: AppMobileNavProps) {
               end={item.href === '/'}
               className={({ isActive }) =>
                 cn(
-                  'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[16px] px-2 py-2 text-center text-[11px] font-medium transition-colors',
+                  'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-1.5 py-2 text-center text-[11px] font-bold leading-tight transition-colors',
                   isActive
-                    ? 'bg-primary text-primary-foreground shadow-[0_16px_28px_-20px_rgba(59,130,246,0.8)]'
-                    : 'text-muted-foreground hover:bg-accent/70',
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-blue-50 hover:text-blue-700 dark:text-muted-foreground dark:hover:bg-accent',
                 )
               }
             >
               <Icon className="size-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
+              <span className="w-full truncate">{item.label}</span>
             </NavLink>
           )
         })}
@@ -42,11 +42,11 @@ export function AppMobileNav({ onOpenMenu }: AppMobileNavProps) {
         <button
           type="button"
           onClick={onOpenMenu}
-          className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-[16px] px-2 py-2 text-center text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/70"
+          className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-1.5 py-2 text-center text-[11px] font-bold leading-tight text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-700 dark:text-muted-foreground dark:hover:bg-accent"
           aria-label="Abrir menu completo"
         >
           <Menu className="size-4 shrink-0" />
-          <span className="truncate">Menu</span>
+          <span className="w-full truncate">Menu</span>
         </button>
       </div>
     </div>

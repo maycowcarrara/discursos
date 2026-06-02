@@ -49,7 +49,7 @@ function getRedirectPath(state: unknown) {
 
 function GoogleMark() {
   return (
-    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_8px_18px_-10px_rgba(15,23,42,0.45)]">
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
@@ -98,25 +98,25 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,rgba(29,78,216,0.14),transparent_34%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(239,244,255,0.92))] px-4 py-8 dark:bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_30%),linear-gradient(180deg,rgba(2,6,23,0.96),rgba(9,15,32,0.98))]">
-      <section className="w-full max-w-md overflow-hidden rounded-[22px] border border-slate-200/80 bg-[rgba(255,255,255,0.88)] shadow-[0_22px_54px_-34px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(15,23,42,0.72)]">
-        <div className="border-b border-sidebar-border/70 bg-[linear-gradient(180deg,#0a1d43,#102754_42%,#0c1c3f)] px-6 py-6 text-white">
-          <Badge className="rounded-full border-white/10 bg-white/10 px-3 py-1 text-xs text-white hover:bg-white/10">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8 dark:bg-background">
+      <section className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-border dark:bg-card">
+        <div className="border-b border-blue-500/30 bg-sidebar px-6 py-6 text-white">
+          <Badge className="rounded-full border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-white hover:bg-white/10">
             Painel administrativo
           </Badge>
 
           <div className="mt-4 space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-white">
+            <h1 className="text-3xl font-black text-white">
               Entrar
             </h1>
-            <p className="text-sm leading-6 text-white/74">
+            <p className="text-sm font-medium leading-6 text-blue-100">
               Use a conta Google aprovada para acessar o sistema.
             </p>
           </div>
         </div>
 
         {authError ? (
-          <div className="mx-5 mt-5 rounded-[16px] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="mx-5 mt-5 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">
             {authError}
           </div>
         ) : null}
@@ -124,7 +124,7 @@ export function LoginPage() {
         <div className="space-y-4 px-5 pb-5 pt-5">
           <Button
             size="lg"
-            className="h-14 w-full justify-center rounded-[18px] border border-blue-400/70 bg-[linear-gradient(180deg,#4f95ff,#2563eb)] text-base font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_18px_36px_-22px_rgba(37,99,235,0.9)] transition-[transform,box-shadow,filter] hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.34),0_22px_42px_-22px_rgba(37,99,235,0.95)] active:translate-y-0"
+            className="h-14 w-full justify-center rounded-xl bg-blue-600 text-base font-black text-white shadow-sm hover:bg-blue-700"
             disabled={isGoogleLoading}
             onClick={handleGoogleLogin}
           >
@@ -141,7 +141,7 @@ export function LoginPage() {
             )}
           </Button>
 
-          <p className="pt-1 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
+          <p className="pt-1 text-center text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">
             O acesso é restrito aos administradores aprovados.
           </p>
         </div>

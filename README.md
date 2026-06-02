@@ -1,6 +1,6 @@
 # Sistema de Gestão de Discursos Públicos
 
-Aplicação web para gerenciar discursos públicos, oradores, congregações, agenda anual, histórico e notificações automáticas.
+Aplicação web para gerenciar discursos públicos de fim de semana, oradores, congregações, temas, histórico e notificações automáticas.
 
 ## Status Atual
 
@@ -25,11 +25,11 @@ Fases concluídas:
 
 Etapa atual em andamento:
 
-* fechamento de lançamento V1
+* refatoração V1 do fluxo direto de designação dos sábados
 
 Próxima etapa obrigatória:
 
-* executar o checklist operacional de lançamento V1
+* validar o fluxo Dashboard → Designações em desktop e mobile antes do checklist operacional de lançamento V1
 
 ## O que já foi entregue
 
@@ -77,8 +77,8 @@ Próxima etapa obrigatória:
 ### Avanço da Fase 3
 
 * `calendarEvents` conectado ao app com leitura anual real
-* `assignments` conectado ao app para agenda e histórico recente
-* telas de agenda, designações e histórico passaram a ler a base real
+* `assignments` conectado ao app para sábados de discurso público e histórico recente
+* dashboard, designações e histórico passaram a ler a base real
 
 ### Fechamento da Fase 3
 
@@ -120,13 +120,13 @@ Próxima etapa obrigatória:
 
 ### Fechamento da Fase 7
 
-* gestão anual real de `calendarEvents` na UI
+* `calendarEvents` mantido como suporte técnico de sábados, exceções, bloqueios e sincronização externa
 * renderização implícita dos sábados regulares na visão anual, sem depender de documento salvo
 * suporte administrativo aos tipos de evento oficiais
 * bloqueio automático de designações para congresso e assembleia
 * `calendarEvents` reservado para exceções, bloqueios, personalizações e materializações operacionais do slot
-* visão anual por mês com destaque para eventos já designados
-* arquivamento lógico e auditoria de create, update e delete
+* a antiga tela de Agenda foi removida da navegação operacional para evitar cadastro genérico de eventos no fluxo principal
+* materialização sob demanda preserva histórico técnico, concorrência e auditoria quando um sábado implícito precisa virar documento
 
 ### Fechamento da Fase 8
 
@@ -146,6 +146,7 @@ Próxima etapa obrigatória:
 * destaque do próximo sábado com status atual, tipo de evento, orador, congregação e tema quando houver cobertura
 * painel de pendências priorizando lacunas de designação e confirmações abertas
 * listagem dos próximos eventos especiais, congressos, assembleias e visitas futuras
+* cards de sábado sem designação abrem Designações com a data pré-selecionada para escolher orador e tema
 
 ### Fechamento da Fase 10
 
@@ -205,8 +206,8 @@ Entregue até o início da Fase 12:
 * CRUD completo de `congregations`
 * CRUD completo de `themes`
 * CRUD completo de `speakers`
-* calendário inteligente com sábados regulares renderizados implicitamente na visão anual
-* gestão anual real de `calendarEvents`
+* sábados regulares renderizados implicitamente sem cadastro manual do ano inteiro
+* `calendarEvents` preservado como suporte técnico para slots, exceções e Google Calendar
 * leitura real de `assignments`, `notifications` e `auditLogs`
 * operação real de designações com confirmações, substituições e auditoria
 * dashboard operacional com próximos 8 sábados, pendências e eventos especiais
@@ -318,7 +319,7 @@ Fluxo operacional do Google Calendar:
 * o worker faz `claim` temporário antes de processar cada item
 * falhas transitórias voltam para `pending` com novo horário; após o limite, ficam em `error`
 * o ID remoto determinístico impede duplicidade se o Google Calendar responder antes de uma falha no Firestore
-* a agenda permite retomar manualmente eventos não operacionais que terminaram em erro
+* a integração com Google Calendar permite retomar manualmente eventos não operacionais que terminaram em erro
 
 ## Acesso administrativo
 

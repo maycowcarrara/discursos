@@ -12,12 +12,6 @@ export const AssignmentsPage = lazy(() =>
   })),
 )
 
-export const CalendarPage = lazy(() =>
-  import('@/pages/calendar-page').then((module) => ({
-    default: module.CalendarPage,
-  })),
-)
-
 export const CongregationsPage = lazy(() =>
   import('@/pages/congregations-page').then((module) => ({
     default: module.CongregationsPage,

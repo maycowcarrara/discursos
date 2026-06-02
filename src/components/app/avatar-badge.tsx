@@ -31,7 +31,7 @@ export function AvatarBadge({
   return (
     <div
       className={cn(
-        `flex ${sizeClasses[size]} shrink-0 items-center justify-center overflow-hidden rounded-full bg-[linear-gradient(145deg,#2f6ef2,#15377d)] font-semibold text-white shadow-[0_12px_26px_-18px_rgba(21,55,125,0.86)] dark:bg-[linear-gradient(145deg,#4d84ff,#17336a)] dark:shadow-[0_18px_30px_-18px_rgba(37,99,235,0.72)]`,
+        `flex ${sizeClasses[size]} shrink-0 items-center justify-center overflow-hidden rounded-full border border-blue-300 bg-blue-600 font-black text-white shadow-sm`,
         className,
       )}
       aria-hidden="true"

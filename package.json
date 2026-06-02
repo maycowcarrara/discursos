@@ -1,7 +1,7 @@
 {
   "name": "discursos",
   "private": true,
-  "version": "1.0.11",
+  "version": "1.0.18",
   "type": "module",
   "scripts": {
     "dev": "node scripts/bump-version.mjs && vite",
@@ -12,8 +12,9 @@
     "test:dashboard": "tsc -p tsconfig.dashboard-test.json && node --test %cd%/node_modules/.tmp/dashboard-tests/utils/dashboard.test.js",
     "test:notifications": "tsc -p tsconfig.notifications-test.json && node --test %cd%/node_modules/.tmp/notifications-tests/utils/assignment-notifications.test.js %cd%/node_modules/.tmp/notifications-tests/utils/notification-sync.test.js",
     "test:calendar-sync": "tsc -p tsconfig.calendar-sync-test.json && node --test %cd%/node_modules/.tmp/calendar-sync-tests/google-calendar-sync.test.js",
+    "test:themes-catalog": "tsc -p tsconfig.theme-catalog-test.json && node --test %cd%/node_modules/.tmp/theme-catalog-tests/utils/theme-catalog-import.test.js",
     "typecheck:worker": "tsc -p tsconfig.worker.json",
-    "verify": "npm run typecheck && npm run typecheck:worker && npm run lint && npm run test:history && npm run test:dashboard && npm run test:notifications && npm run test:calendar-sync && npm run build",
+    "verify": "npm run typecheck && npm run typecheck:worker && npm run lint && npm run test:history && npm run test:dashboard && npm run test:notifications && npm run test:calendar-sync && npm run test:themes-catalog && npm run build",
     "admin:grant": "node scripts/set-firebase-admin-claim.mjs",
     "admin:bootstrap": "node scripts/bootstrap-admin-access.mjs",
     "congregations:remove-zip-code": "node scripts/remove-congregation-zip-code.mjs",
@@ -31,6 +32,7 @@
     "clsx": "^2.1.1",
     "firebase": "^12.14.0",
     "lucide-react": "^1.17.0",
+    "pdfjs-dist": "^6.0.227",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-hook-form": "^7.77.0",

@@ -67,16 +67,16 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
   ]
 
   const dashboardPillClass =
-    'inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-sm text-muted-foreground'
+    'inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm dark:bg-card dark:text-muted-foreground'
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/94 px-3 py-3 backdrop-blur md:px-5">
+    <header className="sticky top-0 z-20 border-b border-border bg-white px-3 py-2.5 shadow-sm dark:bg-card md:px-5">
       {isDashboard ? (
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <Button
-                className="rounded-[16px] border-border/70 bg-card shadow-sm lg:hidden"
+                className="rounded-xl border-border bg-white shadow-sm lg:hidden dark:bg-card"
                 variant="outline"
                 size="icon"
                 onClick={onOpenMobileMenu}
@@ -85,7 +85,7 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
                 <Menu className="size-4" />
               </Button>
 
-              <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-[1.9rem]">
+              <h1 className="truncate text-base font-black text-slate-800 dark:text-foreground sm:text-lg">
                 {currentItem.label}
               </h1>
             </div>
@@ -97,13 +97,13 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
                 return (
                   <div
                     key={item.label}
-                    className="flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5"
+                    className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 shadow-sm dark:bg-card"
                   >
-                    <Icon className="size-3.5 shrink-0 text-primary" />
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    <Icon className="size-3.5 shrink-0 text-blue-600" />
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">
                       {item.label}
                     </span>
-                    <span className="text-sm font-medium text-foreground">
+                    <span className="text-xs font-black text-foreground">
                       {item.value}
                     </span>
                   </div>
@@ -120,11 +120,11 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
 
                   return (
                     <div key={item.label} className={dashboardPillClass}>
-                      <Icon className="size-3.5 shrink-0 text-primary" />
+                      <Icon className="size-3.5 shrink-0 text-blue-600" />
                       <span
                         className={cn(
                           'whitespace-nowrap',
-                          item.emphasize && 'font-medium text-foreground',
+                          item.emphasize && 'font-black text-slate-800 dark:text-foreground',
                         )}
                       >
                         {item.label}
@@ -142,10 +142,10 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
                 return (
                   <div
                     key={item.label}
-                    className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-1.5"
+                    className="flex items-center gap-1.5 rounded-lg border border-border bg-white px-2.5 py-1.5 shadow-sm dark:bg-card"
                   >
-                    <Icon className="size-3.5 shrink-0 text-primary" />
-                    <span className="text-xs font-medium text-foreground">
+                    <Icon className="size-3.5 shrink-0 text-blue-600" />
+                    <span className="text-xs font-black text-foreground">
                       {item.value}
                     </span>
                   </div>
@@ -155,11 +155,11 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <Button
-                className="mt-0.5 rounded-[16px] border-border/70 bg-card shadow-sm lg:hidden"
+                className="mt-0.5 rounded-xl border-border bg-white shadow-sm lg:hidden dark:bg-card"
                 variant="outline"
                 size="icon"
                 onClick={onOpenMobileMenu}
@@ -169,11 +169,11 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
               </Button>
 
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-[1.9rem]">
+                <h1 className="truncate text-base font-black text-slate-800 dark:text-foreground sm:text-lg">
                   {title}
                 </h1>
                 {description ? (
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground md:text-[15px]">
+                  <p className="mt-0.5 max-w-3xl text-xs font-medium leading-5 text-muted-foreground md:text-sm">
                     {description}
                   </p>
                 ) : null}
@@ -189,7 +189,9 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
 
           {meta ? (
             <div className="-mx-1 overflow-x-auto px-1 pb-0.5">
-              <div className="flex min-w-max items-center gap-2">{meta}</div>
+              <div className="flex w-max min-w-full items-center gap-2 lg:w-auto lg:min-w-0 lg:flex-wrap">
+                {meta}
+              </div>
             </div>
           ) : null}
         </div>

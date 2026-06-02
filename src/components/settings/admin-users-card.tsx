@@ -109,7 +109,7 @@ export function AdminUsersCard() {
         {adminUsersQuery.isError ||
         addAdminUserMutation.isError ||
         removeAdminUserMutation.isError ? (
-          <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
             {getErrorMessage(
               adminUsersQuery.error ??
                 addAdminUserMutation.error ??
@@ -119,11 +119,11 @@ export function AdminUsersCard() {
         ) : null}
 
         {adminUsersQuery.isLoading ? (
-          <div className="h-20 animate-pulse rounded-[16px] border border-border/70 bg-background" />
+          <div className="h-20 animate-pulse rounded-xl border border-border bg-background" />
         ) : null}
 
         {!adminUsersQuery.isLoading && adminUsersQuery.data?.length === 0 ? (
-          <div className="rounded-[16px] border border-dashed border-border/80 bg-background px-4 py-5 text-sm leading-6 text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm leading-6 text-muted-foreground">
             Nenhum administrador aprovado. Execute o bootstrap administrativo antes
             de publicar.
           </div>
@@ -136,7 +136,7 @@ export function AdminUsersCard() {
             return (
               <div
                 key={adminUser.email}
-                className="flex flex-col gap-3 rounded-[16px] border border-border/70 bg-background px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 rounded-xl border border-border bg-background px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
                   <div className="flex flex-wrap items-center gap-2">

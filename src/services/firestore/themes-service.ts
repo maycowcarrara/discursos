@@ -8,24 +8,30 @@ import {
   query,
   runTransaction,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 
+import { type ThemeCategory } from '@/lib/theme-categories'
 import { firebaseDb } from '@/lib/firebase-db'
 import {
   speakerSchema,
   themeNumberReservationSchema,
   themeSchema,
-  type ThemeDocument,
   type FirestoreRecord,
+  type ThemeDocument,
   type ThemeNumberReservationDocument,
 } from '@/types/firestore'
+import type { ThemeImportComparable } from '@/utils/theme-catalog-import'
 
-import { appendAuditLogToTransaction } from './audit-logs-service'
+import { appendAuditLogToBatch, appendAuditLogToTransaction } from './audit-logs-service'
 import { getTypedCollection, getTypedDocument } from './shared'
+
+const maxBatchWrites = 450
 
 export type ThemeFormValues = {
   number: string
   title: string
+  category: ThemeCategory
   notes: string
   isActive: boolean
 }
@@ -45,11 +51,30 @@ export type DeleteThemeInput = {
   actorName?: string | null
 }
 
+export type ImportThemesInput = {
+  items: ThemeImportComparable[]
+  actorUid: string
+  actorName?: string | null
+  sourceLabel?: string | null
+}
+
+export type ImportThemesResult = {
+  createdCount: number
+  updatedCount: number
+  unchangedCount: number
+}
+
 export const defaultThemeFormValues: ThemeFormValues = {
   number: '',
   title: '',
+  category: 'bibleGod',
   notes: '',
   isActive: true,
+}
+
+type ThemeImportOperation = {
+  writeCount: number
+  apply: (batch: ReturnType<typeof writeBatch>) => void
 }
 
 function getThemesCollection() {
@@ -64,13 +89,26 @@ function getThemeNumberReservationRef(number: number) {
   return doc(firebaseDb, 'themeNumbers', String(number))
 }
 
+function normalizeThemeNumber(numberValue: string) {
+  return Number.parseInt(numberValue.trim(), 10)
+}
+
+function normalizeThemeTitle(title: string) {
+  return title.trim()
+}
+
+function normalizeThemeNotes(notes: string) {
+  return notes.trim()
+}
+
 function buildThemePayload(
   values: ThemeFormValues,
 ): Omit<ThemeDocument, 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'> {
   return {
-    number: Number.parseInt(values.number.trim(), 10),
-    title: values.title.trim(),
-    notes: values.notes.trim(),
+    number: normalizeThemeNumber(values.number),
+    title: normalizeThemeTitle(values.title),
+    category: values.category,
+    notes: normalizeThemeNotes(values.notes),
     isActive: values.isActive,
   }
 }
@@ -139,6 +177,177 @@ async function assertThemeHasNoActiveSpeakers(themeId: string) {
   }
 }
 
+function buildThemeImportItems(items: ThemeImportComparable[]) {
+  const normalizedItems = items
+    .map((item) => ({
+      number: item.number,
+      title: normalizeThemeTitle(item.title),
+      category: item.category,
+      isActive: item.isActive,
+    }))
+    .sort((left, right) => left.number - right.number)
+
+  const seenNumbers = new Set<number>()
+
+  normalizedItems.forEach((item) => {
+    if (seenNumbers.has(item.number)) {
+      throw new Error(`A importacao recebeu o tema ${item.number} mais de uma vez.`)
+    }
+
+    seenNumbers.add(item.number)
+  })
+
+  return normalizedItems
+}
+
+function buildImportOperations({
+  actorName,
+  actorUid,
+  existingThemes,
+  items,
+  reservationsByNumber,
+  sourceLabel,
+}: {
+  actorUid: string
+  actorName?: string | null
+  existingThemes: Array<FirestoreRecord<ThemeDocument>>
+  items: ThemeImportComparable[]
+  reservationsByNumber: Map<number, ThemeNumberReservationDocument>
+  sourceLabel: string
+}) {
+  const existingThemesByNumber = new Map(
+    existingThemes.map((theme) => [theme.number, theme]),
+  )
+  const operations: ThemeImportOperation[] = []
+  let createdCount = 0
+  let updatedCount = 0
+  let unchangedCount = 0
+
+  items.forEach((item) => {
+    const existingTheme = existingThemesByNumber.get(item.number)
+
+    if (!existingTheme) {
+      const reservation = reservationsByNumber.get(item.number)
+
+      if (reservation) {
+        throw new Error(
+          `A reserva do tema ${item.number} existe sem cadastro correspondente. Revise a base antes de importar novamente.`,
+        )
+      }
+
+      const themeRef = doc(getThemesCollection())
+      const reservationRef = getThemeNumberReservationRef(item.number)
+      const now = Timestamp.now()
+      const themeDocument: ThemeDocument = {
+        ...item,
+        notes: '',
+        createdAt: now,
+        updatedAt: now,
+        createdBy: actorUid,
+        updatedBy: actorUid,
+      }
+
+      operations.push({
+        writeCount: 3,
+        apply: (batch) => {
+          batch.set(themeRef, themeDocument)
+          batch.set(
+            reservationRef,
+            buildThemeNumberReservation(item.number, themeRef.id, now),
+          )
+          appendAuditLogToBatch(batch, {
+            entityType: 'theme',
+            entityId: themeRef.id,
+            action: 'create',
+            actorUid,
+            actorName: actorName ?? null,
+            before: null,
+            after: toAuditSnapshot(themeDocument),
+            metadata: {
+              source: 'themes-pdf-import',
+              importSourceLabel: sourceLabel,
+              reservationNumber: item.number,
+            },
+            createdAt: now,
+          })
+        },
+      })
+      createdCount += 1
+      return
+    }
+
+    const changedTheme: ThemeDocument = {
+      ...stripRecordId(existingTheme),
+      title: item.title,
+      category: item.category,
+      isActive: item.isActive,
+      updatedAt: Timestamp.now(),
+      updatedBy: actorUid,
+    }
+    const isChanged =
+      existingTheme.title !== changedTheme.title ||
+      existingTheme.category !== changedTheme.category ||
+      existingTheme.isActive !== changedTheme.isActive
+
+    if (!isChanged) {
+      unchangedCount += 1
+      return
+    }
+
+    operations.push({
+      writeCount: 2,
+      apply: (batch) => {
+        batch.set(getThemeRef(existingTheme.id), changedTheme)
+        appendAuditLogToBatch(batch, {
+          entityType: 'theme',
+          entityId: existingTheme.id,
+          action: 'update',
+          actorUid,
+          actorName: actorName ?? null,
+          before: toAuditSnapshot(existingTheme),
+          after: toAuditSnapshot(changedTheme),
+          metadata: {
+            source: 'themes-pdf-import',
+            importSourceLabel: sourceLabel,
+            reservationNumber: item.number,
+          },
+          createdAt: changedTheme.updatedAt,
+        })
+      },
+    })
+    updatedCount += 1
+  })
+
+  return {
+    operations,
+    result: {
+      createdCount,
+      updatedCount,
+      unchangedCount,
+    } satisfies ImportThemesResult,
+  }
+}
+
+async function commitThemeImportOperations(operations: ThemeImportOperation[]) {
+  let batch = writeBatch(firebaseDb)
+  let currentWriteCount = 0
+
+  for (const operation of operations) {
+    if (currentWriteCount + operation.writeCount > maxBatchWrites) {
+      await batch.commit()
+      batch = writeBatch(firebaseDb)
+      currentWriteCount = 0
+    }
+
+    operation.apply(batch)
+    currentWriteCount += operation.writeCount
+  }
+
+  if (currentWriteCount > 0) {
+    await batch.commit()
+  }
+}
+
 export function toThemeFormValues(
   theme: FirestoreRecord<ThemeDocument> | null | undefined,
 ): ThemeFormValues {
@@ -149,6 +358,7 @@ export function toThemeFormValues(
   return {
     number: String(theme.number),
     title: theme.title,
+    category: theme.category ?? defaultThemeFormValues.category,
     notes: theme.notes,
     isActive: theme.isActive,
   }
@@ -374,4 +584,36 @@ export async function deleteTheme({
       createdAt: now,
     })
   })
+}
+
+export async function importThemes({
+  items,
+  actorUid,
+  actorName,
+  sourceLabel = 'S-99a_T',
+}: ImportThemesInput): Promise<ImportThemesResult> {
+  const normalizedItems = buildThemeImportItems(items)
+  const [existingThemes, reservations] = await Promise.all([
+    listThemesForManagement(),
+    getTypedCollection(collection(firebaseDb, 'themeNumbers'), themeNumberReservationSchema),
+  ])
+  const reservationsByNumber = new Map(
+    reservations.map((reservation) => [reservation.number, reservation]),
+  )
+  const { operations, result } = buildImportOperations({
+    actorUid,
+    actorName,
+    existingThemes,
+    items: normalizedItems,
+    reservationsByNumber,
+    sourceLabel: sourceLabel ?? 'S-99a_T',
+  })
+
+  if (operations.length === 0) {
+    return result
+  }
+
+  await commitThemeImportOperations(operations)
+
+  return result
 }

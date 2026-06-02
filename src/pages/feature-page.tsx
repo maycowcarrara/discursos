@@ -39,7 +39,7 @@ export function FeaturePage({
             {highlights.map((item) => (
               <div
                 key={item}
-                className="rounded-[16px] border border-border/70 bg-background/65 px-4 py-3.5 text-sm leading-6 text-foreground"
+                className="rounded-xl border border-border bg-background px-4 py-3.5 text-sm leading-6 text-foreground"
               >
                 {item}
               </div>

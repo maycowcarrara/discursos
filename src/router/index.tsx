@@ -7,7 +7,6 @@ import { ProtectedRoute } from '@/components/auth/protected-route'
 import {
   AppShell,
   AssignmentsPage,
-  CalendarPage,
   CongregationsPage,
   DashboardPage,
   HistoryPage,
@@ -59,10 +58,6 @@ export const appRouter = createBrowserRouter([
           {
             path: 'temas',
             element: withRouteLoadingFallback(<ThemesPage />),
-          },
-          {
-            path: 'agenda',
-            element: withRouteLoadingFallback(<CalendarPage />),
           },
           {
             path: 'designacoes',

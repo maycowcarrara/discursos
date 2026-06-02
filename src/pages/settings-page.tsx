@@ -13,7 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { EmptyState } from '@/components/app/empty-state'
 import { PageHeader } from '@/components/app/page-header'
-import { SummaryStat } from '@/components/app/summary-stat'
+import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { AdminUsersCard } from '@/components/settings/admin-users-card'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
@@ -220,20 +220,42 @@ export function SettingsPage() {
         description="Defina a base do painel, mantenha a integração da agenda alinhada e acompanhe os últimos envios e movimentos administrativos."
         meta={
           <>
-            <Badge className="bg-primary/10 text-primary">
-              {persistedSettings ? 'Painel configurado' : 'Configuração inicial pendente'}
-            </Badge>
-            <Badge
-              className={getCalendarRunStatusClassName(
-                persistedCalendarSettings?.lastSyncStatus,
-              )}
-            >
-              {persistedCalendarSettings?.enabled
-                ? getCalendarRunStatusLabel(
-                    persistedCalendarSettings.lastSyncStatus,
-                  )
-                : 'Integração desligada'}
-            </Badge>
+            <PageHeaderStat
+              label="Painel"
+              value={persistedSettings ? 'Configurado' : 'Pendente'}
+              icon={Settings2}
+              tone={persistedSettings ? 'green' : 'amber'}
+            />
+            <PageHeaderStat
+              label="Agenda"
+              value={persistedCalendarSettings?.enabled ? 'Ativa' : 'Desligada'}
+              icon={CalendarDays}
+              tone={persistedCalendarSettings?.enabled ? 'green' : 'slate'}
+            />
+            <PageHeaderStat
+              label="Último ciclo"
+              value={getCalendarRunStatusLabel(persistedCalendarSettings?.lastSyncStatus)}
+              icon={Clock3}
+              tone={
+                persistedCalendarSettings?.lastSyncStatus === 'error'
+                  ? 'amber'
+                  : persistedCalendarSettings?.lastSyncStatus === 'success'
+                    ? 'green'
+                    : 'blue'
+              }
+            />
+            <PageHeaderStat
+              label="Pendentes"
+              value={String(pendingNotifications.length)}
+              icon={BellRing}
+              tone={pendingNotifications.length > 0 ? 'amber' : 'green'}
+            />
+            <PageHeaderStat
+              label="Falhas"
+              value={String(failedNotifications.length)}
+              icon={ShieldCheck}
+              tone={failedNotifications.length > 0 ? 'amber' : 'green'}
+            />
           </>
         }
       />
@@ -278,19 +300,19 @@ export function SettingsPage() {
                 </div>
 
                 {appSettingsQuery.isError ? (
-                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(appSettingsQuery.error)}
                   </div>
                 ) : null}
 
                 {saveAppSettingsMutation.isSuccess ? (
-                  <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                     Ano padrão salvo com sucesso.
                   </div>
                 ) : null}
 
                 {saveAppSettingsMutation.isError ? (
-                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(saveAppSettingsMutation.error)}
                   </div>
                 ) : null}
@@ -365,7 +387,7 @@ export function SettingsPage() {
 
             <CardContent className="space-y-5">
               <form className="space-y-5" onSubmit={submitCalendarHandler}>
-                <label className="flex items-start gap-3 rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
+                <label className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
                   <input
                     type="checkbox"
                     className="mt-1 size-4 rounded border-border text-primary"
@@ -438,57 +460,24 @@ export function SettingsPage() {
                 </div>
 
                 {calendarSettingsQuery.isError ? (
-                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(calendarSettingsQuery.error)}
                   </div>
                 ) : null}
 
                 {saveCalendarSettingsMutation.isSuccess ? (
-                  <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                     Ajustes da agenda salvos com sucesso.
                   </div>
                 ) : null}
 
                 {saveCalendarSettingsMutation.isError ? (
-                  <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                     {getErrorMessage(saveCalendarSettingsMutation.error)}
                   </div>
                 ) : null}
 
-                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-                  <SummaryStat
-                    label="Estado atual"
-                    value={persistedCalendarSettings?.enabled ? 'Ativo' : 'Desligado'}
-                    detail="Liga ou desliga a integração."
-                    tone={persistedCalendarSettings?.enabled ? 'green' : 'slate'}
-                  />
-                  <SummaryStat
-                    label="Último ciclo"
-                    value={getCalendarRunStatusLabel(
-                      persistedCalendarSettings?.lastSyncStatus,
-                    )}
-                    detail="Resultado mais recente."
-                    tone={
-                      persistedCalendarSettings?.lastSyncStatus === 'error'
-                        ? 'amber'
-                        : 'blue'
-                    }
-                  />
-                  <SummaryStat
-                    className="md:col-span-2 2xl:col-span-1"
-                    label="Última execução"
-                    value={
-                      persistedCalendarSettings?.lastSyncAt
-                        ? formatTimestampDate(persistedCalendarSettings.lastSyncAt)
-                        : 'Ainda não executou'
-                    }
-                    detail="Último processamento."
-                    tone="slate"
-                    icon={Clock3}
-                  />
-                </div>
-
-                <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
                   {persistedCalendarSettings?.lastSyncMessage
                     ? persistedCalendarSettings.lastSyncMessage
                     : 'A automação atualiza o estado da integração aqui.'}
@@ -536,23 +525,6 @@ export function SettingsPage() {
         </div>
 
         <div className="space-y-5">
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-            <SummaryStat
-              label="Envios pendentes"
-              value={String(pendingNotifications.length)}
-              detail="Notificações aguardando processamento."
-              tone={pendingNotifications.length > 0 ? 'amber' : 'green'}
-              icon={BellRing}
-            />
-            <SummaryStat
-              label="Falhas recentes"
-              value={String(failedNotifications.length)}
-              detail="Itens que merecem nova revisão."
-              tone={failedNotifications.length > 0 ? 'amber' : 'green'}
-              icon={ShieldCheck}
-            />
-          </section>
-
           <Card>
             <CardHeader>
               <CardTitle>Fila de notificações</CardTitle>
@@ -562,7 +534,7 @@ export function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {notificationsError ? (
-                <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {getErrorMessage(notificationsError)}
                 </div>
               ) : null}
@@ -572,7 +544,7 @@ export function SettingsPage() {
                   {Array.from({ length: 3 }, (_, index) => (
                     <div
                       key={index}
-                      className="h-24 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                      className="h-24 animate-pulse rounded-xl border border-border bg-background"
                     />
                   ))}
                 </div>
@@ -597,7 +569,7 @@ export function SettingsPage() {
                   {[...pendingNotifications, ...failedNotifications].map((notification) => (
                     <div
                       key={notification.id}
-                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
+                      className="rounded-xl border border-border bg-background px-4 py-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -642,7 +614,7 @@ export function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {auditLogsQuery.isError ? (
-                <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
                   {getErrorMessage(auditLogsQuery.error)}
                 </div>
               ) : null}
@@ -652,7 +624,7 @@ export function SettingsPage() {
                   {Array.from({ length: 3 }, (_, index) => (
                     <div
                       key={index}
-                      className="h-24 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                      className="h-24 animate-pulse rounded-xl border border-border bg-background"
                     />
                   ))}
                 </div>
@@ -674,7 +646,7 @@ export function SettingsPage() {
                   {recentAuditLogs.map((auditLog) => (
                     <div
                       key={auditLog.id}
-                      className="rounded-[18px] border border-border/70 bg-background px-4 py-4"
+                      className="rounded-xl border border-border bg-background px-4 py-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>

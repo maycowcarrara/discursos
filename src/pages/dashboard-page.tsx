@@ -1,6 +1,5 @@
 import {
   Building2,
-  CalendarDays,
   CheckCircle2,
   ClipboardList,
   Clock3,
@@ -8,7 +7,9 @@ import {
   Mail,
   Mic2,
   Phone,
+  Plus,
   Sparkles,
+  UsersRound,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
@@ -113,14 +114,18 @@ function normalizePhoneLink(phone: string) {
   return `tel:${digits}`
 }
 
+function getAssignmentCreateHref(entry: DashboardSaturdayEntryView) {
+  return `/designacoes?evento=${encodeURIComponent(entry.event.id)}`
+}
+
 const cardClass =
-  'rounded-[8px] shadow-[0_16px_32px_-30px_rgba(15,23,42,0.22)]'
+  'rounded-xl border-gray-200 shadow-sm'
 
 const quickActionClass =
-  'inline-flex h-8 items-center justify-center gap-1.5 rounded-[8px] border border-border/70 bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
+  'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-card dark:text-foreground'
 
 const dashboardShortcutClass =
-  'flex items-center gap-3 rounded-[8px] border border-border/70 bg-background px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
+  'flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-card dark:text-foreground'
 
 export function DashboardPage() {
   const today = new Date()
@@ -168,13 +173,13 @@ export function DashboardPage() {
       Icon: ClipboardList,
     },
     {
-      href: '/agenda',
-      label: 'Agenda',
-      Icon: CalendarDays,
-    },
-    {
       href: '/oradores',
       label: 'Oradores',
+      Icon: UsersRound,
+    },
+    {
+      href: '/temas',
+      label: 'Temas',
       Icon: Mic2,
     },
     {
@@ -202,12 +207,13 @@ export function DashboardPage() {
     : 'Ainda não definido'
 
   return (
-    <div className="mx-auto max-w-7xl space-y-2.5">
+    <div className="mx-auto max-w-7xl space-y-3">
       <Card className={cardClass}>
-        <CardHeader className="p-3 pb-1.5 md:p-4 md:pb-1.5">
+        <CardHeader className="border-b border-gray-100 bg-white p-4 pb-3 dark:border-border dark:bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base tracking-normal md:text-lg">
+              <CardTitle className="flex items-center gap-2 text-sm font-black text-blue-800 dark:text-blue-200 md:text-base">
+                <ClipboardList className="size-4" />
                 Próximo discurso
               </CardTitle>
             </div>
@@ -219,15 +225,15 @@ export function DashboardPage() {
           </div>
         </CardHeader>
 
-        <CardContent className="p-3 pt-2 md:p-4 md:pt-2">
+        <CardContent className="p-3 md:p-4">
           {isLoading ? (
-            <div className="flex min-h-28 items-center justify-center rounded-[8px] border border-dashed border-border/80 bg-background">
+            <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-border bg-slate-50 dark:bg-background">
               <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
             </div>
           ) : null}
 
           {!isLoading && combinedError ? (
-            <div className="rounded-[8px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
               {getErrorMessage(combinedError)}
             </div>
           ) : null}
@@ -236,19 +242,19 @@ export function DashboardPage() {
             <EmptyState
               className="px-4 py-6"
               title="Nenhum sábado carregado"
-              description="Gere a agenda anual para começar a acompanhar a cobertura da base."
+              description="Os sábados regulares são calculados automaticamente; confira a conexão com o Firestore para carregar a cobertura."
             />
           ) : null}
 
           {!isLoading && !combinedError && nextSaturdayEntry ? (
             <div className="space-y-3">
               <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.95fr)_minmax(230px,0.8fr)]">
-                <div className="min-w-0 rounded-[8px] border border-border/70 bg-background px-3 py-3">
+                <div className="min-w-0 rounded-xl border border-gray-200 bg-slate-50 px-3 py-3 dark:border-border dark:bg-background">
                   <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <span className="rounded-full border border-border/70 bg-muted/40 px-3 py-1 font-medium text-foreground">
+                    <span className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-xs font-black text-slate-800 dark:border-border dark:bg-card dark:text-foreground">
                       {nextSaturdayDateLabel}
                     </span>
-                    <span>{nextSaturdayMeetingTime}</span>
+                    <span className="text-xs font-bold">{nextSaturdayMeetingTime}</span>
                     {nextSaturdayEntry.assignment ? (
                       <StatusPill status={nextSaturdayEntry.assignment.speakerType}>
                         {nextSaturdayEntry.assignment.speakerType === 'local'
@@ -260,7 +266,7 @@ export function DashboardPage() {
 
                   <div className="mt-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="text-lg font-semibold text-foreground md:text-xl">
+                      <h3 className="text-lg font-black leading-tight text-slate-900 dark:text-foreground md:text-xl">
                         {nextSaturdayHeadline}
                       </h3>
                       {nextSaturdayEntry.assignment ? (
@@ -278,7 +284,7 @@ export function DashboardPage() {
                       )}
                     </div>
                     <div
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-full ${highlightStyle.wrapperClass}`}
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${highlightStyle.wrapperClass}`}
                     >
                       <HighlightIcon className="size-5" />
                     </div>
@@ -286,35 +292,42 @@ export function DashboardPage() {
 
                   {!nextSaturdayEntry.assignment &&
                   !nextSaturdayEntry.event.blocksAssignments ? (
-                    <div className="mt-3 rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                      Ainda falta definir orador e tema para esta data.
+                    <div className="mt-3 flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+                      <span>Ainda falta definir orador e tema para esta data.</span>
+                      <Link
+                        className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-black text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
+                        to={getAssignmentCreateHref(nextSaturdayEntry)}
+                      >
+                        <Plus className="size-3.5" />
+                        Designar
+                      </Link>
                     </div>
                   ) : null}
                 </div>
 
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-1">
-                  <div className="rounded-[8px] border border-border/70 bg-background px-3 py-3">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  <div className="rounded-xl border border-gray-200 bg-slate-50 px-3 py-3 dark:border-border dark:bg-background">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground">
                       Congregação
                     </p>
-                    <p className="mt-1.5 text-sm font-medium text-foreground">
+                    <p className="mt-1.5 text-sm font-bold text-foreground">
                       {nextSaturdayCongregation}
                     </p>
                   </div>
-                  <div className="rounded-[8px] border border-border/70 bg-background px-3 py-3">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  <div className="rounded-xl border border-gray-200 bg-slate-50 px-3 py-3 dark:border-border dark:bg-background">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground">
                       Tema
                     </p>
-                    <p className="mt-1.5 text-sm font-medium text-foreground">
+                    <p className="mt-1.5 text-sm font-bold text-foreground">
                       {nextSaturdayTheme}
                     </p>
                   </div>
                 </div>
 
-                <div className="rounded-[8px] border border-border/70 bg-background p-3 lg:col-span-2 xl:col-span-1">
+                <div className="rounded-xl border border-gray-200 bg-slate-50 p-3 dark:border-border dark:bg-background lg:col-span-2 xl:col-span-1">
                   {nextSaturdayEntry.assignment ? (
                     <>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground">
                         Contato rápido
                       </p>
                       <div className="mt-2.5 flex flex-wrap gap-2">
@@ -347,21 +360,30 @@ export function DashboardPage() {
                     </>
                   ) : (
                     <div className="flex h-full flex-col justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                      <p className="text-[10px] font-black uppercase text-muted-foreground">
                         Ação prioritária
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {nextSaturdayEntry.event.blocksAssignments
                           ? 'Nenhuma cobertura é necessária para esta data.'
-                          : 'Priorize a escolha do orador e do tema para fechar a agenda desta semana.'}
+                          : 'Priorize a escolha do orador e do tema para fechar este sábado.'}
                       </p>
+                      {!nextSaturdayEntry.event.blocksAssignments ? (
+                        <Link
+                          className={quickActionClass}
+                          to={getAssignmentCreateHref(nextSaturdayEntry)}
+                        >
+                          <Plus className="size-3.5" />
+                          Nova designação
+                        </Link>
+                      ) : null}
                     </div>
                   )}
                 </div>
               </div>
 
               {remainingSaturdayEntries.length > 0 ? (
-                <div className="border-t border-border/70 pt-3">
+                  <div className="border-t border-gray-100 pt-3 dark:border-border">
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {remainingSaturdayEntries.map((entry) => {
                       const entryStatus = getEntryStatus(entry)
@@ -369,7 +391,7 @@ export function DashboardPage() {
                       return (
                         <div
                           key={entry.event.id}
-                          className="rounded-[8px] border border-border/70 bg-card px-3 py-2.5"
+                          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm dark:border-border dark:bg-card"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-foreground">
@@ -396,6 +418,15 @@ export function DashboardPage() {
                                 ? entry.event.title
                                 : 'Sem designação'}
                           </p>
+                          {!entry.assignment && !entry.event.blocksAssignments ? (
+                            <Link
+                            className="mt-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-background dark:text-foreground"
+                              to={getAssignmentCreateHref(entry)}
+                            >
+                              <Plus className="size-3.5" />
+                              Designar
+                            </Link>
+                          ) : null}
                         </div>
                       )
                     })}
@@ -410,7 +441,7 @@ export function DashboardPage() {
       <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {dashboardShortcuts.map(({ href, label, Icon }) => (
           <Link key={href} className={dashboardShortcutClass} to={href}>
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-muted/50 text-muted-foreground">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-200">
               <Icon className="size-4" />
             </span>
             <span>{label}</span>

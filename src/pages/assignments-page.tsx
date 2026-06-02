@@ -3,24 +3,26 @@ import {
   ArrowRightLeft,
   CalendarDays,
   CheckCircle2,
-  Clock3,
+  LogIn,
+  LogOut,
+  MapPin,
   MapPinned,
   Mic2,
   PencilLine,
   Plus,
   Search,
-  ShieldAlert,
   Speech,
   Undo2,
   XCircle,
+  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
+import { useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 
 import { EmptyState } from '@/components/app/empty-state'
 import { PageHeader } from '@/components/app/page-header'
-import { SummaryStat } from '@/components/app/summary-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -49,6 +51,12 @@ import { useCongregationsManagementQuery } from '@/hooks/use-congregations'
 import { useSpeakersManagementQuery } from '@/hooks/use-speakers'
 import { useThemesManagementQuery } from '@/hooks/use-themes'
 import {
+  getThemeCategoryLabel,
+  themeCategoryOptions,
+  type ThemeCategory,
+} from '@/lib/theme-categories'
+import { cn } from '@/lib/utils'
+import {
   defaultAssignmentFormValues,
   toAssignmentFormValues,
   type AssignmentFormValues,
@@ -75,11 +83,13 @@ import {
 
 const currentYear = new Date().getFullYear()
 
+type ThemeCategoryFilter = 'all' | ThemeCategory
+
 const selectClassName =
   'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70'
 
 const assignmentFormSchema = z.object({
-  calendarEventId: z.string().trim().min(1, 'Selecione o evento da designação.'),
+  calendarEventId: z.string().trim().min(1, 'Selecione o sábado da designação.'),
   localCongregationId: z
     .string()
     .trim()
@@ -112,21 +122,25 @@ const movementOptions: Array<{
   value: MovementType
   title: string
   description: string
+  icon: LucideIcon
 }> = [
   {
     value: 'incoming',
     title: 'Orador visitante',
-    description: 'Orador visitante designado para falar em uma congregação local.',
-  },
-  {
-    value: 'outgoing',
-    title: 'Discurso fora',
-    description: 'Um orador local designado para atender uma congregação parceira.',
+    description: 'Visitante discursa aqui.',
+    icon: LogIn,
   },
   {
     value: 'local',
     title: 'Designação local',
-    description: 'O orador local permanece falando dentro da própria congregação.',
+    description: 'Local discursa aqui.',
+    icon: MapPin,
+  },
+  {
+    value: 'outgoing',
+    title: 'Discurso fora',
+    description: 'Local discursa fora.',
+    icon: LogOut,
   },
 ]
 
@@ -143,7 +157,7 @@ const editableStatusOptions: Array<{
   {
     value: 'confirmed',
     title: 'Confirmado',
-    description: 'Retorno recebido e agenda pronta para operar com seguranca.',
+    description: 'Retorno recebido e sábado pronto para operar com seguranca.',
   },
   {
     value: 'declined',
@@ -174,10 +188,101 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+}
+
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function normalizeMeetingDayLabel(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function getMeetingDayIndex(meetingDay: string) {
+  const normalizedLabel = normalizeMeetingDayLabel(meetingDay)
+
+  switch (normalizedLabel) {
+    case 'domingo':
+      return 0
+    case 'segunda-feira':
+      return 1
+    case 'terca-feira':
+      return 2
+    case 'quarta-feira':
+      return 3
+    case 'quinta-feira':
+      return 4
+    case 'sexta-feira':
+      return 5
+    case 'sabado':
+      return 6
+    default:
+      return null
+  }
+}
+
+function matchesMeetingDay(
+  event: FirestoreRecord<CalendarEventDocument>,
+  meetingDayIndex: number | null,
+) {
+  if (meetingDayIndex === null) {
+    return true
+  }
+
+  return event.date.toDate().getDay() === meetingDayIndex
+}
+
+function getMeetingDayHelperLabel(meetingDay: string) {
+  if (meetingDay.trim().length === 0) {
+    return 'datas carregadas'
+  }
+
+  return `datas de ${meetingDay.toLowerCase()}`
+}
+
+function getMovementOptionToneClassName(
+  movementType: MovementType,
+  isSelected: boolean,
+) {
+  if (movementType === 'incoming') {
+    return isSelected
+      ? 'border-sky-500 bg-sky-50 text-sky-950 shadow-sm dark:border-sky-400 dark:bg-sky-500/10 dark:text-sky-100'
+      : 'border-sky-200 bg-sky-50/50 text-slate-700 hover:bg-sky-50 dark:border-sky-500/20 dark:bg-sky-500/5 dark:text-slate-200'
+  }
+
+  if (movementType === 'local') {
+    return isSelected
+      ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm dark:border-emerald-400 dark:bg-emerald-500/10 dark:text-emerald-100'
+      : 'border-emerald-200 bg-emerald-50/50 text-slate-700 hover:bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-slate-200'
+  }
+
+  return isSelected
+    ? 'border-amber-500 bg-amber-50 text-amber-950 shadow-sm dark:border-amber-400 dark:bg-amber-500/10 dark:text-amber-100'
+    : 'border-amber-200 bg-amber-50/50 text-slate-700 hover:bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-slate-200'
+}
+
+function getMovementOptionIconClassName(movementType: MovementType) {
+  if (movementType === 'incoming') {
+    return 'text-sky-600 dark:text-sky-300'
+  }
+
+  if (movementType === 'local') {
+    return 'text-emerald-600 dark:text-emerald-300'
+  }
+
+  return 'text-amber-600 dark:text-amber-300'
 }
 
 function getStatusClassName(status: AssignmentStatus) {
@@ -211,6 +316,10 @@ function getPreferredMovementType(options: {
 }): MovementType {
   if (options.hasLocalCongregations && options.hasVisitorSpeakers) {
     return 'incoming'
+  }
+
+  if (options.hasLocalCongregations && options.hasLocalSpeakers) {
+    return 'local'
   }
 
   if (options.hasPartnerCongregations && options.hasLocalSpeakers) {
@@ -330,8 +439,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
       ? {
           canRequestSync: false,
           canShowAction: false,
-          description: 'O evento da agenda não foi encontrado para esta designação.',
-          label: 'Evento indisponível',
+          description: 'O sábado vinculado não foi encontrado para esta designação.',
+          label: 'Sábado indisponível',
           tone: 'error',
         }
       : null
@@ -371,7 +480,7 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: false,
       canShowAction: true,
-      description: 'Ative a integração nas configurações antes de publicar ou remover este item na agenda.',
+      description: 'Ative a integração nas configurações antes de publicar ou remover este item no Google Calendar.',
       label: 'Integração desligada',
       tone: 'warning',
     }
@@ -403,7 +512,7 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: true,
       canShowAction: true,
-      description: 'A agenda externa ainda precisa remover a publicação anterior deste evento.',
+      description: 'O Google Calendar ainda precisa remover a publicação anterior deste evento.',
       label: 'Remoção pendente',
       tone: 'warning',
     }
@@ -414,8 +523,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
       canRequestSync: true,
       canShowAction: true,
       description: hasRemoteEvent
-        ? 'A agenda externa ainda não recebeu esta atualização mais recente.'
-        : 'Esta designação já pode ser enviada para a agenda externa.',
+        ? 'O Google Calendar ainda não recebeu esta atualização mais recente.'
+        : 'Esta designação já pode ser enviada para o Google Calendar.',
       label: hasRemoteEvent
         ? 'Atualização pronta'
         : 'Pronto para enviar',
@@ -427,7 +536,7 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: true,
       canShowAction: true,
-      description: 'A agenda externa já está alinhada com a versão atual deste item.',
+      description: 'O Google Calendar já está alinhado com a versão atual deste item.',
       label: 'Agenda atualizada',
       tone: 'success',
     }
@@ -438,15 +547,23 @@ function getAssignmentGoogleCalendarSyncState(options: {
 
 export function AssignmentsPage() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [referenceNow] = useState(() => Date.now())
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | AssignmentStatus>('all')
   const [movementFilter, setMovementFilter] = useState<'all' | MovementType>('all')
+  const [themeCategoryFilter, setThemeCategoryFilter] =
+    useState<ThemeCategoryFilter>('all')
+  const [themeSearchTerm, setThemeSearchTerm] = useState('')
+  const [visitorCongregationFilterId, setVisitorCongregationFilterId] = useState('')
+  const [meetingDateDraft, setMeetingDateDraft] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
+  const [dateFieldFeedback, setDateFieldFeedback] = useState<string | null>(null)
   const [movementTypeOverride, setMovementTypeOverride] = useState<MovementType | null>(
     null,
   )
+  const todayDateKey = useMemo(() => getLocalDateKey(new Date(referenceNow)), [referenceNow])
 
   const appSettingsQuery = useAppSettingsQuery()
   const calendarSettingsQuery = useCalendarSettingsQuery()
@@ -461,6 +578,7 @@ export function AssignmentsPage() {
   const updateAssignmentMutation = useUpdateAssignmentMutation()
   const confirmAssignmentMutation = useConfirmAssignmentMutation()
   const requestManualGoogleCalendarSyncMutation = useRequestManualGoogleCalendarSyncMutation()
+  const requestedCalendarEventId = searchParams.get('evento')?.trim() ?? ''
 
   const assignments = useMemo(
     () =>
@@ -555,9 +673,45 @@ export function AssignmentsPage() {
     }),
     [localCongregations, partnerCongregations],
   )
+  const localMeetingDay = localCongregations[0]?.meetingDay ?? ''
+  const localMeetingDayIndex = useMemo(
+    () => getMeetingDayIndex(localMeetingDay),
+    [localMeetingDay],
+  )
+  const meetingDayEligibleEvents = useMemo(
+    () =>
+      eligibleEvents.filter((event) => matchesMeetingDay(event, localMeetingDayIndex)),
+    [eligibleEvents, localMeetingDayIndex],
+  )
+  const selectableEvents = useMemo(
+    () =>
+      meetingDayEligibleEvents.length > 0 ? meetingDayEligibleEvents : eligibleEvents,
+    [eligibleEvents, meetingDayEligibleEvents],
+  )
+  const quickSelectableEvents = useMemo(() => {
+    const futureEvents = selectableEvents.filter(
+      (event) => getLocalDateKey(event.date.toDate()) >= todayDateKey,
+    )
+
+    return (futureEvents.length > 0 ? futureEvents : selectableEvents).slice(0, 6)
+  }, [selectableEvents, todayDateKey])
+  const selectableEventsByDateInputValue = useMemo(
+    () =>
+      new Map(
+        selectableEvents.map((event) => [getLocalDateKey(event.date.toDate()), event] as const),
+      ),
+    [selectableEvents],
+  )
+  const isMeetingDayFilterActive =
+    localMeetingDayIndex !== null && meetingDayEligibleEvents.length > 0
+  const isMeetingDayFilterUnavailable =
+    localMeetingDay.trim().length > 0 &&
+    localMeetingDayIndex !== null &&
+    eligibleEvents.length > 0 &&
+    meetingDayEligibleEvents.length === 0
 
   const nextOpenEvent = useMemo(() => {
-    const futureOpenEvent = eligibleEvents.find(
+    const futureOpenEvent = selectableEvents.find(
       (event) =>
         event.date.toMillis() >= referenceNow &&
         !operationalAssignmentMap.has(event.id),
@@ -568,15 +722,20 @@ export function AssignmentsPage() {
     }
 
     return (
-      eligibleEvents.find((event) => !operationalAssignmentMap.has(event.id)) ??
-      eligibleEvents[0] ??
+      selectableEvents.find((event) => !operationalAssignmentMap.has(event.id)) ??
+      selectableEvents[0] ??
       null
     )
-  }, [eligibleEvents, operationalAssignmentMap, referenceNow])
+  }, [operationalAssignmentMap, referenceNow, selectableEvents])
 
   const editingAssignment =
     assignments.find((assignment) => assignment.id === editingId) ?? null
   const actorName = user?.displayName ?? user?.email ?? null
+  const baseLocalCongregation = localCongregations[0] ?? null
+  const localCongregationIds = useMemo(
+    () => new Set(localCongregations.map((congregation) => congregation.id)),
+    [localCongregations],
+  )
 
   function getDefaultDestinationId(nextMovementType: MovementType) {
     return defaultDestinationIds[nextMovementType]
@@ -622,6 +781,9 @@ export function AssignmentsPage() {
       control,
       name: 'status',
     }) ?? 'pending'
+  const speakerFieldRegistration = register('speakerId', {
+    onChange: () => setThemeSearchTerm(''),
+  })
 
   const destinationOptions = useMemo(
     () =>
@@ -636,24 +798,65 @@ export function AssignmentsPage() {
       }),
     [congregationsQuery.data, movementType, watchedLocalCongregationId],
   )
-  const speakerOptions = useMemo(
+  const visitorCongregationFilterOptions = useMemo(
     () =>
-      (speakersQuery.data ?? []).filter(
-        (speaker) =>
-          speaker.type === getSpeakerTypeForMovement(movementType) &&
-          (speaker.isActive || speaker.id === watchedSpeakerId),
+      partnerCongregations.filter(
+        (congregation) =>
+          congregation.isActive || congregation.id === visitorCongregationFilterId,
       ),
-    [movementType, speakersQuery.data, watchedSpeakerId],
+    [partnerCongregations, visitorCongregationFilterId],
+  )
+  const speakerOptions = useMemo(
+    () => {
+      if (movementType === 'incoming' && visitorCongregationFilterId.length === 0) {
+        return []
+      }
+
+      return (speakersQuery.data ?? []).filter((speaker) => {
+        const matchesType = speaker.type === getSpeakerTypeForMovement(movementType)
+        const isAllowedByStatus = speaker.isActive || speaker.id === watchedSpeakerId
+
+        if (!matchesType || !isAllowedByStatus) {
+          return false
+        }
+
+        if (movementType === 'incoming') {
+          return (
+            speaker.congregationId === visitorCongregationFilterId ||
+            speaker.id === watchedSpeakerId
+          )
+        }
+
+        return (
+          localCongregationIds.has(speaker.congregationId) || speaker.id === watchedSpeakerId
+        )
+      })
+    },
+    [
+      localCongregationIds,
+      movementType,
+      speakersQuery.data,
+      visitorCongregationFilterId,
+      watchedSpeakerId,
+    ],
   )
 
   const selectedEvent =
     eligibleEvents.find((event) => event.id === watchedCalendarEventId) ?? null
+  const meetingDateValue =
+    meetingDateDraft ?? (selectedEvent ? getLocalDateKey(selectedEvent.date.toDate()) : '')
+  const requestedCalendarEvent =
+    requestedCalendarEventId.length > 0
+      ? eligibleEvents.find((event) => event.id === requestedCalendarEventId) ?? null
+      : null
   const selectedSpeaker = speakersById.get(watchedSpeakerId) ?? null
   const selectedSpeakerMissingEmail = Boolean(
     selectedSpeaker && selectedSpeaker.email.trim().length === 0,
   )
   const selectedDestinationCongregation =
     congregationsById.get(watchedLocalCongregationId) ?? null
+  const selectedVisitorCongregation =
+    congregationsById.get(visitorCongregationFilterId) ?? null
   const speakerThemeOptions = useMemo(() => {
     if (!selectedSpeaker) {
       return []
@@ -665,6 +868,33 @@ export function AssignmentsPage() {
         (theme.isActive || theme.id === watchedThemeId),
     )
   }, [selectedSpeaker, themesQuery.data, watchedThemeId])
+  const selectedTheme = themesById.get(watchedThemeId) ?? null
+  const filteredSpeakerThemeOptions = useMemo(
+    () =>
+      speakerThemeOptions.filter(
+        (theme) => {
+          const matchesCategory =
+            themeCategoryFilter === 'all' ||
+            theme.category === themeCategoryFilter ||
+            theme.id === watchedThemeId
+          const normalizedThemeSearch = themeSearchTerm.trim().toLowerCase()
+          const searchableContent = [
+            String(theme.number),
+            theme.title,
+            getThemeCategoryLabel(theme.category),
+          ]
+            .join(' ')
+            .toLowerCase()
+          const matchesSearch =
+            normalizedThemeSearch.length === 0 ||
+            searchableContent.includes(normalizedThemeSearch) ||
+            theme.id === watchedThemeId
+
+          return matchesCategory && matchesSearch
+        },
+      ),
+    [speakerThemeOptions, themeCategoryFilter, themeSearchTerm, watchedThemeId],
+  )
 
   const currentOperationalAssignment = selectedEvent
     ? operationalAssignmentMap.get(selectedEvent.id) ?? null
@@ -678,21 +908,16 @@ export function AssignmentsPage() {
     !editingAssignment &&
     selectedEventCoveredByOtherAssignment &&
     isAssignmentCoveringCalendarSlot(watchedStatus)
+  const selectedEventTime = selectedEvent?.date.toMillis() ?? Number.POSITIVE_INFINITY
 
-  const recentThemeUsage = useMemo(() => {
-    if (!watchedThemeId) {
-      return null
-    }
-
-    const selectedEventTime = selectedEvent?.date.toMillis() ?? Number.POSITIVE_INFINITY
-
-    return recentAssignments.find(
-      (assignment) =>
-        assignment.id !== editingId &&
-        assignment.themeId === watchedThemeId &&
-        assignment.eventDate.toMillis() <= selectedEventTime,
-    ) ?? null
-  }, [editingId, recentAssignments, selectedEvent, watchedThemeId])
+  const recentThemeUsage = watchedThemeId
+    ? recentAssignments.find(
+        (assignment) =>
+          assignment.id !== editingId &&
+          assignment.themeId === watchedThemeId &&
+          assignment.eventDate.toMillis() <= selectedEventTime,
+      ) ?? null
+    : null
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
   const filteredAssignments = assignments.filter((assignment) => {
@@ -715,29 +940,13 @@ export function AssignmentsPage() {
     return matchesMovement && matchesStatus && matchesSearch
   })
 
-  const stats = useMemo(() => {
-    const pending = assignments.filter((assignment) => assignment.status === 'pending').length
-    const confirmed = assignments.filter((assignment) => assignment.status === 'confirmed').length
-    const outgoing = assignments.filter(
-      (assignment) =>
-        inferAssignmentMovementType(assignment, congregationsById) === 'outgoing',
-    ).length
-    const openSlots = eligibleEvents.filter((event) => !operationalAssignmentMap.has(event.id)).length
-
-    return {
-      total: assignments.length,
-      pending,
-      confirmed,
-      outgoing,
-      openSlots,
-    }
-  }, [assignments, congregationsById, eligibleEvents, operationalAssignmentMap])
-
   const hasDestinations = destinationOptions.length > 0
   const hasSpeakerOptions = speakerOptions.length > 0
   const hasThemeOptions = speakerThemeOptions.length > 0
+  const needsVisitorCongregationFilter =
+    movementType === 'incoming' && visitorCongregationFilterId.length === 0
   const canSubmit =
-    eligibleEvents.length > 0 &&
+    selectableEvents.length > 0 &&
     hasDestinations &&
     hasSpeakerOptions &&
     (!selectedSpeaker || hasThemeOptions)
@@ -758,12 +967,48 @@ export function AssignmentsPage() {
   ].filter(Boolean)
 
   useEffect(() => {
-    if (editingAssignment || !nextOpenEvent || watchedCalendarEventId.length > 0) {
+    if (
+      editingAssignment ||
+      requestedCalendarEventId.length > 0 ||
+      !nextOpenEvent ||
+      watchedCalendarEventId.length > 0
+    ) {
       return
     }
 
     setValue('calendarEventId', nextOpenEvent.id)
-  }, [editingAssignment, nextOpenEvent, setValue, watchedCalendarEventId])
+  }, [
+    editingAssignment,
+    nextOpenEvent,
+    requestedCalendarEventId,
+    setValue,
+    watchedCalendarEventId,
+  ])
+
+  useEffect(() => {
+    if (
+      editingAssignment ||
+      !requestedCalendarEvent ||
+      watchedCalendarEventId === requestedCalendarEvent.id
+    ) {
+      return
+    }
+
+    reset({
+      ...buildCreateFormValues(
+        preferredMovementType,
+        defaultDestinationIds[preferredMovementType],
+      ),
+      calendarEventId: requestedCalendarEvent.id,
+    })
+  }, [
+    defaultDestinationIds,
+    editingAssignment,
+    preferredMovementType,
+    requestedCalendarEvent,
+    reset,
+    watchedCalendarEventId,
+  ])
 
   useEffect(() => {
     if (editingAssignment || watchedLocalCongregationId.length > 0) {
@@ -848,6 +1093,10 @@ export function AssignmentsPage() {
 
   function handleMovementTypeChange(nextMovementType: MovementType) {
     setMovementTypeOverride(nextMovementType)
+    setThemeCategoryFilter('all')
+    setThemeSearchTerm('')
+    setVisitorCongregationFilterId('')
+    setDateFieldFeedback(null)
 
     if (!editingAssignment) {
       setValue('status', nextMovementType === 'local' ? 'confirmed' : 'pending', {
@@ -873,9 +1122,15 @@ export function AssignmentsPage() {
   function handleStartCreate() {
     const nextMovementType = preferredMovementType
 
+    setSearchParams({}, { replace: true })
     setEditingId(null)
     setFeedback(null)
     setMovementTypeOverride(null)
+    setThemeCategoryFilter('all')
+    setThemeSearchTerm('')
+    setVisitorCongregationFilterId('')
+    setMeetingDateDraft(null)
+    setDateFieldFeedback(null)
     reset(
       buildCreateFormValues(
         nextMovementType,
@@ -891,11 +1146,18 @@ export function AssignmentsPage() {
       return
     }
 
+    setSearchParams({}, { replace: true })
     setEditingId(id)
     setFeedback(null)
-    setMovementTypeOverride(
-      inferAssignmentMovementType(assignment, congregationsById),
+    setThemeCategoryFilter('all')
+    setThemeSearchTerm('')
+    const nextMovementType = inferAssignmentMovementType(assignment, congregationsById)
+    setVisitorCongregationFilterId(
+      nextMovementType === 'incoming' ? assignment.originCongregationId : '',
     )
+    setMeetingDateDraft(null)
+    setDateFieldFeedback(null)
+    setMovementTypeOverride(nextMovementType)
     reset(toAssignmentFormValues(assignment))
   }
 
@@ -905,14 +1167,81 @@ export function AssignmentsPage() {
       congregationsById,
     )
 
+    setSearchParams({}, { replace: true })
     setEditingId(null)
     setFeedback(null)
     setMovementTypeOverride(nextMovementType)
+    setThemeCategoryFilter('all')
+    setThemeSearchTerm('')
+    setVisitorCongregationFilterId(
+      nextMovementType === 'incoming' ? assignment.originCongregationId : '',
+    )
+    setMeetingDateDraft(null)
+    setDateFieldFeedback(null)
     reset({
       ...buildCreateFormValues(nextMovementType, assignment.localCongregationId),
       calendarEventId: assignment.calendarEventId,
       localCongregationId: assignment.localCongregationId,
       status: 'pending',
+    })
+  }
+
+  function handleVisitorCongregationFilterChange(nextCongregationId: string) {
+    setVisitorCongregationFilterId(nextCongregationId)
+    setThemeSearchTerm('')
+
+    if (watchedSpeakerId.length > 0) {
+      setValue('speakerId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    }
+
+    if (watchedThemeId.length > 0) {
+      setValue('themeId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    }
+  }
+
+  function handleMeetingDateChange(nextDateValue: string) {
+    if (nextDateValue.trim().length === 0) {
+      setMeetingDateDraft(null)
+      setDateFieldFeedback(null)
+      setValue('calendarEventId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      return
+    }
+
+    const matchingEvent = selectableEventsByDateInputValue.get(nextDateValue) ?? null
+
+    if (!matchingEvent) {
+      setMeetingDateDraft(nextDateValue)
+      setDateFieldFeedback(
+        `Escolha uma das ${getMeetingDayHelperLabel(localMeetingDay)} que já estão carregadas no calendário.`,
+      )
+      setValue('calendarEventId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      return
+    }
+
+    setMeetingDateDraft(null)
+    setDateFieldFeedback(null)
+    setValue('calendarEventId', matchingEvent.id, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }
+
+  function handleThemeSelection(themeId: string) {
+    setValue('themeId', themeId, {
+      shouldDirty: true,
+      shouldValidate: true,
     })
   }
 
@@ -973,7 +1302,12 @@ export function AssignmentsPage() {
         })
       }
 
+      setSearchParams({}, { replace: true })
       setEditingId(null)
+      setDateFieldFeedback(null)
+      setThemeSearchTerm('')
+      setVisitorCongregationFilterId('')
+      setMeetingDateDraft(null)
       reset(
         buildCreateFormValues(
           movementType,
@@ -1104,7 +1438,7 @@ export function AssignmentsPage() {
     if (!calendarSettingsQuery.data?.enabled) {
       setFeedback({
         tone: 'error',
-        message: 'Ative a integração da agenda nas configurações antes de sincronizar.',
+        message: 'Ative a integração com Google Calendar nas configurações antes de sincronizar.',
       })
       return
     }
@@ -1120,7 +1454,7 @@ export function AssignmentsPage() {
 
       setFeedback({
         tone: 'success',
-        message: 'Solicitação enviada para sincronização com a agenda. Ela será processada no próximo ciclo.',
+        message: 'Solicitação enviada para sincronização com Google Calendar. Ela será processada no próximo ciclo.',
       })
     } catch (error) {
       setFeedback({
@@ -1135,55 +1469,9 @@ export function AssignmentsPage() {
       <PageHeader
         eyebrow="Operação"
         title="Designações"
-        description="Organize visitantes, saídas locais e confirmações em uma visão mais direta para o uso diário."
-        actions={
-          <>
-            <Badge className="bg-primary/10 text-primary">{activeYear}</Badge>
-            <Button onClick={handleStartCreate} disabled={isSubmitting}>
-              <Plus className="size-4" />
-              Nova designação
-            </Button>
-          </>
-        }
+        description="Defina orador e tema para cada sábado de reunião, com visitantes, locais e confirmações no mesmo fluxo."
+        actions={<Badge className="bg-primary/10 text-primary">{activeYear}</Badge>}
       />
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryStat
-          label="Designações no ano"
-          value={String(stats.total)}
-          detail="Total de registros do ano selecionado."
-          icon={CalendarDays}
-          tone="blue"
-        />
-        <SummaryStat
-          label="Pendentes"
-          value={String(stats.pending)}
-          detail="Aguardando resposta do orador."
-          icon={Clock3}
-          tone="amber"
-        />
-        <SummaryStat
-          label="Confirmadas"
-          value={String(stats.confirmed)}
-          detail="Datas já prontas para operar."
-          icon={CheckCircle2}
-          tone="green"
-        />
-        <SummaryStat
-          label="Saídas locais"
-          value={String(stats.outgoing)}
-          detail="Oradores locais atendendo fora."
-          icon={ArrowRightLeft}
-          tone="slate"
-        />
-        <SummaryStat
-          label="Datas sem cobertura"
-          value={String(stats.openSlots)}
-          detail="Eventos ainda sem designação ativa."
-          icon={ShieldAlert}
-          tone="amber"
-        />
-      </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
@@ -1196,7 +1484,7 @@ export function AssignmentsPage() {
                 <CardDescription>
                   {editingAssignment
                     ? 'Atualize status, observações, destino e tema sem perder o histórico da data.'
-                    : 'Cadastre uma nova designação e depois envie para a agenda externa somente quando fizer sentido.'}
+                    : 'Escolha o sábado, o orador e o tema do discurso público.'}
                 </CardDescription>
               </div>
               {editingAssignment ? (
@@ -1216,64 +1504,167 @@ export function AssignmentsPage() {
               <div className="grid gap-4">
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Tipo de designação</span>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {movementOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
-                          movementType === option.value
-                            ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                            : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
-                        }`}
-                        onClick={() => handleMovementTypeChange(option.value)}
-                      >
-                        <p className="font-medium text-foreground">{option.title}</p>
-                        <p className="mt-1 leading-6">{option.description}</p>
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    {movementOptions.map((option) => {
+                      const Icon = option.icon
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={cn(
+                            'min-h-[96px] rounded-xl border px-2.5 py-3 text-left text-sm transition sm:px-3.5',
+                            getMovementOptionToneClassName(
+                              option.value,
+                              movementType === option.value,
+                            ),
+                          )}
+                          onClick={() => handleMovementTypeChange(option.value)}
+                        >
+                          <span className="flex items-start justify-between gap-2">
+                            <span className="font-medium leading-5 text-foreground">
+                              {option.title}
+                            </span>
+                            <Icon
+                              className={cn(
+                                'mt-0.5 size-4 shrink-0',
+                                getMovementOptionIconClassName(option.value),
+                              )}
+                            />
+                          </span>
+                          <span className="mt-1 block text-xs leading-4 text-muted-foreground">
+                            {option.description}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Data</span>
-                  <select className={selectClassName} {...register('calendarEventId')}>
-                    <option value="">Selecione um evento</option>
-                    {eligibleEvents.map((event) => {
-                      const activeAssignment = operationalAssignmentMap.get(event.id)
-                      const eventLabel = `${formatTimestampDate(event.date)} - ${
-                        calendarEventTypeLabels[event.type]
-                      }`
+                <div className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">Data da reunião</span>
+                  <input type="hidden" {...register('calendarEventId')} />
 
-                      return (
-                        <option key={event.id} value={event.id}>
-                          {activeAssignment
-                            ? `${eventLabel} - ocupado por ${activeAssignment.speakerName}`
-                            : `${eventLabel} - disponível`}
-                        </option>
-                      )
-                    })}
-                  </select>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
+                    <label className="block">
+                      <span className="sr-only">Data da reunião</span>
+                      <div className="relative w-full sm:max-w-[220px]">
+                        <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          className="h-12 pl-10 text-base font-semibold tracking-[0.02em]"
+                          value={meetingDateValue}
+                          onChange={(event) => handleMeetingDateChange(event.target.value)}
+                        />
+                      </div>
+                    </label>
+
+                    {quickSelectableEvents.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 lg:flex-1 lg:justify-end">
+                        {quickSelectableEvents.map((event) => {
+                          const isSelected = event.id === watchedCalendarEventId
+
+                          return (
+                            <button
+                              key={event.id}
+                              type="button"
+                              className={cn(
+                                'rounded-full border px-3 py-1.5 text-xs font-medium transition',
+                                isSelected
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border bg-background text-muted-foreground hover:bg-accent',
+                              )}
+                              onClick={() =>
+                                handleMeetingDateChange(getLocalDateKey(event.date.toDate()))
+                              }
+                            >
+                              {formatTimestampDate(event.date)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <p className="max-w-md text-xs leading-5 text-muted-foreground">
+                    {isMeetingDayFilterActive
+                      ? `Mostrando somente ${getMeetingDayHelperLabel(localMeetingDay)} da congregação local.`
+                      : isMeetingDayFilterUnavailable
+                        ? `A congregação local está marcada com reunião em ${localMeetingDay.toLowerCase()}, mas não encontrei datas desse dia neste ano; por isso mantive todas as datas carregadas.`
+                        : 'Escolha uma data já carregada no calendário operacional.'}
+                  </p>
+                  {dateFieldFeedback ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {dateFieldFeedback}
+                    </p>
+                  ) : null}
                   {errors.calendarEventId ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
                       {errors.calendarEventId.message}
                     </p>
                   ) : null}
-                </label>
+                </div>
 
+                <input type="hidden" {...register('localCongregationId')} />
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Congregação de destino
+                      {movementType === 'incoming'
+                        ? 'Congregação do orador visitante'
+                        : movementType === 'outgoing'
+                          ? 'Congregação de destino'
+                          : 'Congregação base'}
                     </span>
-                    <select className={selectClassName} {...register('localCongregationId')}>
-                      <option value="">Selecione a congregação</option>
-                      {destinationOptions.map((congregation) => (
-                        <option key={congregation.id} value={congregation.id}>
-                          {congregation.name}
+
+                    {movementType === 'incoming' ? (
+                      <select
+                        className={selectClassName}
+                        value={visitorCongregationFilterId}
+                        onChange={(event) =>
+                          handleVisitorCongregationFilterChange(event.target.value)
+                        }
+                      >
+                        <option value="">Escolha a congregação do visitante</option>
+                        {visitorCongregationFilterOptions.map((congregation) => (
+                          <option key={congregation.id} value={congregation.id}>
+                            {congregation.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select
+                        className={selectClassName}
+                        value={watchedLocalCongregationId}
+                        onChange={(event) =>
+                          setValue('localCongregationId', event.target.value, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          })
+                        }
+                        disabled={movementType === 'local'}
+                      >
+                        <option value="">
+                          {movementType === 'local'
+                            ? 'Congregação local base'
+                            : 'Selecione a congregação'}
                         </option>
-                      ))}
-                    </select>
+                        {destinationOptions.map((congregation) => (
+                          <option key={congregation.id} value={congregation.id}>
+                            {congregation.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {movementType === 'incoming'
+                        ? 'Primeiro escolha a congregação do visitante; depois a lista de irmãos ficará filtrada.'
+                        : movementType === 'outgoing'
+                          ? 'Aqui a congregação define para onde o irmão local vai discursar.'
+                          : baseLocalCongregation
+                            ? `A designação local sempre acontece em ${baseLocalCongregation.name}.`
+                            : 'Cadastre uma congregação local ativa para travar a designação base.'}
+                    </p>
                     {errors.localCongregationId ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
                         {errors.localCongregationId.message}
@@ -1282,15 +1673,38 @@ export function AssignmentsPage() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">Orador</span>
-                    <select className={selectClassName} {...register('speakerId')}>
-                      <option value="">Selecione o orador</option>
+                    <span className="text-sm font-medium text-foreground">
+                      {movementType === 'incoming' ? 'Orador visitante' : 'Orador local'}
+                    </span>
+                    <select
+                      className={selectClassName}
+                      {...speakerFieldRegistration}
+                      disabled={movementType === 'incoming' && visitorCongregationFilterId.length === 0}
+                    >
+                      <option value="">
+                        {movementType === 'incoming'
+                          ? visitorCongregationFilterId.length === 0
+                            ? 'Escolha primeiro a congregação do visitante'
+                            : 'Selecione o orador visitante'
+                          : 'Selecione o orador local'}
+                      </option>
                       {speakerOptions.map((speaker) => (
                         <option key={speaker.id} value={speaker.id}>
-                          {speaker.name} - {speaker.congregationName ?? 'Sem congregação'}
+                          {movementType === 'incoming'
+                            ? `${speaker.name} - ${speaker.congregationName ?? 'Sem congregação'}`
+                            : speaker.name}
                         </option>
                       ))}
                     </select>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {movementType === 'incoming'
+                        ? selectedVisitorCongregation
+                          ? `Mostrando somente irmãos de ${selectedVisitorCongregation.name}.`
+                          : 'Selecione a congregação do visitante para liberar os irmãos.'
+                        : baseLocalCongregation
+                          ? `Mostrando apenas irmãos da congregação base ${baseLocalCongregation.name}.`
+                          : 'Cadastre a congregação base para listar os irmãos locais.'}
+                    </p>
                     {errors.speakerId ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
                         {errors.speakerId.message}
@@ -1299,26 +1713,133 @@ export function AssignmentsPage() {
                   </label>
                 </div>
 
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Tema</span>
-                  <select className={selectClassName} {...register('themeId')}>
-                    <option value="">
-                      {selectedSpeaker
-                        ? 'Selecione um tema do orador'
-                        : 'Escolha primeiro o orador'}
-                    </option>
-                    {speakerThemeOptions.map((theme) => (
-                      <option key={theme.id} value={theme.id}>
-                        Tema {theme.number} - {theme.title}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2">
+                  <input type="hidden" {...register('themeId')} />
+                  <div className="rounded-2xl border border-border bg-slate-50/80 p-4 dark:bg-background/70">
+                    <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-end">
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">Categoria</span>
+                        <select
+                          className={selectClassName}
+                          value={themeCategoryFilter}
+                          onChange={(event) =>
+                            setThemeCategoryFilter(event.target.value as ThemeCategoryFilter)
+                          }
+                          disabled={!selectedSpeaker}
+                        >
+                          <option value="all">Todas as categorias</option>
+                          {themeCategoryOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">Buscar tema</span>
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            value={themeSearchTerm}
+                            onChange={(event) => setThemeSearchTerm(event.target.value)}
+                            placeholder="Buscar por número, nome ou categoria"
+                            className="h-11 pl-10"
+                            disabled={!selectedSpeaker}
+                          />
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-foreground">Tema</span>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {selectedSpeaker
+                              ? 'Escolha abaixo um dos temas liberados para o orador.'
+                              : 'Escolha primeiro o orador para liberar os temas.'}
+                          </p>
+                        </div>
+                        {selectedSpeaker ? (
+                          <Badge variant="outline" className="w-fit">
+                            {filteredSpeakerThemeOptions.length} tema(s)
+                          </Badge>
+                        ) : null}
+                      </div>
+
+                      {selectedTheme ? (
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-foreground">
+                                Tema {selectedTheme.number}
+                              </p>
+                              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                {selectedTheme.title}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="w-fit">
+                              {getThemeCategoryLabel(selectedTheme.category)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {selectedSpeaker ? (
+                        filteredSpeakerThemeOptions.length > 0 ? (
+                          <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                            {filteredSpeakerThemeOptions.map((theme) => {
+                              const isSelected = theme.id === watchedThemeId
+
+                              return (
+                                <button
+                                  key={theme.id}
+                                  type="button"
+                                  className={cn(
+                                    'w-full rounded-xl border px-4 py-3 text-left transition',
+                                    isSelected
+                                      ? 'border-primary bg-primary/10 text-foreground shadow-sm'
+                                      : 'border-border bg-background text-muted-foreground hover:bg-accent',
+                                  )}
+                                  onClick={() => handleThemeSelection(theme.id)}
+                                >
+                                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold text-foreground">
+                                        Tema {theme.number}
+                                      </p>
+                                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                        {theme.title}
+                                      </p>
+                                    </div>
+                                    <Badge variant="outline" className="w-fit shrink-0">
+                                      {getThemeCategoryLabel(theme.category)}
+                                    </Badge>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm leading-6 text-muted-foreground">
+                            Nenhum tema do orador corresponde ao filtro atual. Ajuste a categoria ou a busca para continuar.
+                          </div>
+                        )
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm leading-6 text-muted-foreground">
+                          Escolha o orador para liberar os temas.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {errors.themeId ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
                       {errors.themeId.message}
                     </p>
                   ) : null}
-                </label>
+                </div>
 
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Status</span>
@@ -1331,10 +1852,10 @@ export function AssignmentsPage() {
                         <button
                           key={option.value}
                           type="button"
-                          className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
+                          className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
                             watchedStatus === option.value
                               ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                              : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
+                              : 'border-border bg-background text-muted-foreground hover:bg-accent'
                           } ${disabled ? 'cursor-not-allowed opacity-50 hover:bg-background' : ''}`}
                           onClick={() => {
                             if (disabled) {
@@ -1378,22 +1899,24 @@ export function AssignmentsPage() {
 
               {!canSubmit ? (
                 <div className={getFeedbackContainerClassName('error')}>
-                  {eligibleEvents.length === 0
-                    ? 'Cadastre ao menos uma data disponível na agenda antes de salvar uma designação.'
+                  {selectableEvents.length === 0
+                    ? 'Nenhum sábado disponível foi carregado para salvar uma designação.'
                     : !hasDestinations
                       ? movementType === 'outgoing'
                         ? 'Cadastre ao menos uma congregação parceira ativa para registrar saídas locais.'
                         : 'Cadastre ao menos uma congregação local ativa para registrar entradas ou designações locais.'
+                      : needsVisitorCongregationFilter
+                        ? 'Escolha primeiro a congregação do orador visitante para liberar os irmãos disponíveis.'
                       : !hasSpeakerOptions
                         ? movementType === 'incoming'
-                          ? 'Cadastre ao menos um orador visitante ativo para registrar esse tipo de designação.'
+                          ? 'Nenhum orador visitante ativo foi encontrado para a congregação escolhida.'
                           : 'Cadastre ao menos um orador local ativo para registrar esta operação.'
                         : 'Selecione um orador com temas ativos para concluir a designação.'}
                 </div>
               ) : null}
 
               {selectedEvent ? (
-                <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
                   <p className="font-medium text-foreground">
                     {calendarEventTypeLabels[selectedEvent.type]} em{' '}
                     {formatTimestampDate(selectedEvent.date)}
@@ -1407,18 +1930,18 @@ export function AssignmentsPage() {
               ) : null}
 
               {selectedSpeakerMissingEmail ? (
-                <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   <p className="font-medium">
                     Este orador ainda não possui e-mail cadastrado.
                   </p>
                   <p className="mt-2">
-                    A designação pode ser salva, mas os lembretes por e-mail e o convite na agenda não poderão ser enviados até que o cadastro seja atualizado.
+                    A designação pode ser salva, mas os lembretes por e-mail e o convite no Google Calendar não poderão ser enviados até que o cadastro seja atualizado.
                   </p>
                 </div>
               ) : null}
 
               {selectedEventCoveredByOtherAssignment ? (
-                <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                   <p className="font-medium">Esta data já possui cobertura operacional.</p>
                   <p className="mt-2">
                     {currentOperationalAssignment?.speakerName} esta ocupando o slot
@@ -1438,7 +1961,7 @@ export function AssignmentsPage() {
               ) : null}
 
               {recentThemeUsage ? (
-                <div className="rounded-[16px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
                   <p className="font-medium">Atenção ao tema recente</p>
                   <p className="mt-2">
                     Tema {recentThemeUsage.themeNumber} foi usado em{' '}
@@ -1508,7 +2031,7 @@ export function AssignmentsPage() {
                   Localize, confirme, substitua ou cancele uma designação sem sair da mesma tela.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 self-start rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                 <span>Resultados</span>
                 <span className="font-medium text-foreground">
                   {filteredAssignments.length}/{assignments.length}
@@ -1535,8 +2058,8 @@ export function AssignmentsPage() {
               >
                 <option value="all">Todos os movimentos</option>
                 <option value="incoming">Oradores visitantes</option>
-                <option value="outgoing">Discursos fora</option>
                 <option value="local">Designações locais</option>
+                <option value="outgoing">Discursos fora</option>
               </select>
               <select
                 className={selectClassName}
@@ -1561,7 +2084,7 @@ export function AssignmentsPage() {
                 {Array.from({ length: 3 }, (_, index) => (
                   <div
                     key={index}
-                    className="h-56 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                    className="h-56 animate-pulse rounded-xl border border-border bg-background"
                   />
                 ))}
               </div>
@@ -1579,7 +2102,7 @@ export function AssignmentsPage() {
                 description={
                   assignments.length > 0
                     ? 'Ajuste os filtros para encontrar a designação desejada.'
-                    : 'Crie a primeira designação para começar a organizar a agenda.'
+                    : 'Crie a primeira designação para começar a cobrir os sábados.'
                 }
               />
             ) : null}
@@ -1618,7 +2141,7 @@ export function AssignmentsPage() {
                   return (
                     <div
                       key={assignment.id}
-                      className="rounded-[18px] border border-border/70 bg-background p-4"
+                      className="rounded-xl border border-border bg-background p-4"
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0 flex-1">
@@ -1637,12 +2160,12 @@ export function AssignmentsPage() {
                           </h3>
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
+                            <div className="rounded-xl border border-border bg-background px-4 py-3.5">
                               <div className="flex items-start gap-3">
                                 <CalendarDays className="mt-0.5 size-4 text-primary" />
                                 <div>
                                   <p className="text-sm font-medium text-foreground">
-                                    Evento
+                                    Sábado
                                   </p>
                                   <p className="text-sm text-muted-foreground">
                                     {calendarEventTypeLabels[assignment.eventType]}
@@ -1654,7 +2177,7 @@ export function AssignmentsPage() {
                               </div>
                             </div>
 
-                            <div className="rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
+                            <div className="rounded-xl border border-border bg-background px-4 py-3.5">
                               <div className="flex items-start gap-3">
                                 <MapPinned className="mt-0.5 size-4 text-primary" />
                                 <div>
@@ -1709,7 +2232,7 @@ export function AssignmentsPage() {
 
                             {googleCalendarSyncState ? (
                               <div
-                                className={`rounded-[16px] border px-4 py-3.5 ${getGoogleCalendarSyncBadgeClassName(
+                                className={`rounded-xl border px-4 py-3.5 ${getGoogleCalendarSyncBadgeClassName(
                                   googleCalendarSyncState.tone,
                                 )}`}
                               >
@@ -1737,7 +2260,7 @@ export function AssignmentsPage() {
                               disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
                             >
                               <GoogleCalendarButtonMark />
-                              Enviar para agenda
+                              Enviar ao Google Calendar
                             </Button>
                           ) : null}
                           {hasQuickConfirm ? (

@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { AvatarBadge } from '@/components/app/avatar-badge'
 import { EmptyState } from '@/components/app/empty-state'
 import { PageHeader } from '@/components/app/page-header'
-import { SummaryStat } from '@/components/app/summary-stat'
+import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -191,10 +191,10 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
 }
 
 function getStatusBadgeClassName(status: SpeakerStatus) {
@@ -210,7 +210,7 @@ function getStatusBadgeClassName(status: SpeakerStatus) {
     return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200'
   }
 
-  return 'border-border/80 bg-muted text-muted-foreground'
+  return 'border-border bg-muted text-muted-foreground'
 }
 
 function formatUpdatedAt(value: Date) {
@@ -495,38 +495,35 @@ export function SpeakersPage() {
             Novo orador
           </Button>
         }
+        meta={
+          <>
+            <PageHeaderStat
+              label="Cadastrados"
+              value={String(totalSpeakers)}
+              icon={Mic2}
+              tone="blue"
+            />
+            <PageHeaderStat
+              label="Operacionais"
+              value={String(operationalSpeakersCount)}
+              icon={Plus}
+              tone="green"
+            />
+            <PageHeaderStat
+              label="Indisponíveis"
+              value={String(temporarilyUnavailableCount)}
+              icon={Phone}
+              tone="amber"
+            />
+            <PageHeaderStat
+              label="Visitantes"
+              value={String(visitorsCount)}
+              icon={Mail}
+              tone="slate"
+            />
+          </>
+        }
       />
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryStat
-          label="Cadastrados"
-          value={String(totalSpeakers)}
-          detail="Total de oradores salvos no sistema."
-          icon={Mic2}
-          tone="blue"
-        />
-        <SummaryStat
-          label="Operacionais"
-          value={String(operationalSpeakersCount)}
-          detail="Disponíveis para novas designações."
-          icon={Plus}
-          tone="green"
-        />
-        <SummaryStat
-          label="Com indisponibilidade"
-          value={String(temporarilyUnavailableCount)}
-          detail="Exigem atenção antes de designar."
-          icon={Phone}
-          tone="amber"
-        />
-        <SummaryStat
-          label="Visitantes"
-          value={String(visitorsCount)}
-          detail="Oradores vinculados a congregações parceiras."
-          icon={Mail}
-          tone="slate"
-        />
-      </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <Card className="xl:order-2">
@@ -624,10 +621,10 @@ export function SpeakersPage() {
                       <button
                         key={option.value}
                         type="button"
-                        className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
+                        className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
                           selectedType === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                            : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
+                            : 'border-border bg-background text-muted-foreground hover:bg-accent'
                         }`}
                         onClick={() =>
                           setValue('type', option.value, {
@@ -650,10 +647,10 @@ export function SpeakersPage() {
                       <button
                         key={option.value}
                         type="button"
-                        className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
+                        className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
                           selectedStatus === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                            : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
+                            : 'border-border bg-background text-muted-foreground hover:bg-accent'
                         }`}
                         onClick={() => {
                           setValue('status', option.value, {
@@ -720,7 +717,7 @@ export function SpeakersPage() {
                   </div>
 
                   {hasInvalidSelectedThemes ? (
-                    <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                       <p className="font-medium">Temas fora da base ativa</p>
                       <p className="mt-2 leading-6">
                         Remova os temas inativos ou ausentes antes de salvar este orador.
@@ -758,10 +755,10 @@ export function SpeakersPage() {
                         <button
                           key={theme.id}
                           type="button"
-                          className={`rounded-[16px] border px-4 py-3.5 text-left transition ${
+                          className={`rounded-xl border px-4 py-3.5 text-left transition ${
                             isSelected
                               ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                              : 'border-border/80 bg-background hover:bg-accent'
+                              : 'border-border bg-background hover:bg-accent'
                           }`}
                           onClick={() => handleToggleTheme(theme.id)}
                         >
@@ -894,7 +891,7 @@ export function SpeakersPage() {
                   Veja rapidamente quem está ativo, quem está indisponível e quem já precisa de atualização.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 self-start rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                 <span>Resultados</span>
                 <span className="font-medium text-foreground">
                   {filteredSpeakers.length}/{totalSpeakers}
@@ -957,7 +954,7 @@ export function SpeakersPage() {
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-48 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                    className="h-48 animate-pulse rounded-xl border border-border bg-background"
                   />
                 ))}
               </div>
@@ -1012,7 +1009,7 @@ export function SpeakersPage() {
                   return (
                     <div
                       key={speaker.id}
-                      className="rounded-[18px] border border-border/70 bg-background p-4"
+                      className="rounded-xl border border-border bg-background p-4"
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0 flex-1">
@@ -1037,7 +1034,7 @@ export function SpeakersPage() {
                           </div>
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <div className="flex items-start gap-3 rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
+                            <div className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
                               <Mail className="mt-0.5 size-4 text-primary" />
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-foreground">
@@ -1049,7 +1046,7 @@ export function SpeakersPage() {
                               </div>
                             </div>
 
-                            <div className="flex items-start gap-3 rounded-[16px] border border-border/70 bg-background px-4 py-3.5">
+                            <div className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
                               <Phone className="mt-0.5 size-4 text-primary" />
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-foreground">
@@ -1076,7 +1073,7 @@ export function SpeakersPage() {
                             </div>
 
                             {hasUnavailableWindow ? (
-                              <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                                 Período informado:{' '}
                                 {formatDateRange(
                                   unavailableStart.toDate(),
@@ -1121,6 +1118,7 @@ export function SpeakersPage() {
           </CardContent>
         </Card>
       </section>
+
     </div>
   )
 }

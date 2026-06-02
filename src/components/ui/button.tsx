@@ -4,17 +4,17 @@ import type { ButtonHTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-[0_18px_32px_-20px_rgba(37,99,235,0.75)] hover:bg-primary/92 dark:shadow-[0_20px_36px_-22px_rgba(59,130,246,0.82)]',
+          'bg-blue-600 text-white shadow-sm hover:bg-blue-700',
         outline:
-          'border border-border bg-background text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground dark:bg-card/70 dark:hover:bg-accent',
-        ghost: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+          'border border-border bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-blue-700 dark:bg-card dark:text-foreground dark:hover:bg-accent',
+        ghost: 'text-muted-foreground hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-accent dark:hover:text-accent-foreground',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/85',
+          'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/80',
       },
       size: {
         default: 'h-10 px-4 py-2',
