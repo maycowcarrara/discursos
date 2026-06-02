@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 
 import { EmptyState } from '@/components/app/empty-state'
+import { MetadataChip } from '@/components/app/metadata-chip'
 import { PageHeader } from '@/components/app/page-header'
 import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { AdminUsersCard } from '@/components/settings/admin-users-card'
@@ -477,10 +478,22 @@ export function SettingsPage() {
                   </div>
                 ) : null}
 
-                <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
-                  {persistedCalendarSettings?.lastSyncMessage
-                    ? persistedCalendarSettings.lastSyncMessage
-                    : 'A automação atualiza o estado da integração aqui.'}
+                <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
+                  <MetadataChip
+                    label="Último ciclo"
+                    tone={
+                      persistedCalendarSettings?.lastSyncStatus === 'error'
+                        ? 'warning'
+                        : persistedCalendarSettings?.lastSyncStatus === 'success'
+                          ? 'success'
+                          : 'pending'
+                    }
+                    value={
+                      persistedCalendarSettings?.lastSyncMessage
+                        ? persistedCalendarSettings.lastSyncMessage
+                        : 'Aguardando retorno da automação'
+                    }
+                  />
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -587,10 +600,19 @@ export function SettingsPage() {
                         </Badge>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>Agendado: {formatTimestampDate(notification.scheduledFor)}</span>
-                        <span>Canal: {notificationProviderLabels[notification.provider]}</span>
-                        <span>Tentativas: {notification.retryCount}</span>
+                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
+                        <MetadataChip
+                          label="Agendado"
+                          value={formatTimestampDate(notification.scheduledFor)}
+                        />
+                        <MetadataChip
+                          label="Canal"
+                          value={notificationProviderLabels[notification.provider]}
+                        />
+                        <MetadataChip
+                          label="Tentativas"
+                          value={String(notification.retryCount)}
+                        />
                       </div>
 
                       {notification.errorMessage ? (
@@ -661,9 +683,12 @@ export function SettingsPage() {
                           {auditActionLabels[auditLog.action]}
                         </Badge>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>Em: {formatTimestampDate(auditLog.createdAt)}</span>
-                        <span>Registro: {auditLog.entityId}</span>
+                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
+                        <MetadataChip
+                          label="Em"
+                          value={formatTimestampDate(auditLog.createdAt)}
+                        />
+                        <MetadataChip label="Registro" value={auditLog.entityId} />
                       </div>
                     </div>
                   ))}

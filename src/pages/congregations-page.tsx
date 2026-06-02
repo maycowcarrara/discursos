@@ -16,6 +16,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { EmptyState } from '@/components/app/empty-state'
+import { MetadataChip } from '@/components/app/metadata-chip'
 import { PageHeader } from '@/components/app/page-header'
 import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { useAuth } from '@/components/auth/use-auth'
@@ -856,32 +857,29 @@ export function CongregationsPage() {
           </div>
 
           {!resolvedIsLocalCardExpanded ? (
-            <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-4 text-sm text-muted-foreground sm:grid-cols-3">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
               {localCongregation ? (
                 <>
-                  <div>
-                    <p className="font-medium text-foreground">{localCongregation.name}</p>
-                    <p className="mt-1">
-                      {localCongregation.city}/{localCongregation.state}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {localCongregation.meetingDay}
-                    </p>
-                    <p className="mt-1">{localCongregation.meetingTime}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Última atualização</p>
-                    <p className="mt-1">
-                      {formatUpdatedAt(localCongregation.updatedAt.toDate())}
-                    </p>
-                  </div>
+                  <MetadataChip label="Base" value={localCongregation.name} />
+                  <MetadataChip
+                    label="Cidade"
+                    value={`${localCongregation.city}/${localCongregation.state}`}
+                  />
+                  <MetadataChip
+                    label="Reunião"
+                    value={`${localCongregation.meetingDay}, ${localCongregation.meetingTime}`}
+                  />
+                  <MetadataChip
+                    label="Atualizada"
+                    value={formatUpdatedAt(localCongregation.updatedAt.toDate())}
+                  />
                 </>
               ) : (
-                <p className="sm:col-span-3">
-                  Abra o card para cadastrar a base local obrigatória da agenda.
-                </p>
+                <MetadataChip
+                  label="Próximo passo"
+                  tone="warning"
+                  value="Cadastre a base local obrigatória"
+                />
               )}
             </div>
           ) : null}

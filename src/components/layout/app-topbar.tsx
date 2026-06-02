@@ -97,13 +97,13 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
                 return (
                   <div
                     key={item.label}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 shadow-sm dark:bg-card"
+                    className="flex items-center gap-2.5 rounded-xl border border-border bg-white px-4 py-2.5 shadow-sm dark:bg-card"
                   >
-                    <Icon className="size-3.5 shrink-0 text-blue-600" />
-                    <span className="text-[10px] font-black uppercase text-muted-foreground">
+                    <Icon className="size-4 shrink-0 text-blue-600" />
+                    <span className="text-[11px] font-black uppercase text-muted-foreground">
                       {item.label}
                     </span>
-                    <span className="text-xs font-black text-foreground">
+                    <span className="text-sm font-black text-foreground">
                       {item.value}
                     </span>
                   </div>

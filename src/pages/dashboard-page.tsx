@@ -14,6 +14,7 @@ import {
 import { Link } from 'react-router-dom'
 
 import { EmptyState } from '@/components/app/empty-state'
+import { MetadataChip } from '@/components/app/metadata-chip'
 import { StatusPill } from '@/components/app/status-pill'
 import {
   Card,
@@ -305,23 +306,9 @@ export function DashboardPage() {
                   ) : null}
                 </div>
 
-                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-1">
-                  <div className="rounded-xl border border-gray-200 bg-slate-50 px-3 py-3 dark:border-border dark:bg-background">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground">
-                      Congregação
-                    </p>
-                    <p className="mt-1.5 text-sm font-bold text-foreground">
-                      {nextSaturdayCongregation}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-gray-200 bg-slate-50 px-3 py-3 dark:border-border dark:bg-background">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground">
-                      Tema
-                    </p>
-                    <p className="mt-1.5 text-sm font-bold text-foreground">
-                      {nextSaturdayTheme}
-                    </p>
-                  </div>
+                <div className="flex flex-wrap content-start gap-x-5 gap-y-3 border-t border-gray-200 pt-3 dark:border-border lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                  <MetadataChip label="Congregação" value={nextSaturdayCongregation} />
+                  <MetadataChip label="Tema" value={nextSaturdayTheme} />
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-slate-50 p-3 dark:border-border dark:bg-background lg:col-span-2 xl:col-span-1">

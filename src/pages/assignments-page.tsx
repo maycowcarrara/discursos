@@ -1,9 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   ArrowRightLeft,
+  Ban,
   CalendarDays,
   CheckCircle2,
   CircleAlert,
+  Clock3,
   LogIn,
   LogOut,
   MailWarning,
@@ -24,7 +26,9 @@ import { useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 
 import { EmptyState } from '@/components/app/empty-state'
+import { MetadataChip } from '@/components/app/metadata-chip'
 import { PageHeader } from '@/components/app/page-header'
+import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -111,7 +115,6 @@ type FeedbackState =
 
 type MovementType = AssignmentMovementType
 type GoogleCalendarSyncTone = 'error' | 'neutral' | 'success' | 'warning'
-type FormSummaryChipTone = 'default' | 'pending' | 'success' | 'warning'
 
 type GoogleCalendarSyncState = {
   canRequestSync: boolean
@@ -150,32 +153,44 @@ const movementOptions: Array<{
 const editableStatusOptions: Array<{
   value: AssignmentStatus
   title: string
+  shortDescription: string
   description: string
+  icon: LucideIcon
 }> = [
   {
     value: 'pending',
     title: 'Pendente',
+    shortDescription: 'Aguardando resposta.',
     description: 'A designação foi montada, mas ainda aguarda resposta.',
+    icon: Clock3,
   },
   {
     value: 'confirmed',
     title: 'Confirmado',
+    shortDescription: 'Pronto para operar.',
     description: 'Retorno recebido e sábado pronto para operar com seguranca.',
+    icon: CheckCircle2,
   },
   {
     value: 'declined',
     title: 'Recusado',
+    shortDescription: 'Orador não aceitou.',
     description: 'O orador não aceitou e a data precisa ser reorganizada.',
+    icon: Ban,
   },
   {
     value: 'cancelled',
     title: 'Cancelado',
+    shortDescription: 'Sai da operação.',
     description: 'O registro permanece no histórico, mas sai da operação atual.',
+    icon: XCircle,
   },
   {
     value: 'replaced',
     title: 'Substituído',
+    shortDescription: 'Preserva a troca.',
     description: 'Fica preservado apenas como trilha da troca realizada.',
+    icon: ArrowRightLeft,
   },
 ]
 
@@ -195,44 +210,6 @@ function getFeedbackContainerClassName(tone: 'success' | 'error') {
   }
 
   return 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
-}
-
-function getFormSummaryChipClassName(tone: FormSummaryChipTone) {
-  if (tone === 'success') {
-    return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
-  }
-
-  if (tone === 'warning') {
-    return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100'
-  }
-
-  if (tone === 'pending') {
-    return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300'
-  }
-
-  return 'border-border bg-background text-foreground'
-}
-
-function FormSummaryChip({
-  label,
-  tone = 'default',
-  value,
-}: {
-  label: string
-  tone?: FormSummaryChipTone
-  value: string
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs leading-5',
-        getFormSummaryChipClassName(tone),
-      )}
-    >
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate font-semibold">{value}</span>
-    </span>
-  )
 }
 
 function getLocalDateKey(date: Date) {
@@ -980,6 +957,18 @@ export function AssignmentsPage() {
 
     return matchesMovement && matchesStatus && matchesSearch
   })
+  const pendingAssignmentsCount = assignments.filter(
+    (assignment) => assignment.status === 'pending',
+  ).length
+  const confirmedAssignmentsCount = assignments.filter(
+    (assignment) => assignment.status === 'confirmed',
+  ).length
+  const closedAssignmentsCount = assignments.filter(
+    (assignment) =>
+      assignment.status === 'declined' ||
+      assignment.status === 'cancelled' ||
+      assignment.status === 'replaced',
+  ).length
 
   const hasDestinations = destinationOptions.length > 0
   const hasSpeakerOptions = speakerOptions.length > 0
@@ -1534,6 +1523,34 @@ export function AssignmentsPage() {
         title="Designações"
         description="Defina orador e tema para cada sábado de reunião, com visitantes, locais e confirmações no mesmo fluxo."
         actions={<Badge className="bg-primary/10 text-primary">{activeYear}</Badge>}
+        meta={
+          <>
+            <PageHeaderStat
+              label="Cadastradas"
+              value={String(assignments.length)}
+              icon={Speech}
+              tone="blue"
+            />
+            <PageHeaderStat
+              label="Pendentes"
+              value={String(pendingAssignmentsCount)}
+              icon={Clock3}
+              tone="amber"
+            />
+            <PageHeaderStat
+              label="Confirmadas"
+              value={String(confirmedAssignmentsCount)}
+              icon={CheckCircle2}
+              tone="green"
+            />
+            <PageHeaderStat
+              label="Encerradas"
+              value={String(closedAssignmentsCount)}
+              icon={XCircle}
+              tone="slate"
+            />
+          </>
+        }
       />
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
@@ -1562,11 +1579,11 @@ export function AssignmentsPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <FormSummaryChip
+              <MetadataChip
                 label="Tipo"
                 value={selectedMovementOption?.title ?? 'Designação'}
               />
-              <FormSummaryChip
+              <MetadataChip
                 label="Data"
                 tone={selectedEvent ? 'success' : 'pending'}
                 value={
@@ -1575,18 +1592,18 @@ export function AssignmentsPage() {
                     : 'Escolha data'
                 }
               />
-              <FormSummaryChip label="Destino" value={destinationSummaryLabel} />
-              <FormSummaryChip
+              <MetadataChip label="Destino" value={destinationSummaryLabel} />
+              <MetadataChip
                 label="Orador"
                 tone={selectedSpeaker ? 'success' : 'pending'}
                 value={speakerSummaryLabel}
               />
-              <FormSummaryChip
+              <MetadataChip
                 label="Tema"
                 tone={selectedTheme ? 'success' : 'pending'}
                 value={themeSummaryLabel}
               />
-              <FormSummaryChip
+              <MetadataChip
                 label="Status"
                 tone={watchedStatus === 'confirmed' ? 'success' : 'warning'}
                 value={selectedStatusOption?.title ?? assignmentStatusLabels[watchedStatus]}
@@ -1682,7 +1699,7 @@ export function AssignmentsPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <FormSummaryChip
+                    <MetadataChip
                       label="Filtro"
                       tone={isMeetingDayFilterUnavailable ? 'warning' : 'pending'}
                       value={
@@ -1693,7 +1710,7 @@ export function AssignmentsPage() {
                             : 'calendário operacional'
                       }
                     />
-                    <FormSummaryChip
+                    <MetadataChip
                       label="Atalho"
                       value={`${quickSelectableEvents.length} próximas datas`}
                     />
@@ -1769,7 +1786,7 @@ export function AssignmentsPage() {
                     )}
 
                     <div className="flex flex-wrap gap-2">
-                      <FormSummaryChip
+                      <MetadataChip
                         label="Destino"
                         tone={selectedDestinationCongregation ? 'success' : 'pending'}
                         value={
@@ -1813,7 +1830,7 @@ export function AssignmentsPage() {
                       ))}
                     </select>
                     <div className="flex flex-wrap gap-2">
-                      <FormSummaryChip
+                      <MetadataChip
                         label="Lista"
                         tone={hasSpeakerOptions ? 'success' : 'pending'}
                         value={
@@ -1848,13 +1865,13 @@ export function AssignmentsPage() {
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <FormSummaryChip
+                        <MetadataChip
                           label="Disponíveis"
                           tone={selectedSpeaker ? 'success' : 'pending'}
                           value={`${filteredSpeakerThemeOptions.length} tema(s)`}
                         />
                         {selectedTheme ? (
-                          <FormSummaryChip
+                          <MetadataChip
                             label="Categoria"
                             value={getThemeCategoryLabel(selectedTheme.category)}
                           />
@@ -1972,29 +1989,24 @@ export function AssignmentsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="text-sm font-medium text-foreground">Status</span>
-                    {!editingAssignment ? (
-                      <FormSummaryChip
-                        label="Edição"
-                        value="recusado, cancelado e substituído"
-                      />
-                    ) : null}
-                  </div>
+                  <span className="text-sm font-medium text-foreground">Status</span>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {statusOptionsForForm.map((option) => {
                       const disabled =
                         !editingAssignment && !creatableStatusValues.includes(option.value)
+                      const StatusIcon = option.icon
 
                       return (
                         <button
                           key={option.value}
                           type="button"
-                          className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
+                          className={cn(
+                            'flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition',
                             watchedStatus === option.value
-                              ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                              : 'border-border bg-background text-muted-foreground hover:bg-accent'
-                          } ${disabled ? 'cursor-not-allowed opacity-50 hover:bg-background' : ''}`}
+                              ? 'border-primary bg-primary/8 text-foreground shadow-sm'
+                              : 'border-border bg-background text-muted-foreground hover:bg-accent',
+                            disabled && 'cursor-not-allowed opacity-50 hover:bg-background',
+                          )}
                           onClick={() => {
                             if (disabled) {
                               return
@@ -2007,17 +2019,33 @@ export function AssignmentsPage() {
                           }}
                           disabled={disabled}
                         >
-                          <p className="font-medium text-foreground">{option.title}</p>
-                          <p className="mt-1 text-xs leading-5">{option.description}</p>
+                          <span
+                            className={cn(
+                              'flex size-8 shrink-0 items-center justify-center rounded-md border',
+                              watchedStatus === option.value
+                                ? 'border-primary/25 bg-primary/10 text-primary'
+                                : 'border-border bg-muted/60 text-muted-foreground',
+                            )}
+                          >
+                            <StatusIcon className="size-4" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block font-medium text-foreground">
+                              {option.title}
+                            </span>
+                            <span className="mt-0.5 block text-xs leading-4">
+                              {option.shortDescription}
+                            </span>
+                          </span>
                         </button>
                       )
                     })}
                   </div>
                   {!editingAssignment ? (
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      Novas designações começam como pendentes ou confirmadas. Os
-                      demais status ficam disponíveis quando a data já estiver criada.
-                    </p>
+                    <MetadataChip
+                      label="Disponíveis após salvar"
+                      value="recusado, cancelado e substituído"
+                    />
                   ) : null}
                 </div>
 

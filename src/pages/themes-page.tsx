@@ -1,6 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   BookText,
+  CheckCircle2,
+  CircleOff,
   FileUp,
   FolderTree,
   PencilLine,
@@ -14,6 +16,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { EmptyState } from '@/components/app/empty-state'
+import { MetadataChip } from '@/components/app/metadata-chip'
 import { PageHeader } from '@/components/app/page-header'
 import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { useAuth } from '@/components/auth/use-auth'
@@ -392,20 +395,14 @@ export function ThemesPage() {
         title="Temas"
         description="Mantenha o catálogo oficial enxuto, categorizado e pronto para as próximas designações."
         actions={
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              variant="outline"
-              onClick={() => setIsImportModalOpen(true)}
-              disabled={isSubmitting}
-            >
-              <FileUp className="size-4" />
-              Importar PDF
-            </Button>
-            <Button onClick={handleStartCreate} disabled={isSubmitting}>
-              <Plus className="size-4" />
-              Novo tema
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => setIsImportModalOpen(true)}
+            disabled={isSubmitting}
+          >
+            <FileUp className="size-4" />
+            Importar PDF
+          </Button>
         }
         meta={
           <>
@@ -496,9 +493,10 @@ export function ThemesPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    Categoria atual: {getThemeCategoryLabel(selectedCategory)}
-                  </p>
+                  <MetadataChip
+                    label="Categoria atual"
+                    value={getThemeCategoryLabel(selectedCategory)}
+                  />
                   {errors.category ? (
                     <p className="text-sm text-rose-600 dark:text-rose-300">
                       {errors.category.message}
@@ -511,7 +509,7 @@ export function ThemesPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button
                       type="button"
-                      className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
+                      className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
                         isActive
                           ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                           : 'border-border bg-background text-muted-foreground hover:bg-accent'
@@ -522,14 +520,23 @@ export function ThemesPage() {
                         })
                       }
                     >
-                      <p className="font-medium text-foreground">Ativo</p>
-                      <p className="mt-1 leading-6">
-                        Disponível para novas designações.
-                      </p>
+                      <span
+                        className={`flex size-8 shrink-0 items-center justify-center rounded-md border ${
+                          isActive
+                            ? 'border-primary/30 bg-primary/10 text-primary'
+                            : 'border-border bg-muted/60 text-muted-foreground'
+                        }`}
+                      >
+                        <CheckCircle2 className="size-4" />
+                      </span>
+                      <span>
+                        <span className="block font-medium text-foreground">Ativo</span>
+                        <span className="block text-xs leading-5">Disponível para designar.</span>
+                      </span>
                     </button>
                     <button
                       type="button"
-                      className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
+                      className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
                         !isActive
                           ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                           : 'border-border bg-background text-muted-foreground hover:bg-accent'
@@ -540,10 +547,19 @@ export function ThemesPage() {
                         })
                       }
                     >
-                      <p className="font-medium text-foreground">Inativo</p>
-                      <p className="mt-1 leading-6">
-                        Sai da operação atual, mas continua acessível para histórico e reativação.
-                      </p>
+                      <span
+                        className={`flex size-8 shrink-0 items-center justify-center rounded-md border ${
+                          !isActive
+                            ? 'border-primary/30 bg-primary/10 text-primary'
+                            : 'border-border bg-muted/60 text-muted-foreground'
+                        }`}
+                      >
+                        <CircleOff className="size-4" />
+                      </span>
+                      <span>
+                        <span className="block font-medium text-foreground">Inativo</span>
+                        <span className="block text-xs leading-5">Preservado no histórico.</span>
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -690,16 +706,18 @@ export function ThemesPage() {
                           <BookText className="size-5" />
                         </div>
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                             <Badge variant={theme.isActive ? 'default' : 'outline'}>
                               {theme.isActive ? 'Ativo' : 'Inativo'}
                             </Badge>
-                            <Badge variant="outline">
-                              {getThemeCategoryLabel(theme.category)}
-                            </Badge>
-                            <p className="text-sm text-muted-foreground">
-                              Tema {theme.number}
-                            </p>
+                            <MetadataChip
+                              label="Tema"
+                              value={String(theme.number)}
+                            />
+                            <MetadataChip
+                              label="Categoria"
+                              value={getThemeCategoryLabel(theme.category)}
+                            />
                           </div>
                           <h3 className="mt-2 text-xl font-semibold text-foreground">
                             {theme.title}
@@ -707,9 +725,12 @@ export function ThemesPage() {
                           <p className="mt-3 text-sm leading-6 text-muted-foreground">
                             {theme.notes || 'Sem observações cadastradas.'}
                           </p>
-                          <p className="mt-4 text-xs text-muted-foreground">
-                            Atualizado em {formatUpdatedAt(theme.updatedAt.toDate())}
-                          </p>
+                          <div className="mt-4">
+                            <MetadataChip
+                              label="Atualizado"
+                              value={formatUpdatedAt(theme.updatedAt.toDate())}
+                            />
+                          </div>
                         </div>
                       </div>
 

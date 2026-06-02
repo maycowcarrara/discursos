@@ -4,13 +4,13 @@ import {
   ChevronDown,
   Filter,
   History,
-  Mic2,
   RotateCcw,
   UsersRound,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { EmptyState } from '@/components/app/empty-state'
+import { MetadataChip } from '@/components/app/metadata-chip'
 import { PageHeader } from '@/components/app/page-header'
 import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { Badge } from '@/components/ui/badge'
@@ -603,35 +603,24 @@ export function HistoryPage() {
                               </div>
                             </div>
 
-                            <div className="grid gap-2 text-sm text-muted-foreground lg:min-w-[250px]">
-                              <div className="flex items-center gap-2">
-                                <Church className="size-4 text-primary" />
-                                <span>
-                                  {assignment.originCongregationName} para{' '}
-                                  {assignment.localCongregationName}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Mic2 className="size-4 text-primary" />
-                                <span>
-                                  Tema {assignment.themeNumber} •{' '}
-                                  {assignment.speakerType === 'visitor'
-                                    ? 'Visitante'
-                                    : 'Local'}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <CalendarDays className="size-4 text-primary" />
-                                <span>
-                                  Atualizado em{' '}
-                                  {dateTimeFormatter.format(assignment.updatedAt.toDate())}
-                                </span>
-                              </div>
+                            <div className="flex flex-wrap gap-x-5 gap-y-2 lg:max-w-[420px] lg:justify-end">
+                              <MetadataChip
+                                label="Destino"
+                                value={assignment.localCongregationName}
+                              />
+                              <MetadataChip
+                                label="Tipo"
+                                value={assignment.speakerType === 'visitor' ? 'Visitante' : 'Local'}
+                              />
+                              <MetadataChip
+                                label="Atualizado"
+                                value={dateTimeFormatter.format(assignment.updatedAt.toDate())}
+                              />
                             </div>
                           </div>
 
                           {assignment.notes ? (
-                            <div className="mt-4 rounded-xl border border-border bg-secondary/45 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                            <div className="mt-4 border-l-2 border-border py-0.5 pl-3 text-sm leading-6 text-muted-foreground">
                               {assignment.notes}
                             </div>
                           ) : null}

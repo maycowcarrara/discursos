@@ -1,12 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
+  ArrowRightLeft,
+  Ban,
+  CheckCircle2,
+  Clock3,
+  LogIn,
   Mail,
+  MapPin,
   Mic2,
   PencilLine,
+  Plane,
   Phone,
   Plus,
   Search,
   Trash2,
+  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
@@ -14,6 +22,7 @@ import { z } from 'zod'
 
 import { AvatarBadge } from '@/components/app/avatar-badge'
 import { EmptyState } from '@/components/app/empty-state'
+import { MetadataChip } from '@/components/app/metadata-chip'
 import { PageHeader } from '@/components/app/page-header'
 import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { useAuth } from '@/components/auth/use-auth'
@@ -63,16 +72,19 @@ const speakerTypeOptions: Array<{
   value: SpeakerType
   title: string
   description: string
+  icon: LucideIcon
 }> = [
   {
     value: 'local',
     title: 'Local',
-    description: 'Permanece na base principal de oradores da própria agenda.',
+    description: 'Da própria congregação.',
+    icon: MapPin,
   },
   {
     value: 'visitor',
     title: 'Visitante',
-    description: 'Representa oradores de congregações parceiras ou visitantes.',
+    description: 'De congregação parceira.',
+    icon: LogIn,
   },
 ]
 
@@ -80,31 +92,37 @@ const speakerStatusOptions: Array<{
   value: SpeakerStatus
   title: string
   description: string
+  icon: LucideIcon
 }> = [
   {
     value: 'active',
     title: 'Ativo',
-    description: 'Fica disponivel na base operacional das proximas designacoes.',
+    description: 'Disponível para designar.',
+    icon: CheckCircle2,
   },
   {
     value: 'vacation',
     title: 'Férias',
-    description: 'Permanece cadastrado, mas exige período de indisponibilidade.',
+    description: 'Informe o período.',
+    icon: Plane,
   },
   {
     value: 'unavailable',
     title: 'Indisponível',
-    description: 'Mantém o cadastro e registra um intervalo bloqueado.',
+    description: 'Intervalo bloqueado.',
+    icon: Clock3,
   },
   {
     value: 'transferred',
     title: 'Transferido',
-    description: 'Sai da base ativa, mas continua no cadastro para histórico.',
+    description: 'Preservado no histórico.',
+    icon: ArrowRightLeft,
   },
   {
     value: 'inactive',
     title: 'Inativo',
-    description: 'Sai da operação atual e pode ser reativado depois por edição.',
+    description: 'Fora da operação atual.',
+    icon: Ban,
   },
 ]
 
@@ -489,12 +507,6 @@ export function SpeakersPage() {
         eyebrow="Cadastro"
         title="Oradores"
         description="Mantenha a base de oradores organizada, com filtros simples e destaque para o que mais importa no uso diário."
-        actions={
-          <Button onClick={handleStartCreate} disabled={isSubmitting}>
-            <Plus className="size-4" />
-            Novo orador
-          </Button>
-        }
         meta={
           <>
             <PageHeaderStat
@@ -617,11 +629,14 @@ export function SpeakersPage() {
                     Tipo de orador
                   </span>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {speakerTypeOptions.map((option) => (
+                    {speakerTypeOptions.map((option) => {
+                      const OptionIcon = option.icon
+
+                      return (
                       <button
                         key={option.value}
                         type="button"
-                        className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
+                        className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
                           selectedType === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                             : 'border-border bg-background text-muted-foreground hover:bg-accent'
@@ -633,21 +648,36 @@ export function SpeakersPage() {
                           })
                         }
                       >
-                        <p className="font-medium text-foreground">{option.title}</p>
-                        <p className="mt-1 leading-6">{option.description}</p>
+                        <span
+                          className={`flex size-8 shrink-0 items-center justify-center rounded-md border ${
+                            selectedType === option.value
+                              ? 'border-primary/30 bg-primary/10 text-primary'
+                              : 'border-border bg-muted/60 text-muted-foreground'
+                          }`}
+                        >
+                          <OptionIcon className="size-4" />
+                        </span>
+                        <span>
+                          <span className="block font-medium text-foreground">{option.title}</span>
+                          <span className="block text-xs leading-5">{option.description}</span>
+                        </span>
                       </button>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Status</span>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {speakerStatusOptions.map((option) => (
+                    {speakerStatusOptions.map((option) => {
+                      const OptionIcon = option.icon
+
+                      return (
                       <button
                         key={option.value}
                         type="button"
-                        className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
+                        className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
                           selectedStatus === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                             : 'border-border bg-background text-muted-foreground hover:bg-accent'
@@ -673,10 +703,22 @@ export function SpeakersPage() {
                           }
                         }}
                       >
-                        <p className="font-medium text-foreground">{option.title}</p>
-                        <p className="mt-1 leading-6">{option.description}</p>
+                        <span
+                          className={`flex size-8 shrink-0 items-center justify-center rounded-md border ${
+                            selectedStatus === option.value
+                              ? 'border-primary/30 bg-primary/10 text-primary'
+                              : 'border-border bg-muted/60 text-muted-foreground'
+                          }`}
+                        >
+                          <OptionIcon className="size-4" />
+                        </span>
+                        <span>
+                          <span className="block font-medium text-foreground">{option.title}</span>
+                          <span className="block text-xs leading-5">{option.description}</span>
+                        </span>
                       </button>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -1033,30 +1075,9 @@ export function SpeakersPage() {
                             </div>
                           </div>
 
-                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <div className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
-                              <Mail className="mt-0.5 size-4 text-primary" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-foreground">
-                                  E-mail
-                                </p>
-                                <p className="truncate text-sm text-muted-foreground">
-                                  {speaker.email}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
-                              <Phone className="mt-0.5 size-4 text-primary" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-foreground">
-                                  Telefone
-                                </p>
-                                <p className="truncate text-sm text-muted-foreground">
-                                  {speaker.phone}
-                                </p>
-                              </div>
-                            </div>
+                          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
+                            <MetadataChip label="E-mail" value={speaker.email} />
+                            <MetadataChip label="Telefone" value={speaker.phone} />
                           </div>
 
                           <div className="mt-4 space-y-3 text-sm text-muted-foreground">
