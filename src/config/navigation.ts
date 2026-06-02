@@ -1,7 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Building2,
-  CalendarDays,
   History,
   LayoutDashboard,
   Mic2,
@@ -27,15 +26,9 @@ const dashboardNavigationItem: NavigationItem = {
 export const navigationItems: NavigationItem[] = [
   dashboardNavigationItem,
   {
-    href: '/agenda',
-    label: 'Agenda',
-    description: 'Planejamento anual e datas especiais',
-    icon: CalendarDays,
-  },
-  {
     href: '/designacoes',
     label: 'Designações',
-    description: 'Convites, confirmações e ajustes',
+    description: 'Sábados, oradores e temas',
     icon: Speech,
   },
   {

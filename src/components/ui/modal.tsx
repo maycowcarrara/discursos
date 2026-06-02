@@ -55,7 +55,7 @@ export function Modal({
   return createPortal(
     <div className="fixed inset-0 z-50">
       <div
-        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/45"
         onClick={() => {
           if (closeOnBackdrop) {
             onOpenChange(false)
@@ -81,7 +81,7 @@ export function ModalContent({
       role="dialog"
       aria-modal="true"
       className={cn(
-        'relative w-full max-w-5xl rounded-[28px] border border-border/70 bg-card shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)] dark:shadow-[0_32px_90px_-42px_rgba(2,8,23,0.92)]',
+        'relative w-full max-w-5xl overflow-visible rounded-2xl border border-border bg-card shadow-2xl',
         className,
       )}
       {...props}
@@ -95,7 +95,7 @@ export function ModalHeader({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('border-b border-border/70 px-4 py-4 sm:px-6 sm:py-5', className)}
+      className={cn('border-b border-border bg-slate-50 px-4 py-4 sm:px-6 sm:py-5 dark:bg-secondary', className)}
       {...props}
     />
   )
@@ -115,7 +115,7 @@ export function ModalFooter({
   return (
     <div
       className={cn(
-        'border-t border-border/70 px-4 py-4 sm:px-6 sm:py-5',
+        'border-t border-border bg-slate-50 px-4 py-4 sm:px-6 sm:py-5 dark:bg-secondary',
         className,
       )}
       {...props}
@@ -129,7 +129,7 @@ export function ModalTitle({
 }: HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h2
-      className={cn('text-xl font-semibold text-foreground sm:text-2xl', className)}
+      className={cn('text-lg font-black text-foreground sm:text-xl', className)}
       {...props}
     />
   )

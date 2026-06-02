@@ -1,12 +1,21 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { BookText, PencilLine, Plus, Search, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import {
+  BookText,
+  FileUp,
+  FolderTree,
+  PencilLine,
+  Plus,
+  Search,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
+import { useState, type ChangeEvent } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { EmptyState } from '@/components/app/empty-state'
 import { PageHeader } from '@/components/app/page-header'
-import { SummaryStat } from '@/components/app/summary-stat'
+import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,18 +27,43 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalDescription,
+  ModalFooter,
+  ModalHeader,
+  ModalTitle,
+} from '@/components/ui/modal'
 import { Textarea } from '@/components/ui/textarea'
 import {
   useCreateThemeMutation,
   useDeleteThemeMutation,
+  useImportThemesMutation,
   useThemesManagementQuery,
   useUpdateThemeMutation,
 } from '@/hooks/use-themes'
+import {
+  getThemeCategoryLabel,
+  themeCategoryOptions,
+  themeCategoryValues,
+  type ThemeCategory,
+} from '@/lib/theme-categories'
 import {
   defaultThemeFormValues,
   toThemeFormValues,
   type ThemeFormValues,
 } from '@/services/firestore/themes-service'
+import {
+  buildThemeImportPreview,
+  getThemeImportCategorySummary,
+  type ParsedThemeCatalog,
+} from '@/utils/theme-catalog-import'
+import { parseThemeCatalogPdf } from '@/utils/theme-catalog-pdf'
+
+const selectClassName =
+  'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring'
 
 const themeFormSchema = z.object({
   number: z
@@ -40,9 +74,14 @@ const themeFormSchema = z.object({
       message: 'Use um número maior que zero.',
     }),
   title: z.string().trim().min(3, 'Informe o título oficial do tema.'),
+  category: z.enum(themeCategoryValues, {
+    error: 'Selecione a categoria do tema.',
+  }),
   notes: z.string().trim(),
   isActive: z.boolean(),
 })
+
+type ThemeCategoryFilter = 'all' | ThemeCategory
 
 type FeedbackState =
   | {
@@ -61,10 +100,10 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
 }
 
 function formatUpdatedAt(value: Date) {
@@ -74,16 +113,31 @@ function formatUpdatedAt(value: Date) {
   })
 }
 
+function buildImportResultMessage(result: {
+  createdCount: number
+  updatedCount: number
+  unchangedCount: number
+}) {
+  return `Importação concluída: ${result.createdCount} novo(s), ${result.updatedCount} atualizado(s) e ${result.unchangedCount} sem mudanças.`
+}
+
 export function ThemesPage() {
   const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<ThemeCategoryFilter>('all')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isParsingImport, setIsParsingImport] = useState(false)
+  const [importCatalog, setImportCatalog] = useState<ParsedThemeCatalog | null>(null)
+  const [importFileName, setImportFileName] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
 
   const themesQuery = useThemesManagementQuery()
   const createThemeMutation = useCreateThemeMutation()
   const updateThemeMutation = useUpdateThemeMutation()
   const deleteThemeMutation = useDeleteThemeMutation()
+  const importThemesMutation = useImportThemesMutation()
 
   const editingTheme = themesQuery.data?.find((item) => item.id === editingId) ?? null
 
@@ -100,12 +154,34 @@ export function ThemesPage() {
   })
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
+  const selectedCategory =
+    useWatch({
+      control,
+      name: 'category',
+    }) ?? defaultThemeFormValues.category
+  const isActive =
+    useWatch({
+      control,
+      name: 'isActive',
+    }) ?? true
+
   const filteredThemes = (themesQuery.data ?? []).filter((item) => {
+    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter
+
+    if (!matchesCategory) {
+      return false
+    }
+
     if (normalizedSearch.length === 0) {
       return true
     }
 
-    const searchableContent = [item.number, item.title, item.notes]
+    const searchableContent = [
+      item.number,
+      item.title,
+      item.notes,
+      getThemeCategoryLabel(item.category),
+    ]
       .join(' ')
       .toLowerCase()
 
@@ -116,17 +192,19 @@ export function ThemesPage() {
   const activeThemesCount =
     themesQuery.data?.filter((item) => item.isActive).length ?? 0
   const inactiveThemesCount = totalThemes - activeThemesCount
+  const categoriesCount = new Set((themesQuery.data ?? []).map((item) => item.category)).size
   const isSubmitting =
     createThemeMutation.isPending ||
     updateThemeMutation.isPending ||
-    deleteThemeMutation.isPending
+    deleteThemeMutation.isPending ||
+    importThemesMutation.isPending ||
+    isParsingImport
   const formModeLabel = editingTheme ? 'Editar tema' : 'Novo tema'
   const actorName = user?.displayName ?? user?.email ?? null
-  const isActive =
-    useWatch({
-      control,
-      name: 'isActive',
-    }) ?? true
+  const importPreview =
+    importCatalog && themesQuery.data
+      ? buildThemeImportPreview(importCatalog.items, themesQuery.data)
+      : null
 
   const submitHandler = handleSubmit(async (values) => {
     if (!user) {
@@ -235,43 +313,129 @@ export function ThemesPage() {
     }
   }
 
+  async function handleImportFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+
+    if (!file) {
+      return
+    }
+
+    setImportError(null)
+    setImportCatalog(null)
+    setImportFileName(file.name)
+    setIsParsingImport(true)
+
+    try {
+      const parsedCatalog = await parseThemeCatalogPdf(file)
+      setImportCatalog(parsedCatalog)
+    } catch (error) {
+      setImportError(getErrorMessage(error))
+    } finally {
+      setIsParsingImport(false)
+      event.target.value = ''
+    }
+  }
+
+  async function handleConfirmImport() {
+    if (!user || !importCatalog) {
+      return
+    }
+
+    setImportError(null)
+    setFeedback(null)
+
+    try {
+      const result = await importThemesMutation.mutateAsync({
+        items: importCatalog.items,
+        actorUid: user.uid,
+        actorName,
+        sourceLabel: importCatalog.sourceLabel,
+      })
+
+      setFeedback({
+        tone: 'success',
+        message: buildImportResultMessage(result),
+      })
+      setIsImportModalOpen(false)
+      setImportCatalog(null)
+      setImportFileName('')
+      setImportError(null)
+    } catch (error) {
+      setImportError(getErrorMessage(error))
+    }
+  }
+
+  function handleCloseImportModal() {
+    if (isParsingImport || importThemesMutation.isPending) {
+      return
+    }
+
+    setIsImportModalOpen(false)
+    setImportCatalog(null)
+    setImportFileName('')
+    setImportError(null)
+  }
+
+  function handleImportModalOpenChange(open: boolean) {
+    if (open) {
+      setIsImportModalOpen(true)
+      return
+    }
+
+    handleCloseImportModal()
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Catálogo"
         title="Temas"
-        description="Mantenha o catálogo oficial enxuto, fácil de buscar e pronto para as próximas designações."
+        description="Mantenha o catálogo oficial enxuto, categorizado e pronto para as próximas designações."
         actions={
-          <Button onClick={handleStartCreate} disabled={isSubmitting}>
-            <Plus className="size-4" />
-            Novo tema
-          </Button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(true)}
+              disabled={isSubmitting}
+            >
+              <FileUp className="size-4" />
+              Importar PDF
+            </Button>
+            <Button onClick={handleStartCreate} disabled={isSubmitting}>
+              <Plus className="size-4" />
+              Novo tema
+            </Button>
+          </div>
+        }
+        meta={
+          <>
+            <PageHeaderStat
+              label="No catálogo"
+              value={String(totalThemes)}
+              icon={BookText}
+              tone="blue"
+            />
+            <PageHeaderStat
+              label="Ativos"
+              value={String(activeThemesCount)}
+              icon={Plus}
+              tone="green"
+            />
+            <PageHeaderStat
+              label="Categorias"
+              value={String(categoriesCount)}
+              icon={FolderTree}
+              tone="amber"
+            />
+            <PageHeaderStat
+              label="Inativos"
+              value={String(inactiveThemesCount)}
+              icon={PencilLine}
+              tone="slate"
+            />
+          </>
         }
       />
-
-      <section className="grid gap-4 sm:grid-cols-3">
-        <SummaryStat
-          label="No catálogo"
-          value={String(totalThemes)}
-          detail="Total de temas cadastrados."
-          icon={BookText}
-          tone="blue"
-        />
-        <SummaryStat
-          label="Ativos"
-          value={String(activeThemesCount)}
-          detail="Disponíveis para novas designações."
-          icon={Plus}
-          tone="green"
-        />
-        <SummaryStat
-          label="Inativos"
-          value={String(inactiveThemesCount)}
-          detail="Preservados para histórico e revisão."
-          icon={PencilLine}
-          tone="slate"
-        />
-      </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <Card>
@@ -281,8 +445,8 @@ export function ThemesPage() {
                 <CardTitle className="text-2xl">{formModeLabel}</CardTitle>
                 <CardDescription>
                   {editingTheme
-                    ? 'Atualize número, título, status e observações nesta mesma tela.'
-                    : 'Cadastre um novo tema com número único e título claro.'}
+                    ? 'Atualize número, categoria, status e observações nesta mesma tela.'
+                    : 'Cadastre um novo tema com número único, categoria oficial e título claro.'}
                 </CardDescription>
               </div>
               {editingTheme ? (
@@ -323,15 +487,34 @@ export function ThemesPage() {
                   ) : null}
                 </label>
 
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">Categoria</span>
+                  <select className={selectClassName} {...register('category')}>
+                    {themeCategoryOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Categoria atual: {getThemeCategoryLabel(selectedCategory)}
+                  </p>
+                  {errors.category ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {errors.category.message}
+                    </p>
+                  ) : null}
+                </label>
+
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Status</span>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button
                       type="button"
-                      className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
+                      className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
                         isActive
                           ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                          : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
+                          : 'border-border bg-background text-muted-foreground hover:bg-accent'
                       }`}
                       onClick={() =>
                         setValue('isActive', true, {
@@ -346,10 +529,10 @@ export function ThemesPage() {
                     </button>
                     <button
                       type="button"
-                      className={`rounded-[16px] border px-4 py-3.5 text-left text-sm transition ${
+                      className={`rounded-xl border px-4 py-3.5 text-left text-sm transition ${
                         !isActive
                           ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                          : 'border-border/80 bg-background text-muted-foreground hover:bg-accent'
+                          : 'border-border bg-background text-muted-foreground hover:bg-accent'
                       }`}
                       onClick={() =>
                         setValue('isActive', false, {
@@ -424,25 +607,39 @@ export function ThemesPage() {
               <div>
                 <CardTitle className="text-2xl">Catálogo oficial</CardTitle>
                 <CardDescription>
-                  Lista completa, ordenada por número e pronta para busca rápida.
+                  Lista completa, ordenada por número e pronta para busca rápida por categoria.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 self-start rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                 <span>Ordenação</span>
                 <span className="font-medium text-foreground">Número ascendente</span>
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
+            <div className="grid gap-3 lg:grid-cols-[1fr_240px_220px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-11"
-                  placeholder="Buscar por número, título ou observação..."
+                  placeholder="Buscar por número, título, categoria ou observação..."
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
               </div>
+              <select
+                className={selectClassName}
+                value={categoryFilter}
+                onChange={(event) =>
+                  setCategoryFilter(event.target.value as ThemeCategoryFilter)
+                }
+              >
+                <option value="all">Todas as categorias</option>
+                {themeCategoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               <div className="flex h-11 items-center rounded-2xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm">
                 {filteredThemes.length} resultado(s) de {totalThemes}
               </div>
@@ -455,7 +652,7 @@ export function ThemesPage() {
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-40 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                    className="h-40 animate-pulse rounded-xl border border-border bg-background"
                   />
                 ))}
               </div>
@@ -472,8 +669,8 @@ export function ThemesPage() {
                 }
                 description={
                   totalThemes > 0
-                    ? 'Ajuste a busca para localizar o tema desejado.'
-                    : 'Cadastre o primeiro tema para começar a montar o catálogo.'
+                    ? 'Ajuste a busca ou o filtro de categoria para localizar o tema desejado.'
+                    : 'Cadastre o primeiro tema ou importe o PDF oficial para começar a montar o catálogo.'
                 }
               />
             ) : null}
@@ -485,7 +682,7 @@ export function ThemesPage() {
                 {filteredThemes.map((theme) => (
                   <div
                     key={theme.id}
-                    className="rounded-[18px] border border-border/70 bg-background p-4"
+                    className="rounded-xl border border-border bg-background p-4"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="flex min-w-0 gap-4">
@@ -496,6 +693,9 @@ export function ThemesPage() {
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant={theme.isActive ? 'default' : 'outline'}>
                               {theme.isActive ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                            <Badge variant="outline">
+                              {getThemeCategoryLabel(theme.category)}
                             </Badge>
                             <p className="text-sm text-muted-foreground">
                               Tema {theme.number}
@@ -539,6 +739,117 @@ export function ThemesPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Modal open={isImportModalOpen} onOpenChange={handleImportModalOpenChange}>
+        <ModalContent className="max-w-3xl">
+          <ModalHeader>
+            <ModalTitle>Importar catálogo oficial de temas</ModalTitle>
+            <ModalDescription>
+              Selecione o PDF `S-99a_T` para criar os temas ausentes e atualizar títulos,
+              categorias e status dos que já existem.
+            </ModalDescription>
+          </ModalHeader>
+
+          <ModalBody className="space-y-5">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Arquivo PDF</span>
+              <Input
+                type="file"
+                accept="application/pdf"
+                onChange={handleImportFileChange}
+                disabled={isSubmitting}
+              />
+              <p className="text-xs leading-5 text-muted-foreground">
+                A reimportação funciona em modo de atualização por número do tema.
+              </p>
+            </label>
+
+            {isParsingImport ? (
+              <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                Lendo o PDF e classificando os temas por categoria...
+              </div>
+            ) : null}
+
+            {importError ? (
+              <div className={getFeedbackContainerClassName('error')}>{importError}</div>
+            ) : null}
+
+            {importCatalog && importPreview ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-border bg-background px-4 py-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      No PDF
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">
+                      {importCatalog.items.length}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      temas lidos de {importFileName || importCatalog.sourceLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background px-4 py-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Importação
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">
+                      {importPreview.createCount + importPreview.updateCount}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {importPreview.createCount} novo(s) e {importPreview.updateCount} atualização(ões)
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background px-4 py-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Sem mudança
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">
+                      {importPreview.unchangedCount}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      temas já alinhados com o PDF
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-background p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Sparkles className="size-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">
+                      Categorias encontradas
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {importPreview.categoryBreakdown.map((item) => (
+                      <Badge key={item.category} variant="outline">
+                        {getThemeImportCategorySummary(item.category, item.count)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </ModalBody>
+
+          <ModalFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-muted-foreground">
+              O importador preserva observações já existentes e faz atualização por número do tema.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button variant="outline" onClick={handleCloseImportModal} disabled={isSubmitting}>
+                Fechar
+              </Button>
+              <Button
+                onClick={handleConfirmImport}
+                disabled={isSubmitting || !importCatalog || !importPreview}
+              >
+                <FileUp className="size-4" />
+                Importar catálogo
+              </Button>
+            </div>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

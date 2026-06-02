@@ -3,11 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createTheme,
   deleteTheme,
+  importThemes,
   listThemes,
   listThemesForManagement,
   updateTheme,
   type CreateThemeInput,
   type DeleteThemeInput,
+  type ImportThemesInput,
   type UpdateThemeInput,
 } from '@/services/firestore/themes-service'
 
@@ -66,6 +68,17 @@ export function useDeleteThemeMutation() {
 
   return useMutation({
     mutationFn: (input: DeleteThemeInput) => deleteTheme(input),
+    onSuccess: async () => {
+      await invalidateThemeQueries(queryClient)
+    },
+  })
+}
+
+export function useImportThemesMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: ImportThemesInput) => importThemes(input),
     onSuccess: async () => {
       await invalidateThemeQueries(queryClient)
     },

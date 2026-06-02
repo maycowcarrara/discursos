@@ -209,7 +209,7 @@ Campos:
 Observações:
 
 * `name` é o nome oficial exibido na UI
-* `isLocal = true` identifica a única congregação local ativa da própria agenda
+* `isLocal = true` identifica a única congregação local ativa da própria programação
 * a congregação local deve existir sempre, não deve ser excluída pela UI e concentra `publicTalkCoordinatorContact`
 * congregações externas/parceiras devem ser cadastradas com `isLocal = false` automaticamente, sem escolha manual de tipo na UI
 * `zipCode` deixou de fazer parte do schema oficial por não gerar valor operacional no fluxo administrativo da V1; bases legadas devem remover o campo com saneamento controlado
@@ -260,6 +260,17 @@ Campos:
 {
   number: number
   title: string
+  category:
+    | "bibleGod"
+    | "evangelismMinistry"
+    | "familyYoungPeople"
+    | "faithSpirituality"
+    | "worldNoPart"
+    | "trialsProblems"
+    | "christianQualitiesStandards"
+    | "kingdomParadise"
+    | "religionWorship"
+    | "lastDaysJudgment"
   isActive: boolean
   notes: string
   createdAt: Timestamp
@@ -273,7 +284,11 @@ Observações:
 
 * `number` deve ser único no contexto da base
 * usar `title`, nunca `name` para tema
+* `category` deve usar o enum oficial por assunto do catálogo `S-99a_T`
 * create e update de `themes.number` devem reservar o número em `themeNumbers/{number}` antes de concluir a gravação
+* a UI deve exibir o rótulo PT-BR da categoria a partir do enum técnico, sem salvar um segundo campo de label no documento
+* a importação administrativa do PDF oficial deve localizar cada tema pelo `number`, criar itens ausentes e atualizar `title`, `category` e `isActive` quando o catálogo oficial mudar
+* bases legadas sem `category` devem ser saneadas pela importação do PDF oficial antes de depender dos filtros por categoria no fluxo operacional
 
 ### 4A. `themeNumbers`
 
@@ -301,7 +316,9 @@ Observações:
 ### 5. `calendarEvents`
 
 Finalidade:
-Agenda anual com sábados, congressos, assembleias e eventos especiais.
+Suporte técnico dos sábados de discurso público, exceções, bloqueios e sincronização externa.
+
+`calendarEvents` não representa uma aba operacional genérica de Agenda na V1. O fluxo principal do usuário é designar orador e tema em `assignments` para cada sábado de reunião. Esta coleção continua necessária para dar identidade estável aos slots, bloquear datas como congresso/assembleia, preservar exceções e manter o vínculo com Google Calendar.
 
 Campos:
 
@@ -336,8 +353,8 @@ Campos:
 Observações:
 
 * para congressos e assembleias, `blocksAssignments` deve ser `true`
-* sábados comuns também vivem nesta coleção
-* a UI anual pode renderizar slots regulares de `publicTalk` implicitamente a partir dos sábados do ano, mesmo sem documento salvo
+* sábados comuns podem viver implicitamente nesta coleção lógica sem documento salvo
+* a UI operacional renderiza slots regulares de `publicTalk` implicitamente a partir dos sábados do ano
 * quando existir um `calendarEvents` ativo na mesma data, ele passa a ser a fonte oficial da exceção, bloqueio ou personalização daquele dia
 * slots implícitos podem ser materializados sob demanda em `calendarEvents/{active-YYYY-MM-DD}` quando a operação precisar de um documento estável para concorrência, histórico técnico ou sincronização
 * o vínculo remoto do Google Calendar deve ficar neste documento, nunca em coleção paralela
@@ -349,7 +366,7 @@ Observações:
 * `googleCalendarRetryCount` e `googleCalendarSyncScheduledFor` controlam retentativas sem perder a pendência após falha transitória
 * o ID enviado ao Google Calendar deve ser determinístico a partir de `calendarEvents/{id}`, para que uma retomada após falha não duplique o evento remoto
 * campos técnicos de sincronização não devem sobrescrever `updatedAt`, que continua representando mudança real feita no calendário administrativo
-* slots regulares de `publicTalk` não precisam existir no Firestore para aparecer no planejamento anual e também não precisam existir no Google Calendar
+* slots regulares de `publicTalk` não precisam existir no Firestore para aparecer no Dashboard/Designações e também não precisam existir no Google Calendar
 * quando houver publicação de `orador visitante` ou `discurso fora`, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e adicionar o orador como convidado no Google Calendar
 * não criar coleção paralela como `events`, `schedules` ou `annualCalendar`
 
@@ -389,7 +406,7 @@ Campos:
 
 Observações:
 
-* esta coleção concentra o histórico operacional da agenda
+* esta coleção concentra o histórico operacional dos discursos
 * salvar snapshots mínimos como `speakerName`, `themeTitle` e `originCongregationName` é permitido para preservar histórico
 * nunca depender apenas do documento relacionado para reconstruir histórico antigo
 * `confirmationToken` só deve ser resolvido por fluxo público mediado por worker, nunca por escrita pública direta no frontend
@@ -627,7 +644,7 @@ Se houver dúvida sobre onde salvar um dado:
 * congregações em `congregations`
 * oradores em `speakers`
 * temas em `themes`
-* agenda anual em `calendarEvents`
+* sábados, exceções e bloqueios em `calendarEvents`
 * designações em `assignments`
 * envios e lembretes em `notifications`
 * trilha de auditoria em `auditLogs`

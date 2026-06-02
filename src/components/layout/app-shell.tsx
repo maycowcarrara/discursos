@@ -9,17 +9,28 @@ import { cn } from '@/lib/utils'
 
 export function AppShell() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true)
   const location = useLocation()
 
   return (
-    <div className="min-h-screen bg-transparent lg:h-screen lg:overflow-hidden">
-      <div className="grid min-h-screen w-full grid-cols-1 lg:h-full lg:min-h-0 lg:grid-cols-[272px_minmax(0,1fr)] lg:gap-3 lg:p-3">
+    <div className="min-h-screen bg-background lg:h-screen lg:overflow-hidden">
+      <div
+        className={cn(
+          'grid min-h-screen w-full grid-cols-1 lg:h-full lg:min-h-0',
+          isDesktopSidebarOpen
+            ? 'lg:grid-cols-[256px_minmax(0,1fr)]'
+            : 'lg:grid-cols-[64px_minmax(0,1fr)]',
+        )}
+      >
         <div className="hidden lg:block lg:h-full lg:min-h-0">
-          <AppSidebar />
+          <AppSidebar
+            desktopExpanded={isDesktopSidebarOpen}
+            onDesktopExpandedChange={setIsDesktopSidebarOpen}
+          />
         </div>
 
         <PageHeaderProvider>
-          <div className="app-surface relative min-w-0 overflow-hidden border border-border/75 shadow-[0_20px_46px_-30px_rgba(15,23,42,0.16)] lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:rounded-[24px]">
+          <div className="app-surface relative min-w-0 overflow-hidden lg:flex lg:h-full lg:min-h-0 lg:flex-col">
             <AppTopbar onOpenMobileMenu={() => setIsMobileMenuOpen(true)} />
 
             <main className="px-3 py-4 pb-28 md:px-5 md:py-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5 lg:pb-6">
@@ -38,7 +49,7 @@ export function AppShell() {
 
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-background/74 p-4 backdrop-blur-sm transition dark:bg-slate-950/80 lg:hidden',
+          'fixed inset-0 z-40 bg-background p-4 transition dark:bg-slate-950/80 lg:hidden',
           isMobileMenuOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0',
@@ -50,8 +61,12 @@ export function AppShell() {
           aria-label="Fechar menu"
           onClick={() => setIsMobileMenuOpen(false)}
         />
-        <div className="relative mx-auto mt-6 max-w-sm">
-          <AppSidebar mobile onNavigate={() => setIsMobileMenuOpen(false)} />
+        <div className="relative ml-auto h-full max-w-72">
+          <AppSidebar
+            mobile
+            onNavigate={() => setIsMobileMenuOpen(false)}
+            onMobileClose={() => setIsMobileMenuOpen(false)}
+          />
         </div>
       </div>
     </div>

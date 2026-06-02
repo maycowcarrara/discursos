@@ -30,14 +30,14 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        'rounded-[18px] border border-border/70 bg-card px-4 py-4 shadow-[0_12px_26px_-20px_rgba(15,23,42,0.18)] dark:shadow-[0_14px_30px_-22px_rgba(2,8,23,0.82)]',
+        'rounded-xl border border-border bg-card px-4 py-4 shadow-sm',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+          <p className="text-[10px] font-black uppercase text-muted-foreground">{label}</p>
+          <p className="mt-2 text-2xl font-black leading-none text-foreground md:text-3xl">
             {value}
           </p>
         </div>

@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react'
 
 import { EmptyState } from '@/components/app/empty-state'
 import { PageHeader } from '@/components/app/page-header'
-import { SummaryStat } from '@/components/app/summary-stat'
+import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -127,6 +127,22 @@ function buildPeriodSummary(periodStart: string, periodEnd: string) {
   }
 
   return `Até ${formatPeriodBoundary(periodEnd)}`
+}
+
+function buildResultSummary(loadedCount: number, filteredCount: number) {
+  if (loadedCount === 0) {
+    return 'Nenhum registro carregado'
+  }
+
+  if (filteredCount === 0) {
+    return 'Nenhum item com os filtros atuais'
+  }
+
+  if (filteredCount !== loadedCount) {
+    return `${filteredCount} item(ns) após os filtros`
+  }
+
+  return `${loadedCount} registro(s) carregado(s)`
 }
 
 function buildTimelineSections(
@@ -281,6 +297,36 @@ export function HistoryPage() {
     }
   }, [filteredAssignments])
 
+  const visibleHeaderStats = [
+    metrics.confirmed > 0 ? (
+      <PageHeaderStat
+        key="confirmed"
+        label="Confirmados"
+        value={String(metrics.confirmed)}
+        icon={UsersRound}
+        tone="green"
+      />
+    ) : null,
+    metrics.pending > 0 ? (
+      <PageHeaderStat
+        key="pending"
+        label="Pendentes"
+        value={String(metrics.pending)}
+        icon={CalendarDays}
+        tone="amber"
+      />
+    ) : null,
+    metrics.congregations > 0 && metrics.total > 0 ? (
+      <PageHeaderStat
+        key="congregations"
+        label="Congregações"
+        value={String(metrics.congregations)}
+        icon={Church}
+        tone="slate"
+      />
+    ) : null,
+  ]
+
   function handleApplyPeriod() {
     if (
       draftPeriod.periodStart &&
@@ -332,8 +378,9 @@ export function HistoryPage() {
               {buildPeriodSummary(appliedPeriod.periodStart, appliedPeriod.periodEnd)}
             </Badge>
             <Badge variant="outline">
-              {loadedAssignments.length} registros carregados
+              {buildResultSummary(loadedAssignments.length, metrics.total)}
             </Badge>
+            {visibleHeaderStats}
           </>
         }
       />
@@ -350,19 +397,19 @@ export function HistoryPage() {
         </CardHeader>
         <CardContent className="space-y-5">
           {historyQuery.isError ? (
-            <div className="rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
               {getErrorMessage(historyQuery.error)}
             </div>
           ) : null}
 
           {filterOptionsError ? (
-            <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
               {getErrorMessage(filterOptionsError)}
             </div>
           ) : null}
 
           {periodFeedback ? (
-            <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
               {periodFeedback}
             </div>
           ) : null}
@@ -471,37 +518,6 @@ export function HistoryPage() {
         </CardContent>
       </Card>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryStat
-          label="Registros"
-          value={String(metrics.total)}
-          detail="Total após os filtros atuais."
-          icon={History}
-          tone="blue"
-        />
-        <SummaryStat
-          label="Confirmados"
-          value={String(metrics.confirmed)}
-          detail="Designações já aceitas."
-          icon={UsersRound}
-          tone="green"
-        />
-        <SummaryStat
-          label="Pendentes"
-          value={String(metrics.pending)}
-          detail="Ainda aguardando resposta."
-          icon={CalendarDays}
-          tone="amber"
-        />
-        <SummaryStat
-          label="Congregações"
-          value={String(metrics.congregations)}
-          detail="Origem e destino envolvidos."
-          icon={Church}
-          tone="slate"
-        />
-      </section>
-
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Linha do tempo</CardTitle>
@@ -515,7 +531,7 @@ export function HistoryPage() {
               {Array.from({ length: 4 }, (_, index) => (
                 <div
                   key={index}
-                  className="h-36 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                  className="h-36 animate-pulse rounded-xl border border-border bg-background"
                 />
               ))}
             </div>
@@ -561,7 +577,7 @@ export function HistoryPage() {
                       return (
                         <article
                           key={assignment.id}
-                          className="rounded-[18px] border border-border/70 bg-background px-5 py-4"
+                          className="rounded-xl border border-border bg-background px-5 py-4"
                         >
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="space-y-3">
@@ -615,7 +631,7 @@ export function HistoryPage() {
                           </div>
 
                           {assignment.notes ? (
-                            <div className="mt-4 rounded-[16px] border border-border/70 bg-secondary/45 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                            <div className="mt-4 rounded-xl border border-border bg-secondary/45 px-4 py-3 text-sm leading-6 text-muted-foreground">
                               {assignment.notes}
                             </div>
                           ) : null}
@@ -641,7 +657,7 @@ export function HistoryPage() {
                   </Button>
                 </div>
               ) : loadedAssignments.length > 0 ? (
-                <div className="rounded-[16px] border border-dashed border-border/80 bg-background px-4 py-3 text-center text-sm text-muted-foreground">
+                <div className="rounded-xl border border-dashed border-border bg-background px-4 py-3 text-center text-sm text-muted-foreground">
                   Todos os registros disponíveis para este filtro já foram carregados.
                 </div>
               ) : null}

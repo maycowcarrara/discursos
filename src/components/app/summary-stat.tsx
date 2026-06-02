@@ -8,6 +8,7 @@ type SummaryStatProps = {
   detail?: string
   icon?: LucideIcon
   tone?: 'blue' | 'amber' | 'green' | 'slate'
+  size?: 'default' | 'compact'
   className?: string
 }
 
@@ -24,35 +25,59 @@ export function SummaryStat({
   detail,
   icon: Icon,
   tone = 'blue',
+  size = 'default',
   className,
 }: SummaryStatProps) {
+  const isCompact = size === 'compact'
+
   return (
     <div
       className={cn(
-        'rounded-[18px] border border-border/70 bg-background px-4 py-4 shadow-[0_10px_22px_-18px_rgba(15,23,42,0.18)]',
+        'rounded-xl border border-border bg-card shadow-sm',
+        isCompact ? 'px-3.5 py-3 sm:px-4 sm:py-4' : 'px-4 py-4',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="mt-1.5 break-words text-2xl leading-tight font-semibold tracking-tight text-foreground sm:text-3xl">
+          <p
+            className={cn(
+              'font-black uppercase text-muted-foreground',
+              isCompact ? 'text-[9px] sm:text-[10px]' : 'text-[10px]',
+            )}
+          >
+            {label}
+          </p>
+          <p
+            className={cn(
+              'break-words leading-tight font-black text-foreground',
+              isCompact ? 'mt-1 text-xl sm:mt-1.5 sm:text-2xl' : 'mt-1.5 text-2xl',
+            )}
+          >
             {value}
           </p>
         </div>
         {Icon ? (
           <div
             className={cn(
-              'flex size-9 items-center justify-center rounded-xl',
+              'flex items-center justify-center rounded-xl',
+              isCompact ? 'size-8 sm:size-9' : 'size-9',
               toneClasses[tone],
             )}
           >
-            <Icon className="size-4" />
+            <Icon className={cn(isCompact ? 'size-3.5 sm:size-4' : 'size-4')} />
           </div>
         ) : null}
       </div>
       {detail ? (
-        <p className="mt-2 text-sm leading-5 text-muted-foreground">{detail}</p>
+        <p
+          className={cn(
+            'text-muted-foreground',
+            isCompact ? 'mt-1.5 text-xs leading-4 sm:mt-2 sm:text-sm sm:leading-5' : 'mt-2 text-sm leading-5',
+          )}
+        >
+          {detail}
+        </p>
       ) : null}
     </div>
   )

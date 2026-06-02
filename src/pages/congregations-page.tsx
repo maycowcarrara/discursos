@@ -17,7 +17,7 @@ import { z } from 'zod'
 
 import { EmptyState } from '@/components/app/empty-state'
 import { PageHeader } from '@/components/app/page-header'
-import { SummaryStat } from '@/components/app/summary-stat'
+import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -152,10 +152,10 @@ function getErrorMessage(error: unknown) {
 
 function getFeedbackContainerClassName(tone: 'success' | 'error') {
   if (tone === 'success') {
-    return 'rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
+    return 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  return 'rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+  return 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
 }
 
 function formatUpdatedAt(value: Date) {
@@ -445,6 +445,22 @@ export function CongregationsPage() {
         eyebrow="Cadastro"
         title="Congregações"
         description="Mantenha a base local fixa e cadastre separadamente as congregações externas usadas na operação."
+        meta={
+          <>
+            <PageHeaderStat
+              label="Externas"
+              value={String(totalExternalCongregations)}
+              icon={Users}
+              tone="blue"
+            />
+            <PageHeaderStat
+              label="Ativas"
+              value={String(totalCongregations)}
+              icon={MapPinned}
+              tone="slate"
+            />
+          </>
+        }
       />
 
       {feedback ? (
@@ -647,7 +663,7 @@ export function CongregationsPage() {
                   Lista das parceiras ativas, com busca local e paginação simples.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 self-start rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                 <span>Página</span>
                 <span className="font-medium text-foreground">
                   {visiblePage}/{totalPages}
@@ -683,7 +699,7 @@ export function CongregationsPage() {
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-44 animate-pulse rounded-[18px] border border-border/70 bg-background"
+                    className="h-44 animate-pulse rounded-xl border border-border bg-background"
                   />
                 ))}
               </div>
@@ -713,7 +729,7 @@ export function CongregationsPage() {
                 {paginatedExternalCongregations.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[18px] border border-border/70 bg-background p-4"
+                    className="rounded-xl border border-border bg-background p-4"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="flex min-w-0 gap-4">
@@ -781,7 +797,7 @@ export function CongregationsPage() {
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
                 Exibindo {paginatedExternalCongregations.length} item(ns) nesta página.
               </p>
@@ -808,23 +824,6 @@ export function CongregationsPage() {
             </div>
           </CardContent>
         </Card>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <SummaryStat
-          label="Externas"
-          value={String(totalExternalCongregations)}
-          detail="Parceiras usadas para visitantes e saídas."
-          icon={Users}
-          tone="blue"
-        />
-        <SummaryStat
-          label="Ativas"
-          value={String(totalCongregations)}
-          detail="Total disponível na base atual."
-          icon={MapPinned}
-          tone="slate"
-        />
       </section>
 
       <Card>
@@ -857,7 +856,7 @@ export function CongregationsPage() {
           </div>
 
           {!resolvedIsLocalCardExpanded ? (
-            <div className="grid gap-3 rounded-[16px] border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground sm:grid-cols-3">
+            <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-4 text-sm text-muted-foreground sm:grid-cols-3">
               {localCongregation ? (
                 <>
                   <div>
@@ -1026,7 +1025,7 @@ export function CongregationsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-muted-foreground">
                   {localCongregation
                     ? `Última atualização em ${formatUpdatedAt(

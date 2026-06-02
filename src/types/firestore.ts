@@ -1,6 +1,8 @@
 import { Timestamp } from 'firebase/firestore'
 import { z } from 'zod'
 
+import { themeCategoryValues } from '../lib/theme-categories.js'
+
 export const timestampSchema = z.custom<Timestamp>(
   (value) => value instanceof Timestamp,
   {
@@ -34,6 +36,7 @@ export const speakerStatusSchema = z.enum([
   'transferred',
   'inactive',
 ])
+export const themeCategorySchema = z.enum(themeCategoryValues)
 
 export const calendarEventTypeSchema = z.enum([
   'publicTalk',
@@ -143,6 +146,7 @@ export const speakerSchema = managedDocumentSchema.extend({
 export const themeSchema = managedDocumentSchema.extend({
   number: z.number().int(),
   title: z.string(),
+  category: themeCategorySchema.nullable().optional(),
   notes: z.string(),
 })
 
@@ -243,6 +247,7 @@ export type AuditLogDocument = z.infer<typeof auditLogSchema>
 
 export type SpeakerType = z.infer<typeof speakerTypeSchema>
 export type SpeakerStatus = z.infer<typeof speakerStatusSchema>
+export type ThemeCategory = z.infer<typeof themeCategorySchema>
 export type CalendarEventType = z.infer<typeof calendarEventTypeSchema>
 export type AssignmentStatus = z.infer<typeof assignmentStatusSchema>
 export type NotificationType = z.infer<typeof notificationTypeSchema>

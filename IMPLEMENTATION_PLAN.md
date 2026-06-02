@@ -29,14 +29,17 @@
 
 ## Etapa atual em andamento
 
-* Fechamento de lançamento V1
+* Refatoração V1 — fluxo direto de designação dos sábados
 
 ## Próxima etapa obrigatória
 
-* Executar o checklist operacional de lançamento V1
+* Validar o fluxo Dashboard → Designações em desktop e mobile antes do checklist operacional de lançamento V1
 
 ## Frente ativa de qualidade do lançamento
 
+* simplificação do modelo operacional para designar discurso público em cada sábado, escolhendo orador e tema
+* remoção da aba Agenda como cadastro genérico de eventos, preservando `calendarEvents` apenas como suporte técnico para sábados, exceções, bloqueios e Google Calendar
+* saneamento do catálogo oficial de temas com categorização por assunto e importação assistida do PDF oficial `S-99a_T`
 * saneamento completo de PT-BR com correção de acentuação, consistência editorial e mensagens mais claras
 * redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
 * reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
@@ -86,10 +89,10 @@
 
 ### Firestore — avanço da Fase 3
 
-* `calendarEvents` conectado ao app com navegação anual por ano
+* `calendarEvents` conectado ao app como base técnica de sábados, exceções e bloqueios por ano
 * `assignments` conectado ao app com leitura de histórico recente
-* agenda anual cruza `calendarEvents` com `assignments` para indicar onde já existe designação
-* páginas de agenda, designações e histórico deixaram de depender de mocks principais
+* visão operacional cruza `calendarEvents` com `assignments` para indicar onde já existe designação
+* páginas de dashboard, designações e histórico deixaram de depender de mocks principais
 
 ### Firestore — fechamento da Fase 3
 
@@ -157,6 +160,7 @@
 * destaque do próximo sábado com status, tipo de evento, orador, congregação e tema quando houver cobertura
 * painel de pendências priorizando lacunas de designação e confirmações ainda em aberto
 * listagem dos próximos eventos especiais, congressos, assembleias e visitas futuras
+* refatoração V1 removeu a aba Agenda da navegação e adicionou ação direta nos cards de sábado sem designação para abrir Designações com a data pré-selecionada
 
 ### Histórico — fechamento da Fase 10
 
@@ -230,7 +234,7 @@ Desenvolver um sistema web para gerenciamento de:
 * Oradores locais
 * Oradores visitantes
 * Congregações
-* Agenda anual
+* Sábados de reunião com designação de orador e tema
 * Histórico
 * Notificações automáticas
 * Integração Google Calendar
@@ -393,7 +397,7 @@ Entregas desta fase:
 * `congregations`, `themes` e `speakers` em leitura real
 * validação de documentos via tipagem estrita no frontend
 * `calendarEvents` em leitura real por ano
-* `assignments` em leitura real para agenda e histórico
+* `assignments` em leitura real para sábados de discurso e histórico
 * `notifications` em leitura real por status
 * `auditLogs` em leitura real recente
 
@@ -467,6 +471,7 @@ Campos:
 
 * número
 * título
+* categoria
 * ativo
 * observações
 
@@ -481,10 +486,19 @@ Entregas realizadas:
 * listagem administrativa real com itens ativos e inativos
 * edição em tela com controle de status ativo/inativo
 * exclusão lógica via `isActive`
-* busca local rápida por número, título e observações
+* categorização oficial por assunto no próprio cadastro de temas
+* busca local rápida por número, título, categoria e observações
 * auditoria para create, update e delete
 * reserva transacional de número para evitar duplicidade concorrente
 * bloqueio de inativação ou exclusão quando houver oradores ativos vinculados
+* importação administrativa do PDF oficial `S-99a_T` com preview, categorização automática e atualização por número
+
+Impacto técnico desta extensão:
+
+* `themes` passa a exigir o campo `category` como enum oficial do catálogo
+* a importação por PDF reutiliza `themeNumbers` e faz create/update por número, sem coleção paralela
+* notas existentes permanecem preservadas durante importações quando o PDF não traz observações equivalentes
+* bases legadas sem `category` devem ser regularizadas pela importação do PDF oficial antes do uso pleno dos novos filtros por categoria
 
 ---
 
@@ -563,12 +577,12 @@ Critérios:
 Entregas realizadas:
 
 * geração automática dos sábados de cada ano sob demanda
-* CRUD administrativo real de `calendarEvents` com validação estrita
+* `calendarEvents` mantido como estrutura técnica para sábados, exceções, bloqueios e sincronização externa
 * suporte aos tipos `publicTalk`, `congress`, `assembly`, `visit` e `special`
 * bloqueio automático de designações em congressos e assembleias
-* visão anual por mês com renderização implícita dos sábados regulares, mesmo sem documento salvo
+* renderização implícita dos sábados regulares, mesmo sem documento salvo
 * `calendarEvents` passa a representar exceções, bloqueios e personalizações do dia, além dos slots materializados sob demanda
-* exclusão lógica com preservação administrativa do histórico do calendário
+* a antiga tela de Agenda deixou de ser parte da navegação operacional; exceções futuras devem ser tratadas sem reintroduzir cadastro genérico no fluxo principal
 * auditoria para create, update e delete
 
 ---
@@ -624,10 +638,11 @@ Implementar:
 Entregas realizadas:
 
 * dashboard operacional com leituras reais do Firestore
-* próximos 8 sábados calculados a partir da agenda ativa
+* próximos 8 sábados calculados a partir dos slots ativos de discurso público
 * contagem de pendências, sem designação e aguardando resposta na janela imediata
 * destaque do próximo sábado com cobertura atual ou alerta de lacuna
 * listagem dos próximos eventos especiais com contexto operacional
+* cards de sábado sem designação apontam diretamente para nova designação com a data pré-selecionada
 
 ---
 

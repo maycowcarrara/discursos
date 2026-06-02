@@ -29,7 +29,7 @@ export function ThemeToggle({
       variant="outline"
       size={size ?? (children || showActionLabel ? 'default' : 'icon')}
       className={cn(
-        'border-border/70 bg-card/70 backdrop-blur dark:bg-card/80',
+        'border-border bg-card dark:bg-card',
         className,
       )}
       onClick={toggleTheme}
