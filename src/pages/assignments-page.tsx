@@ -3,8 +3,10 @@ import {
   ArrowRightLeft,
   CalendarDays,
   CheckCircle2,
+  CircleAlert,
   LogIn,
   LogOut,
+  MailWarning,
   MapPin,
   MapPinned,
   Mic2,
@@ -109,6 +111,7 @@ type FeedbackState =
 
 type MovementType = AssignmentMovementType
 type GoogleCalendarSyncTone = 'error' | 'neutral' | 'success' | 'warning'
+type FormSummaryChipTone = 'default' | 'pending' | 'success' | 'warning'
 
 type GoogleCalendarSyncState = {
   canRequestSync: boolean
@@ -192,6 +195,44 @@ function getFeedbackContainerClassName(tone: 'success' | 'error') {
   }
 
   return 'rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200'
+}
+
+function getFormSummaryChipClassName(tone: FormSummaryChipTone) {
+  if (tone === 'success') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
+  }
+
+  if (tone === 'warning') {
+    return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100'
+  }
+
+  if (tone === 'pending') {
+    return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300'
+  }
+
+  return 'border-border bg-background text-foreground'
+}
+
+function FormSummaryChip({
+  label,
+  tone = 'default',
+  value,
+}: {
+  label: string
+  tone?: FormSummaryChipTone
+  value: string
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs leading-5',
+        getFormSummaryChipClassName(tone),
+      )}
+    >
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate font-semibold">{value}</span>
+    </span>
+  )
 }
 
 function getLocalDateKey(date: Date) {
@@ -950,6 +991,28 @@ export function AssignmentsPage() {
     hasDestinations &&
     hasSpeakerOptions &&
     (!selectedSpeaker || hasThemeOptions)
+  const selectedMovementOption =
+    movementOptions.find((option) => option.value === movementType) ?? null
+  const selectedStatusOption =
+    editableStatusOptions.find((option) => option.value === watchedStatus) ?? null
+  const destinationSummaryLabel =
+    selectedDestinationCongregation?.name ??
+    (movementType === 'outgoing'
+      ? 'Escolha destino'
+      : baseLocalCongregation?.name ?? 'Sem congregação base')
+  const speakerSummaryLabel =
+    selectedSpeaker?.name ??
+    (needsVisitorCongregationFilter ? 'Escolha congregação' : 'Escolha orador')
+  const themeSummaryLabel = selectedTheme
+    ? `Tema ${selectedTheme.number}`
+    : selectedSpeaker
+      ? 'Escolha tema'
+      : 'Tema bloqueado'
+  const statusOptionsForForm = editingAssignment
+    ? editableStatusOptions
+    : editableStatusOptions.filter((option) =>
+        creatableStatusValues.includes(option.value),
+      )
   const isSubmitting =
     createAssignmentMutation.isPending ||
     updateAssignmentMutation.isPending ||
@@ -1475,7 +1538,7 @@ export function AssignmentsPage() {
 
       <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
-          <CardHeader className="gap-4">
+          <CardHeader className="gap-4 pb-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-2xl">
@@ -1497,14 +1560,46 @@ export function AssignmentsPage() {
                 </Button>
               ) : null}
             </div>
+
+            <div className="flex flex-wrap gap-2">
+              <FormSummaryChip
+                label="Tipo"
+                value={selectedMovementOption?.title ?? 'Designação'}
+              />
+              <FormSummaryChip
+                label="Data"
+                tone={selectedEvent ? 'success' : 'pending'}
+                value={
+                  selectedEvent
+                    ? formatTimestampDate(selectedEvent.date)
+                    : 'Escolha data'
+                }
+              />
+              <FormSummaryChip label="Destino" value={destinationSummaryLabel} />
+              <FormSummaryChip
+                label="Orador"
+                tone={selectedSpeaker ? 'success' : 'pending'}
+                value={speakerSummaryLabel}
+              />
+              <FormSummaryChip
+                label="Tema"
+                tone={selectedTheme ? 'success' : 'pending'}
+                value={themeSummaryLabel}
+              />
+              <FormSummaryChip
+                label="Status"
+                tone={watchedStatus === 'confirmed' ? 'success' : 'warning'}
+                value={selectedStatusOption?.title ?? assignmentStatusLabels[watchedStatus]}
+              />
+            </div>
           </CardHeader>
 
           <CardContent>
-            <form className="space-y-5" onSubmit={submitHandler}>
+            <form className="space-y-4" onSubmit={submitHandler}>
               <div className="grid gap-4">
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Tipo de designação</span>
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="grid gap-2 min-[440px]:grid-cols-3 sm:gap-3">
                     {movementOptions.map((option) => {
                       const Icon = option.icon
 
@@ -1513,7 +1608,7 @@ export function AssignmentsPage() {
                           key={option.value}
                           type="button"
                           className={cn(
-                            'min-h-[96px] rounded-xl border px-2.5 py-3 text-left text-sm transition sm:px-3.5',
+                            'min-h-[76px] rounded-xl border px-3 py-2.5 text-left text-sm transition sm:px-3.5 sm:py-3',
                             getMovementOptionToneClassName(
                               option.value,
                               movementType === option.value,
@@ -1532,7 +1627,7 @@ export function AssignmentsPage() {
                               )}
                             />
                           </span>
-                          <span className="mt-1 block text-xs leading-4 text-muted-foreground">
+                          <span className="mt-1 block text-xs leading-4 text-muted-foreground min-[440px]:line-clamp-2">
                             {option.description}
                           </span>
                         </button>
@@ -1586,7 +1681,24 @@ export function AssignmentsPage() {
                     ) : null}
                   </div>
 
-                  <p className="max-w-md text-xs leading-5 text-muted-foreground">
+                  <div className="flex flex-wrap gap-2">
+                    <FormSummaryChip
+                      label="Filtro"
+                      tone={isMeetingDayFilterUnavailable ? 'warning' : 'pending'}
+                      value={
+                        isMeetingDayFilterActive
+                          ? `${getMeetingDayHelperLabel(localMeetingDay)} da congregação local`
+                          : isMeetingDayFilterUnavailable
+                            ? `sem datas de ${localMeetingDay.toLowerCase()}`
+                            : 'calendário operacional'
+                      }
+                    />
+                    <FormSummaryChip
+                      label="Atalho"
+                      value={`${quickSelectableEvents.length} próximas datas`}
+                    />
+                  </div>
+                  <p className="sr-only">
                     {isMeetingDayFilterActive
                       ? `Mostrando somente ${getMeetingDayHelperLabel(localMeetingDay)} da congregação local.`
                       : isMeetingDayFilterUnavailable
@@ -1656,15 +1768,19 @@ export function AssignmentsPage() {
                       </select>
                     )}
 
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      {movementType === 'incoming'
-                        ? 'Primeiro escolha a congregação do visitante; depois a lista de irmãos ficará filtrada.'
-                        : movementType === 'outgoing'
-                          ? 'Aqui a congregação define para onde o irmão local vai discursar.'
-                          : baseLocalCongregation
-                            ? `A designação local sempre acontece em ${baseLocalCongregation.name}.`
-                            : 'Cadastre uma congregação local ativa para travar a designação base.'}
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <FormSummaryChip
+                        label="Destino"
+                        tone={selectedDestinationCongregation ? 'success' : 'pending'}
+                        value={
+                          movementType === 'incoming'
+                            ? selectedVisitorCongregation?.name ?? 'Escolha origem'
+                            : movementType === 'outgoing'
+                              ? selectedDestinationCongregation?.name ?? 'Escolha destino'
+                              : baseLocalCongregation?.name ?? 'Sem base local'
+                        }
+                      />
+                    </div>
                     {errors.localCongregationId ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
                         {errors.localCongregationId.message}
@@ -1696,15 +1812,21 @@ export function AssignmentsPage() {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      {movementType === 'incoming'
-                        ? selectedVisitorCongregation
-                          ? `Mostrando somente irmãos de ${selectedVisitorCongregation.name}.`
-                          : 'Selecione a congregação do visitante para liberar os irmãos.'
-                        : baseLocalCongregation
-                          ? `Mostrando apenas irmãos da congregação base ${baseLocalCongregation.name}.`
-                          : 'Cadastre a congregação base para listar os irmãos locais.'}
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <FormSummaryChip
+                        label="Lista"
+                        tone={hasSpeakerOptions ? 'success' : 'pending'}
+                        value={
+                          movementType === 'incoming'
+                            ? selectedVisitorCongregation
+                              ? `${speakerOptions.length} visitante(s)`
+                              : 'aguardando congregação'
+                            : baseLocalCongregation
+                              ? `${speakerOptions.length} local(is)`
+                              : 'sem base local'
+                        }
+                      />
+                    </div>
                     {errors.speakerId ? (
                       <p className="text-sm text-rose-600 dark:text-rose-300">
                         {errors.speakerId.message}
@@ -1715,7 +1837,31 @@ export function AssignmentsPage() {
 
                 <div className="space-y-2">
                   <input type="hidden" {...register('themeId')} />
-                  <div className="rounded-2xl border border-border bg-slate-50/80 p-4 dark:bg-background/70">
+                  <div className="rounded-xl border border-border bg-slate-50/80 p-3 dark:bg-background/70 sm:p-4">
+                    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-foreground">Tema</span>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          {selectedSpeaker
+                            ? 'Filtre e escolha um dos temas do orador.'
+                            : 'Escolha o orador para liberar os temas.'}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <FormSummaryChip
+                          label="Disponíveis"
+                          tone={selectedSpeaker ? 'success' : 'pending'}
+                          value={`${filteredSpeakerThemeOptions.length} tema(s)`}
+                        />
+                        {selectedTheme ? (
+                          <FormSummaryChip
+                            label="Categoria"
+                            value={getThemeCategoryLabel(selectedTheme.category)}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+
                     <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-end">
                       <label className="space-y-2">
                         <span className="text-sm font-medium text-foreground">Categoria</span>
@@ -1751,23 +1897,7 @@ export function AssignmentsPage() {
                       </label>
                     </div>
 
-                    <div className="mt-4 space-y-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <span className="text-sm font-medium text-foreground">Tema</span>
-                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                            {selectedSpeaker
-                              ? 'Escolha abaixo um dos temas liberados para o orador.'
-                              : 'Escolha primeiro o orador para liberar os temas.'}
-                          </p>
-                        </div>
-                        {selectedSpeaker ? (
-                          <Badge variant="outline" className="w-fit">
-                            {filteredSpeakerThemeOptions.length} tema(s)
-                          </Badge>
-                        ) : null}
-                      </div>
-
+                    <div className="mt-3 space-y-3">
                       {selectedTheme ? (
                         <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1788,7 +1918,7 @@ export function AssignmentsPage() {
 
                       {selectedSpeaker ? (
                         filteredSpeakerThemeOptions.length > 0 ? (
-                          <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                          <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
                             {filteredSpeakerThemeOptions.map((theme) => {
                               const isSelected = theme.id === watchedThemeId
 
@@ -1797,7 +1927,7 @@ export function AssignmentsPage() {
                                   key={theme.id}
                                   type="button"
                                   className={cn(
-                                    'w-full rounded-xl border px-4 py-3 text-left transition',
+                                    'w-full rounded-xl border px-3 py-2.5 text-left transition sm:px-4 sm:py-3',
                                     isSelected
                                       ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                                       : 'border-border bg-background text-muted-foreground hover:bg-accent',
@@ -1842,9 +1972,17 @@ export function AssignmentsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">Status</span>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {editableStatusOptions.map((option) => {
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-sm font-medium text-foreground">Status</span>
+                    {!editingAssignment ? (
+                      <FormSummaryChip
+                        label="Edição"
+                        value="recusado, cancelado e substituído"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {statusOptionsForForm.map((option) => {
                       const disabled =
                         !editingAssignment && !creatableStatusValues.includes(option.value)
 
@@ -1870,7 +2008,7 @@ export function AssignmentsPage() {
                           disabled={disabled}
                         >
                           <p className="font-medium text-foreground">{option.title}</p>
-                          <p className="mt-1 leading-6">{option.description}</p>
+                          <p className="mt-1 text-xs leading-5">{option.description}</p>
                         </button>
                       )
                     })}
@@ -1915,60 +2053,51 @@ export function AssignmentsPage() {
                 </div>
               ) : null}
 
-              {selectedEvent ? (
-                <div className="rounded-xl border border-border bg-background px-4 py-3 text-sm leading-6 text-muted-foreground">
-                  <p className="font-medium text-foreground">
-                    {calendarEventTypeLabels[selectedEvent.type]} em{' '}
-                    {formatTimestampDate(selectedEvent.date)}
-                  </p>
-                  <p className="mt-2">
-                    {selectedDestinationCongregation
-                      ? `Congregação de destino: ${selectedDestinationCongregation.name}.`
-                      : 'Selecione a congregação de destino para completar a designação.'}
-                  </p>
-                </div>
-              ) : null}
-
               {selectedSpeakerMissingEmail ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                  <p className="font-medium">
-                    Este orador ainda não possui e-mail cadastrado.
-                  </p>
-                  <p className="mt-2">
-                    A designação pode ser salva, mas os lembretes por e-mail e o convite no Google Calendar não poderão ser enviados até que o cadastro seja atualizado.
-                  </p>
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                  <MailWarning className="mt-0.5 size-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">Orador sem e-mail cadastrado</p>
+                    <p className="mt-1">
+                      Pode salvar, mas lembretes e convite do Google Calendar ficam pendentes até atualizar o cadastro.
+                    </p>
+                  </div>
                 </div>
               ) : null}
 
               {selectedEventCoveredByOtherAssignment ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                  <p className="font-medium">Esta data já possui cobertura operacional.</p>
-                  <p className="mt-2">
-                    {currentOperationalAssignment?.speakerName} esta ocupando o slot
-                    agora com status{' '}
-                    {currentOperationalAssignment
-                      ? assignmentStatusLabels[currentOperationalAssignment.status]
-                      : 'operacional'}
-                    .
-                  </p>
-                  {!editingAssignment && isAssignmentCoveringCalendarSlot(watchedStatus) ? (
-                    <p className="mt-2">
-                      Se você salvar uma nova designação pendente ou confirmada,
-                      a anterior será marcada como substituída automaticamente.
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                  <CircleAlert className="mt-0.5 size-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">Data já coberta</p>
+                    <p className="mt-1">
+                      {currentOperationalAssignment?.speakerName} está com status{' '}
+                      {currentOperationalAssignment
+                        ? assignmentStatusLabels[currentOperationalAssignment.status]
+                        : 'operacional'}
+                      .
                     </p>
-                  ) : null}
+                    {!editingAssignment && isAssignmentCoveringCalendarSlot(watchedStatus) ? (
+                      <p className="mt-1">
+                        Ao salvar, a designação anterior será marcada como substituída.
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
 
               {recentThemeUsage ? (
-                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
-                  <p className="font-medium">Atenção ao tema recente</p>
-                  <p className="mt-2">
-                    Tema {recentThemeUsage.themeNumber} foi usado em{' '}
-                    {formatTimestampDate(recentThemeUsage.eventDate)} por{' '}
-                    {recentThemeUsage.speakerName} para{' '}
-                    {recentThemeUsage.localCongregationName}.
-                  </p>
+                <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
+                  <CircleAlert className="mt-0.5 size-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">Tema usado recentemente</p>
+                    <p className="mt-1">
+                      Tema {recentThemeUsage.themeNumber}, em{' '}
+                      {formatTimestampDate(recentThemeUsage.eventDate)}, por{' '}
+                      {recentThemeUsage.speakerName} para{' '}
+                      {recentThemeUsage.localCongregationName}.
+                    </p>
+                  </div>
                 </div>
               ) : null}
 
