@@ -63,7 +63,6 @@ import {
   getThemeImportCategorySummary,
   type ParsedThemeCatalog,
 } from '@/utils/theme-catalog-import'
-import { parseThemeCatalogPdf } from '@/utils/theme-catalog-pdf'
 
 const selectClassName =
   'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring'
@@ -329,6 +328,7 @@ export function ThemesPage() {
     setIsParsingImport(true)
 
     try {
+      const { parseThemeCatalogPdf } = await import('@/utils/theme-catalog-pdf')
       const parsedCatalog = await parseThemeCatalogPdf(file)
       setImportCatalog(parsedCatalog)
     } catch (error) {

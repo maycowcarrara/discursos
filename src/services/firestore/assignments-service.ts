@@ -552,7 +552,7 @@ async function assertCalendarEventExists(id: string) {
   const implicitCalendarEvent = buildImplicitCalendarEventFromId(id)
 
   if (!implicitCalendarEvent) {
-    throw new Error('O evento selecionado nao esta mais disponivel na agenda ativa.')
+    throw new Error('O sábado selecionado nao esta mais disponivel no calendário ativo.')
   }
 
   return implicitCalendarEvent
@@ -641,7 +641,7 @@ function assertCalendarEventAllowsAssignments(
   calendarEvent: FirestoreRecord<CalendarEventDocument>,
 ) {
   if (!calendarEvent.isActive) {
-    throw new Error('O evento selecionado nao esta mais disponivel na agenda ativa.')
+    throw new Error('O sábado selecionado nao esta mais disponivel no calendário ativo.')
   }
 
   if (calendarEvent.blocksAssignments) {
@@ -655,6 +655,7 @@ async function runAssignmentSlotTransaction(options: {
   actorUid: string
   calendarEventId: string
   execute: (context: {
+    calendarEvent: FirestoreRecord<CalendarEventDocument>
     currentAssignments: Array<FirestoreRecord<AssignmentDocument>>
     now: Timestamp
     transaction: Transaction
@@ -671,7 +672,7 @@ async function runAssignmentSlotTransaction(options: {
       : buildImplicitCalendarEventFromId(options.calendarEventId)
 
     if (!lockedCalendarEvent) {
-      throw new Error('O evento selecionado nao esta mais disponivel na agenda ativa.')
+      throw new Error('O sábado selecionado nao esta mais disponivel no calendário ativo.')
     }
 
     assertCalendarEventAllowsAssignments(lockedCalendarEvent)
@@ -687,6 +688,7 @@ async function runAssignmentSlotTransaction(options: {
     const now = Timestamp.now()
 
     await options.execute({
+      calendarEvent: lockedCalendarEvent,
       currentAssignments,
       now,
       transaction,
@@ -871,9 +873,17 @@ export async function createAssignment({
   await runAssignmentSlotTransaction({
     actorUid,
     calendarEventId: entities.calendarEvent.id,
-    execute: async ({ currentAssignments, now, transaction }) => {
+    execute: async ({ calendarEvent, currentAssignments, now, transaction }) => {
       const operationalAssignments = getOperationalAssignments(currentAssignments)
-      const payload = buildAssignmentPayload(values, entities, now)
+      assertSpeakerAvailability(entities.speaker, calendarEvent.date)
+      const payload = buildAssignmentPayload(
+        values,
+        {
+          ...entities,
+          calendarEvent,
+        },
+        now,
+      )
       const assignmentDocument: AssignmentDocument = {
         ...payload,
         createdAt: now,
@@ -1111,7 +1121,7 @@ export async function updateAssignment({
       await runAssignmentSlotTransaction({
         actorUid,
         calendarEventId: entities.calendarEvent.id,
-        execute: async ({ currentAssignments, now, transaction }) => {
+        execute: async ({ calendarEvent, currentAssignments, now, transaction }) => {
           const conflictingOperationalAssignments = getOperationalAssignments(
             currentAssignments,
             id,
@@ -1123,7 +1133,16 @@ export async function updateAssignment({
             )
           }
 
-          const payload = buildAssignmentPayload(values, entities, now, existingAssignment)
+          assertSpeakerAvailability(entities.speaker, calendarEvent.date)
+          const payload = buildAssignmentPayload(
+            values,
+            {
+              ...entities,
+              calendarEvent,
+            },
+            now,
+            existingAssignment,
+          )
 
           updatedAssignment = {
             ...stripRecordId(existingAssignment),

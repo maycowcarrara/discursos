@@ -130,7 +130,7 @@ function assertSpeakerTypeMatchesCongregation(
 ) {
   if (speakerType === 'local' && !congregation.isLocal) {
     throw new Error(
-      'Oradores locais precisam ficar vinculados a uma congregacao local da propria agenda.',
+      'Oradores locais precisam ficar vinculados a uma congregacao local da propria programacao.',
     )
   }
 

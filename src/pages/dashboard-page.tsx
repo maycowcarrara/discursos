@@ -116,7 +116,12 @@ function normalizePhoneLink(phone: string) {
 }
 
 function getAssignmentCreateHref(entry: DashboardSaturdayEntryView) {
-  return `/designacoes?evento=${encodeURIComponent(entry.event.id)}`
+  const params = new URLSearchParams({
+    evento: entry.event.id,
+    ano: String(entry.event.year),
+  })
+
+  return `/designacoes?${params.toString()}`
 }
 
 const cardClass =

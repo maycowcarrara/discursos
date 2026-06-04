@@ -197,7 +197,7 @@ function assertCalendarEventMatchesTargetYear(
 ) {
   if (calendarEvent.year !== targetYear) {
     throw new Error(
-      `Use uma data dentro de ${targetYear} para manter a agenda no ano correto.`,
+      `Use uma data dentro de ${targetYear} para manter o calendário no ano correto.`,
     )
   }
 }
@@ -528,7 +528,7 @@ export async function deleteCalendarEvent({
   )
 
   if (!existingCalendarEvent || !existingCalendarEvent.isActive) {
-    throw new Error('O evento selecionado nao esta mais ativo na agenda.')
+    throw new Error('O evento selecionado nao esta mais ativo no calendário.')
   }
 
   const assignmentCount = await getAssignmentCountByCalendarEventId(id)

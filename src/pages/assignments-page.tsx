@@ -220,6 +220,28 @@ function getLocalDateKey(date: Date) {
   return `${year}-${month}-${day}`
 }
 
+function getYearFromImplicitCalendarEventId(id: string) {
+  const match = /^active-(\d{4})-\d{2}-\d{2}$/.exec(id)
+
+  if (!match) {
+    return null
+  }
+
+  const year = Number.parseInt(match[1] ?? '', 10)
+
+  return Number.isInteger(year) ? year : null
+}
+
+function parseCalendarEventYearParam(value: string | null) {
+  if (!value) {
+    return null
+  }
+
+  const year = Number.parseInt(value, 10)
+
+  return Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : null
+}
+
 function normalizeMeetingDayLabel(value: string) {
   return value
     .trim()
@@ -586,9 +608,28 @@ export function AssignmentsPage() {
   const appSettingsQuery = useAppSettingsQuery()
   const calendarSettingsQuery = useCalendarSettingsQuery()
   const activeYear = appSettingsQuery.data?.defaultYear ?? currentYear
+  const requestedCalendarEventId = searchParams.get('evento')?.trim() ?? ''
+  const requestedCalendarEventYearParam = parseCalendarEventYearParam(
+    searchParams.get('ano'),
+  )
+  const requestedCalendarEventYear =
+    requestedCalendarEventId.length > 0
+      ? requestedCalendarEventYearParam ??
+        getYearFromImplicitCalendarEventId(requestedCalendarEventId)
+      : null
+  const shouldLoadRequestedCalendarEventYear =
+    requestedCalendarEventYear !== null && requestedCalendarEventYear !== activeYear
   const assignmentsQuery = useAssignmentsByYearQuery(activeYear)
+  const requestedYearAssignmentsQuery = useAssignmentsByYearQuery(
+    requestedCalendarEventYear ?? activeYear,
+    shouldLoadRequestedCalendarEventYear,
+  )
   const recentAssignmentsQuery = useRecentAssignmentsQuery(24)
   const calendarEventsQuery = useCalendarEventsQuery(activeYear)
+  const requestedYearCalendarEventsQuery = useCalendarEventsQuery(
+    requestedCalendarEventYear ?? activeYear,
+    shouldLoadRequestedCalendarEventYear,
+  )
   const congregationsQuery = useCongregationsManagementQuery()
   const speakersQuery = useSpeakersManagementQuery()
   const themesQuery = useThemesManagementQuery()
@@ -596,11 +637,15 @@ export function AssignmentsPage() {
   const updateAssignmentMutation = useUpdateAssignmentMutation()
   const confirmAssignmentMutation = useConfirmAssignmentMutation()
   const requestManualGoogleCalendarSyncMutation = useRequestManualGoogleCalendarSyncMutation()
-  const requestedCalendarEventId = searchParams.get('evento')?.trim() ?? ''
 
   const assignments = useMemo(
     () =>
-      [...(assignmentsQuery.data ?? [])].sort((left, right) => {
+      [
+        ...(assignmentsQuery.data ?? []),
+        ...(shouldLoadRequestedCalendarEventYear
+          ? requestedYearAssignmentsQuery.data ?? []
+          : []),
+      ].sort((left, right) => {
         const eventDateDifference = right.eventDate.toMillis() - left.eventDate.toMillis()
 
         if (eventDateDifference !== 0) {
@@ -609,7 +654,11 @@ export function AssignmentsPage() {
 
         return right.updatedAt.toMillis() - left.updatedAt.toMillis()
       }),
-    [assignmentsQuery.data],
+    [
+      assignmentsQuery.data,
+      requestedYearAssignmentsQuery.data,
+      shouldLoadRequestedCalendarEventYear,
+    ],
   )
   const recentAssignments = useMemo(
     () =>
@@ -626,8 +675,17 @@ export function AssignmentsPage() {
   )
   const eligibleEvents = useMemo(
     () =>
-      (calendarEventsQuery.data ?? []).filter((event) => !event.blocksAssignments && event.isActive),
-    [calendarEventsQuery.data],
+      [
+        ...(calendarEventsQuery.data ?? []),
+        ...(shouldLoadRequestedCalendarEventYear
+          ? requestedYearCalendarEventsQuery.data ?? []
+          : []),
+      ].filter((event) => !event.blocksAssignments && event.isActive),
+    [
+      calendarEventsQuery.data,
+      requestedYearCalendarEventsQuery.data,
+      shouldLoadRequestedCalendarEventYear,
+    ],
   )
   const congregationsById = useMemo(
     () => new Map((congregationsQuery.data ?? []).map((item) => [item.id, item])),
@@ -1010,8 +1068,10 @@ export function AssignmentsPage() {
 
   const totalQueryErrors = [
     assignmentsQuery.error,
+    requestedYearAssignmentsQuery.error,
     recentAssignmentsQuery.error,
     calendarEventsQuery.error,
+    requestedYearCalendarEventsQuery.error,
     calendarSettingsQuery.error,
     congregationsQuery.error,
     speakersQuery.error,

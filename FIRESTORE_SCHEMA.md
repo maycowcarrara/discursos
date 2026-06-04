@@ -541,9 +541,11 @@ Os índices abaixo devem ser tratados como base inicial da V1.
 * `isActive ASC, date ASC`
 * `year ASC, date ASC`
 * `type ASC, date ASC`
+* `type ASC` — índice simples automático usado ao reenfileirar eventos especiais após mudança de configuração
 * `blocksAssignments ASC, date ASC`
 * `googleCalendarSyncStatus ASC, date ASC`
 * `googleCalendarSyncStatus ASC, googleCalendarSyncScheduledFor ASC`
+* `googleCalendarEventId ASC` — índice simples automático usado para localizar eventos já publicados, inclusive sábados `publicTalk` publicados por designação operacional
 
 ### `assignments`
 
@@ -553,7 +555,7 @@ Os índices abaixo devem ser tratados como base inicial da V1.
 * `localCongregationId ASC, eventDate DESC`
 * `originCongregationId ASC, eventDate DESC`
 * `status ASC, eventDate ASC`
-* `calendarEventId ASC`
+* `calendarEventId ASC` — índice simples automático usado para localizar designações de um sábado
 
 ### `notifications`
 

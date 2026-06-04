@@ -185,14 +185,28 @@ Próxima etapa obrigatória:
 * ciclos técnicos do worker deixam de sobrescrever `calendarEvents.updatedAt`
 * login administrativo simplificado para Google Popup
 * `settings/adminAccess` passa a guardar a allowlist administrativa reconciliada pelo worker
+* hardening pós-varredura corrige o handoff Dashboard → Designações na virada de ano, evita snapshot desatualizado em designações transacionais e mantém o parser de PDF fora do carregamento inicial de Temas
+* mudanças de configuração do Google Calendar reenfileiram eventos especiais ativos e eventos já publicados sem ler todos os sábados materializados
 
 ## Próxima etapa
+
+### Validação visual V1
+
+Status atual:
+
+* obrigatória antes do checklist operacional de lançamento
+
+Executar:
+
+* validar Dashboard → Designações em desktop
+* validar Dashboard → Designações em mobile
+* confirmar que cards de sábados de outro ano abrem Designações com a data correta
 
 ### Checklist de lançamento V1
 
 Status atual:
 
-* obrigatório antes da abertura ao uso
+* próximo passo após a validação visual V1
 
 Executar:
 
@@ -214,7 +228,7 @@ Entregue até o início da Fase 12:
 * histórico permanente com filtros por período, tema, orador e congregação
 * fila automática de notificações com EmailJS, Cloudflare Worker, cron e confirmação pública por link
 
-Próximo passo obrigatório:
+Próximo passo obrigatório depois da validação visual:
 
 * executar o checklist operacional de lançamento V1
 

@@ -39,6 +39,10 @@
 
 * simplificação do modelo operacional para designar discurso público em cada sábado, escolhendo orador e tema
 * remoção da aba Agenda como cadastro genérico de eventos, preservando `calendarEvents` apenas como suporte técnico para sábados, exceções, bloqueios e Google Calendar
+* hardening pós-varredura do fluxo Dashboard → Designações, incluindo handoff de virada de ano com `evento` + `ano`
+* hardening transacional de designações para salvar snapshots a partir do sábado relido dentro da transação
+* otimização do carregamento de PDF de temas para baixar o parser apenas quando houver importação
+* reenfileiramento de Google Calendar em mudança de configuração restrito a eventos especiais ativos e eventos já publicados
 * saneamento do catálogo oficial de temas com categorização por assunto e importação assistida do PDF oficial `S-99a_T`
 * saneamento completo de PT-BR com correção de acentuação, consistência editorial e mensagens mais claras
 * redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
@@ -151,6 +155,7 @@
 * bloqueios de RN001, RN002, RN003 e RN006 aplicados na camada de serviço
 * alerta de uso recente de tema na própria tela para apoiar a RN007
 * cancelamento via mudança de status, sem exclusão de documentos em `assignments`
+* criação e edição passam a usar o sábado relido dentro da transação para evitar snapshot operacional desatualizado
 
 ### Dashboard — fechamento da Fase 9
 
@@ -161,6 +166,7 @@
 * painel de pendências priorizando lacunas de designação e confirmações ainda em aberto
 * listagem dos próximos eventos especiais, congressos, assembleias e visitas futuras
 * refatoração V1 removeu a aba Agenda da navegação e adicionou ação direta nos cards de sábado sem designação para abrir Designações com a data pré-selecionada
+* handoff Dashboard → Designações passa a carregar corretamente sábados de outro ano em janelas de virada
 
 ### Histórico — fechamento da Fase 10
 
@@ -194,6 +200,7 @@
 * a tela de configurações passa a exibir a configuração e o último estado global de sincronização da Fase 12
 * o Google Calendar deixa de espelhar slots vazios e passa a publicar apenas `orador visitante`, `discurso fora` e `evento especial`
 * quando o cadastro em `speakers` tiver `email`, o orador envolvido entra como convidado em `orador visitante` e `discurso fora`, com convites, updates e cancelamentos enviados pelo Google Calendar
+* mudanças de configuração do Google Calendar reenfileiram eventos especiais ativos e eventos já publicados sem varrer todos os sábados materializados
 
 Impacto técnico desta abertura de fase:
 

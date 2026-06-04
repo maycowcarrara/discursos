@@ -5,8 +5,10 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore'
 
@@ -147,9 +149,8 @@ function shouldQueueCalendarEventForConfigurationChange(
   calendarEvent: CalendarEventDocument,
 ) {
   return (
-    calendarEvent.type === 'special' ||
-    (calendarEvent.type !== 'publicTalk' &&
-      Boolean(calendarEvent.googleCalendarEventId))
+    (calendarEvent.type === 'special' && calendarEvent.isActive) ||
+    Boolean(calendarEvent.googleCalendarEventId)
   )
 }
 
@@ -161,6 +162,35 @@ function chunkItems<T>(items: T[], chunkSize: number) {
   }
 
   return chunks
+}
+
+async function listCalendarEventsForConfigurationQueue() {
+  const calendarEventsRef = collection(firebaseDb, 'calendarEvents')
+  const [specialEventsSnapshot, remotelyLinkedEventsSnapshot] = await Promise.all([
+    getDocs(query(calendarEventsRef, where('type', '==', 'special'))),
+    getDocs(query(calendarEventsRef, where('googleCalendarEventId', '>', ''))),
+  ])
+  const queuedEventsById = new Map<string, ReturnType<typeof doc>>()
+  const calendarEventSnapshots = [
+    ...specialEventsSnapshot.docs,
+    ...remotelyLinkedEventsSnapshot.docs,
+  ]
+
+  calendarEventSnapshots.forEach((calendarEventSnapshot) => {
+    const parsedCalendarEvent = calendarEventSchema.safeParse({
+      id: calendarEventSnapshot.id,
+      ...calendarEventSnapshot.data(),
+    })
+
+    if (
+      parsedCalendarEvent.success &&
+      shouldQueueCalendarEventForConfigurationChange(parsedCalendarEvent.data)
+    ) {
+      queuedEventsById.set(calendarEventSnapshot.id, calendarEventSnapshot.ref)
+    }
+  })
+
+  return Array.from(queuedEventsById.values()).map((ref) => ({ ref }))
 }
 
 export async function saveAppSettings({
@@ -225,23 +255,7 @@ export async function saveCalendarSettings({
     ref: ReturnType<typeof doc>
   }> = []
   if (queueFullSync) {
-    const calendarEventsSnapshot = await getDocs(collection(firebaseDb, 'calendarEvents'))
-
-    calendarEventsSnapshot.docs.forEach((calendarEventSnapshot) => {
-      const parsedCalendarEvent = calendarEventSchema.safeParse({
-        id: calendarEventSnapshot.id,
-        ...calendarEventSnapshot.data(),
-      })
-
-      if (
-        parsedCalendarEvent.success &&
-        shouldQueueCalendarEventForConfigurationChange(parsedCalendarEvent.data)
-      ) {
-        calendarEventsToQueue.push({
-          ref: calendarEventSnapshot.ref,
-        })
-      }
-    })
+    calendarEventsToQueue.push(...(await listCalendarEventsForConfigurationQueue()))
   }
 
   const batch = writeBatch(firebaseDb)

@@ -833,7 +833,7 @@ export function CongregationsPage() {
             <div>
               <CardTitle className="text-2xl">Congregação local</CardTitle>
               <CardDescription>
-                Cadastro fixo da congregação que recebe a agenda principal.
+                Cadastro fixo da congregação que recebe os discursos.
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1029,7 +1029,7 @@ export function CongregationsPage() {
                     ? `Última atualização em ${formatUpdatedAt(
                         localCongregation.updatedAt.toDate(),
                       )}.`
-                    : 'Preencha estes dados para criar a base local fixa da agenda.'}
+                    : 'Preencha estes dados para criar a base local fixa da programação.'}
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Button

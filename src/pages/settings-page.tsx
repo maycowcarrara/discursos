@@ -366,7 +366,7 @@ export function SettingsPage() {
                     <CalendarDays className="size-5" />
                   </div>
                   <div>
-                    <CardTitle>Integração com agenda</CardTitle>
+                    <CardTitle>Integração Google Calendar</CardTitle>
                     <CardDescription>
                       Use o calendário remoto das publicações.
                     </CardDescription>
@@ -396,7 +396,7 @@ export function SettingsPage() {
                   />
                   <div className="space-y-1">
                     <span className="text-sm font-medium text-foreground">
-                      Ativar sincronização com a agenda
+                      Ativar sincronização com o Google Calendar
                     </span>
                     <p className="text-sm leading-6 text-muted-foreground">
                       Quando ligado, a automação processa os envios manuais.
@@ -468,7 +468,7 @@ export function SettingsPage() {
 
                 {saveCalendarSettingsMutation.isSuccess ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                    Ajustes da agenda salvos com sucesso.
+                    Ajustes do Google Calendar salvos com sucesso.
                   </div>
                 ) : null}
 

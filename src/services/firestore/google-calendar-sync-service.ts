@@ -62,7 +62,7 @@ export async function requestManualGoogleCalendarSync({
   const normalizedCalendarEventId = calendarEventId.trim()
 
   if (normalizedCalendarEventId.length === 0) {
-    throw new Error('Selecione um evento valido para sincronizar com a agenda.')
+    throw new Error('Selecione um evento valido para sincronizar com o Google Calendar.')
   }
 
   const calendarEventRef = doc(firebaseDb, 'calendarEvents', normalizedCalendarEventId)
@@ -72,7 +72,7 @@ export async function requestManualGoogleCalendarSync({
   )
 
   if (!existingCalendarEvent || !existingCalendarEvent.isActive) {
-    throw new Error('O evento vinculado a esta designacao nao esta mais ativo na agenda.')
+    throw new Error('O evento vinculado a esta designacao nao esta mais ativo no calendário.')
   }
 
   const now = Timestamp.now()
