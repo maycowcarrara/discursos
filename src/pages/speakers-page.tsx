@@ -253,6 +253,7 @@ export function SpeakersPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | SpeakerStatus>('all')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
+  const [formThemeSearch, setFormThemeSearch] = useState('')
 
   const speakersQuery = useSpeakersManagementQuery()
   const congregationsQuery = useCongregationsQuery()
@@ -302,6 +303,14 @@ export function SpeakersPage() {
       selectedType === 'local' ? congregation.isLocal : !congregation.isLocal,
   )
   const activeThemes = activeThemesQuery.data ?? []
+  const filteredFormThemes = activeThemes.filter((theme) => {
+    const term = formThemeSearch.trim().toLowerCase()
+    if (!term) return true
+    return (
+      String(theme.number).includes(term) ||
+      theme.title.toLowerCase().includes(term)
+    )
+  })
   const themesById = new Map(
     (themesManagementQuery.data ?? []).map((theme) => [theme.id, theme]),
   )
@@ -393,6 +402,7 @@ export function SpeakersPage() {
       }
 
       setEditingId(null)
+      setFormThemeSearch('')
       reset(defaultSpeakerFormValues)
     } catch (error) {
       setFeedback({
@@ -469,6 +479,7 @@ export function SpeakersPage() {
 
       if (editingId === id) {
         setEditingId(null)
+        setFormThemeSearch('')
         reset(defaultSpeakerFormValues)
       }
 
@@ -487,6 +498,7 @@ export function SpeakersPage() {
   function handleStartCreate() {
     setEditingId(null)
     setFeedback(null)
+    setFormThemeSearch('')
     reset(defaultSpeakerFormValues)
   }
 
@@ -495,6 +507,7 @@ export function SpeakersPage() {
 
     setEditingId(id)
     setFeedback(null)
+    setFormThemeSearch('')
 
     if (speaker) {
       reset(toSpeakerFormValues(speaker))
@@ -751,11 +764,22 @@ export function SpeakersPage() {
                 ) : null}
 
                 <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-foreground">Temas</span>
+                  <div className="flex flex-col gap-2 min-[440px]:flex-row min-[440px]:items-center min-[440px]:justify-between">
+                    <span className="text-sm font-medium text-foreground">Temas vinculados ({selectedThemeIds.length} selecionados)</span>
                     <span className="text-xs text-muted-foreground">
                       Somente temas ativos entram em novas designações
                     </span>
+                  </div>
+
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      className="pl-9 h-10 text-sm"
+                      placeholder="Buscar por número ou título do tema..."
+                      value={formThemeSearch}
+                      onChange={(e) => setFormThemeSearch(e.target.value)}
+                    />
                   </div>
 
                   {hasInvalidSelectedThemes ? (
@@ -789,37 +813,45 @@ export function SpeakersPage() {
                     </div>
                   ) : null}
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {activeThemes.map((theme) => {
-                      const isSelected = selectedThemeIds.includes(theme.id)
+                  <div className="max-h-[300px] overflow-y-auto rounded-xl border border-border p-3 bg-muted/5">
+                    {filteredFormThemes.length > 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {filteredFormThemes.map((theme) => {
+                          const isSelected = selectedThemeIds.includes(theme.id)
 
-                      return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          className={`rounded-xl border px-4 py-3.5 text-left transition ${
-                            isSelected
-                              ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                              : 'border-border bg-background hover:bg-accent'
-                          }`}
-                          onClick={() => handleToggleTheme(theme.id)}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-medium text-foreground">
-                                Tema {theme.number}
-                              </p>
-                              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                {theme.title}
-                              </p>
-                            </div>
-                            <Badge variant={theme.isActive ? 'default' : 'outline'}>
-                              {theme.isActive ? 'Ativo' : 'Inativo'}
-                            </Badge>
-                          </div>
-                        </button>
-                      )
-                    })}
+                          return (
+                            <button
+                              key={theme.id}
+                              type="button"
+                              className={`rounded-xl border px-4 py-3 text-left transition ${
+                                isSelected
+                                  ? 'border-primary bg-primary/10 text-foreground shadow-sm'
+                                  : 'border-border bg-background hover:bg-accent'
+                              }`}
+                              onClick={() => handleToggleTheme(theme.id)}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-foreground">
+                                    Tema {theme.number}
+                                  </p>
+                                  <p className="mt-1 text-xs leading-5 text-muted-foreground line-clamp-2">
+                                    {theme.title}
+                                  </p>
+                                </div>
+                                <Badge variant={theme.isActive ? 'default' : 'outline'} className="shrink-0 text-[10px] px-1.5 py-0 h-4">
+                                  {theme.isActive ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-sm text-muted-foreground">
+                        Nenhum tema encontrado para "{formThemeSearch}".
+                      </div>
+                    )}
                   </div>
 
                   {errors.themeIds ? (

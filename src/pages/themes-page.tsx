@@ -734,7 +734,7 @@ export function ThemesPage() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                      <div className="flex flex-col gap-2 sm:flex-row lg:flex-row lg:items-center">
                         <Button
                           variant="outline"
                           onClick={() => handleStartEdit(theme.id)}

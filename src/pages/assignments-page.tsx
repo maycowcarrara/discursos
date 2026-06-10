@@ -1717,7 +1717,7 @@ export function AssignmentsPage() {
                   <span className="text-sm font-medium text-foreground">Data da reunião</span>
                   <input type="hidden" {...register('calendarEventId')} />
 
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
                     <label className="block">
                       <span className="sr-only">Data da reunião</span>
                       <div className="relative w-full sm:max-w-[220px]">

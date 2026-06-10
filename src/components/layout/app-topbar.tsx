@@ -1,20 +1,15 @@
 import { useContext, useSyncExternalStore } from 'react'
 
-import { Building2, CalendarClock, CalendarDays, Clock3, Menu } from 'lucide-react'
+import { Building2, CalendarClock, CalendarDays, Clock3 } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 
 import { PageHeaderContext } from '@/components/app/page-header-context'
-import { Button } from '@/components/ui/button'
 import { getNavigationItem } from '@/config/navigation'
 import { useAppSettingsQuery } from '@/hooks/use-app-settings'
 import { useCongregationsQuery } from '@/hooks/use-congregations'
 import { cn } from '@/lib/utils'
 
-type AppTopbarProps = {
-  onOpenMobileMenu: () => void
-}
-
-export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
+export function AppTopbar() {
   const location = useLocation()
   const currentItem = getNavigationItem(location.pathname)
   const pageHeaderStore = useContext(PageHeaderContext)
@@ -75,16 +70,6 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <Button
-                className="rounded-xl border-border bg-white shadow-sm lg:hidden dark:bg-card"
-                variant="outline"
-                size="icon"
-                onClick={onOpenMobileMenu}
-                aria-label="Abrir menu"
-              >
-                <Menu className="size-4" />
-              </Button>
-
               <h1 className="truncate text-base font-black text-slate-800 dark:text-foreground sm:text-lg">
                 {currentItem.label}
               </h1>
@@ -158,16 +143,6 @@ export function AppTopbar({ onOpenMobileMenu }: AppTopbarProps) {
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <Button
-                className="mt-0.5 rounded-xl border-border bg-white shadow-sm lg:hidden dark:bg-card"
-                variant="outline"
-                size="icon"
-                onClick={onOpenMobileMenu}
-                aria-label="Abrir menu"
-              >
-                <Menu className="size-4" />
-              </Button>
-
               <div className="min-w-0">
                 <h1 className="truncate text-base font-black text-slate-800 dark:text-foreground sm:text-lg">
                   {title}
