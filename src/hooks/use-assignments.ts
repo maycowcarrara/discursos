@@ -125,9 +125,9 @@ export function useRequestManualAssignmentConfirmationEmailMutation() {
 
   return useMutation({
     mutationFn: async (input: RequestManualAssignmentConfirmationEmailInput) => {
-      const notificationId = await requestManualAssignmentConfirmationEmail(input)
+      const delivery = await requestManualAssignmentConfirmationEmail(input)
 
-      return processManualNotificationImmediately(notificationId)
+      return processManualNotificationImmediately(delivery)
     },
     onSettled: async () => {
       await invalidateAssignmentQueries(queryClient)

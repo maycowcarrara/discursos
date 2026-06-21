@@ -166,7 +166,7 @@ Próxima etapa obrigatória:
 * confirmação por WhatsApp abre mensagem completa com data, discurso, origem, destino, endereço, dia e horário da reunião
 * lembrete único de 4 dias com agendamento tipado e cobertura por teste
 * edição operacional com automação ativa reenvia a confirmação com `ATUALIZAÇÃO` no assunto, sem duplicar envios em sincronizações de status
-* o botão manual de e-mail aciona processamento imediato no worker e mostra o resultado na mesma ação
+* o botão manual de e-mail envia diretamente pelo EmailJS no navegador, sem fila ou worker, e mostra o resultado na mesma ação
 * confirmação pública por link em rota dedicada do frontend, com boa leitura em desktop e mobile
 * worker Cloudflare com cron exclusivo para o lembrete de 4 dias, sem expor segredos no frontend
 * confirmação por link validada no worker antes de gravar `confirmedAt`, `responseAt` e auditoria
@@ -186,7 +186,7 @@ Próxima etapa obrigatória:
 * o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account da Fase 11
 * a tela de configurações passa a exibir a configuração e o último estado global de sincronização
 * o Google Calendar passa a publicar, mediante ação manual, qualquer designação operacional (`orador visitante`, `designação local` ou `discurso fora`), além de `evento especial`, sem espelhar slots vazios
-* quando `speakers.email` existir, as designações publicadas passam a incluir o orador como convidado, com convite, atualização e cancelamento enviados pelo Google Calendar
+* quando `speakers.email` existir, o worker tenta incluir o orador como convidado; sem delegação de domínio para a service account, publica o evento sem convidado para não bloquear a ação manual
 * fila leve protegida com `claim` temporário, retentativa persistida e ID remoto determinístico
 * regras do Firestore e frontend restritos à custom claim `admin = true`
 * ciclos técnicos do worker deixam de sobrescrever `calendarEvents.updatedAt`

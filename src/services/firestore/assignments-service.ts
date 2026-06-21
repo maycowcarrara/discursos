@@ -82,6 +82,26 @@ export type RequestManualAssignmentConfirmationEmailInput = {
   actorName?: string | null
 }
 
+export type ManualAssignmentEmailDelivery = {
+  actorName: string | null
+  actorUid: string
+  assignmentId: string
+  confirmationToken: string
+  eventDate: Date
+  eventType: AssignmentDocument['eventType']
+  localCongregationName: string
+  notes: string
+  notificationId: string
+  organizationName: string
+  originCongregationName: string
+  recipientEmail: string
+  speakerName: string
+  status: AssignmentStatus
+  subject: string
+  themeNumber: number
+  themeTitle: string
+}
+
 export type ListAssignmentHistoryInput = {
   periodStart?: string | null
   periodEnd?: string | null
@@ -1430,7 +1450,7 @@ export async function requestManualAssignmentConfirmationEmail({
     throw new Error('Cadastre o e-mail do orador antes de solicitar o envio.')
   }
 
-  await runTransaction(firebaseDb, async (transaction) => {
+  return runTransaction(firebaseDb, async (transaction) => {
     const assignmentSnapshot = await transaction.get(assignmentRef)
 
     if (!assignmentSnapshot.exists()) {
@@ -1489,15 +1509,14 @@ export async function requestManualAssignmentConfirmationEmail({
     }
 
     transaction.set(assignmentRef, assignmentWithManualRequest)
-    transaction.set(
-      manualNotificationRef,
-      buildManualConfirmationEmailNotificationDocument({
-        assignment,
-        organizationName,
-        recipientEmail: speakerForNotifications.email,
-        now,
-      }),
-    )
+    const manualNotification = buildManualConfirmationEmailNotificationDocument({
+      assignment,
+      organizationName,
+      recipientEmail: speakerForNotifications.email,
+      now,
+    })
+
+    transaction.set(manualNotificationRef, manualNotification)
     transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
       entityType: 'notification',
       entityId: manualNotificationRef.id,
@@ -1518,7 +1537,25 @@ export async function requestManualAssignmentConfirmationEmail({
       },
       createdAt: now,
     })
-  })
 
-  return getAssignmentNotificationRef(id, 'manual').id
+    return {
+      actorName: actorName ?? null,
+      actorUid,
+      assignmentId: id,
+      confirmationToken: assignmentWithManualRequest.confirmationToken ?? '',
+      eventDate: assignment.eventDate.toDate(),
+      eventType: assignment.eventType,
+      localCongregationName: assignment.localCongregationName,
+      notes: assignment.notes,
+      notificationId: manualNotificationRef.id,
+      organizationName,
+      originCongregationName: assignment.originCongregationName,
+      recipientEmail: manualNotification.recipientEmail,
+      speakerName: assignment.speakerName,
+      status: assignment.status,
+      subject: manualNotification.subject,
+      themeNumber: assignment.themeNumber,
+      themeTitle: assignment.themeTitle,
+    } satisfies ManualAssignmentEmailDelivery
+  })
 }

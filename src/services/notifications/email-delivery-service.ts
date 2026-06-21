@@ -1,75 +1,122 @@
+import { Timestamp, doc, writeBatch } from 'firebase/firestore'
+
 import { env } from '@/config/env'
-import { firebaseAuth } from '@/lib/firebase-auth'
+import { firebaseDb } from '@/lib/firebase-db'
+import { appendAuditLogToBatch } from '@/services/firestore/audit-logs-service'
+import type { ManualAssignmentEmailDelivery } from '@/services/firestore/assignments-service'
+import { assignmentStatusLabels, calendarEventTypeLabels } from '@/utils/calendar-events'
 
 export type ImmediateEmailProcessResult = 'sent'
 
-function getWorkerUrl() {
-  const workerBaseUrl = env.VITE_PUBLIC_NOTIFICATION_WORKER_URL?.trim()
+const emailJsSendUrl = 'https://api.emailjs.com/api/v1.0/email/send'
+const confirmationBaseUrl = 'https://discursos-15891.web.app/confirmacao/designacao'
 
-  if (!workerBaseUrl) {
-    throw new Error(
-      'Configure VITE_PUBLIC_NOTIFICATION_WORKER_URL para habilitar o envio imediato.',
-    )
+function getEmailJsConfiguration() {
+  const serviceId = env.VITE_EMAILJS_SERVICE_ID?.trim()
+  const templateId = env.VITE_EMAILJS_TEMPLATE_ID?.trim()
+  const publicKey = env.VITE_EMAILJS_PUBLIC_KEY?.trim()
+
+  if (!serviceId || !templateId || !publicKey) {
+    throw new Error('Configure as credenciais do EmailJS para habilitar o envio imediato.')
   }
 
-  return new URL(
-    '/api/admin/process-manual-notification',
-    `${workerBaseUrl.replace(/\/+$/, '')}/`,
-  )
+  return { publicKey, serviceId, templateId }
 }
 
-function getResponseMessage(payload: unknown) {
-  if (
-    payload &&
-    typeof payload === 'object' &&
-    'message' in payload &&
-    typeof payload.message === 'string'
-  ) {
-    return payload.message
-  }
+function buildConfirmationUrl(delivery: ManualAssignmentEmailDelivery) {
+  const url = new URL(confirmationBaseUrl)
 
-  return 'Não foi possível enviar o e-mail de confirmação.'
+  url.searchParams.set('assignmentId', delivery.assignmentId)
+  url.searchParams.set('token', delivery.confirmationToken)
+
+  return url.toString()
 }
 
-function getProcessResult(payload: unknown): ImmediateEmailProcessResult | null {
-  if (
-    payload &&
-    typeof payload === 'object' &&
-    'result' in payload &&
-    payload.result === 'sent'
-  ) {
-    return payload.result
-  }
+async function updateDeliveryStatus(
+  delivery: ManualAssignmentEmailDelivery,
+  result: { errorMessage: string | null; status: 'failed' | 'sent' },
+) {
+  const now = Timestamp.now()
+  const batch = writeBatch(firebaseDb)
+  const notificationRef = doc(firebaseDb, 'notifications', delivery.notificationId)
 
-  return null
-}
-
-export async function processManualNotificationImmediately(notificationId: string) {
-  const user = firebaseAuth.currentUser
-
-  if (!user) {
-    throw new Error('Sua sessão expirou. Entre novamente para continuar.')
-  }
-
-  const response = await fetch(getWorkerUrl(), {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${await user.getIdToken()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ notificationId }),
+  batch.update(notificationRef, {
+    errorMessage: result.errorMessage,
+    retryCount: result.status === 'failed' ? 1 : 0,
+    sentAt: result.status === 'sent' ? now : null,
+    status: result.status,
+    updatedAt: now,
   })
-  const payload = (await response.json().catch(() => null)) as unknown
+  appendAuditLogToBatch(batch, {
+    entityType: 'notification',
+    entityId: delivery.notificationId,
+    action: 'sync',
+    actorUid: delivery.actorUid,
+    actorName: delivery.actorName,
+    before: { status: 'pending' },
+    after: {
+      errorMessage: result.errorMessage,
+      status: result.status,
+    },
+    metadata: {
+      source: 'assignments-phase-11',
+      trigger: 'manual-confirmation-email-browser',
+    },
+    createdAt: now,
+  })
+
+  await batch.commit()
+}
+
+export async function processManualNotificationImmediately(
+  delivery: ManualAssignmentEmailDelivery,
+): Promise<ImmediateEmailProcessResult> {
+  const configuration = getEmailJsConfiguration()
+  let response: Response
+
+  try {
+    response = await fetch(emailJsSendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: configuration.serviceId,
+        template_id: configuration.templateId,
+        user_id: configuration.publicKey,
+        template_params: {
+          email_subject: delivery.subject,
+          confirmation_url: buildConfirmationUrl(delivery),
+          event_date: new Intl.DateTimeFormat('pt-BR', {
+            dateStyle: 'full',
+            timeZone: 'America/Sao_Paulo',
+          }).format(delivery.eventDate),
+          event_type_label: calendarEventTypeLabels[delivery.eventType],
+          local_congregation_name: delivery.localCongregationName,
+          notes: delivery.notes,
+          notification_type_label: 'Envio manual',
+          organization_name: delivery.organizationName.trim() || 'Congregação local',
+          origin_congregation_name: delivery.originCongregationName,
+          reply_to: '',
+          speaker_name: delivery.speakerName,
+          status_label: assignmentStatusLabels[delivery.status],
+          theme_number: String(delivery.themeNumber),
+          theme_title: delivery.themeTitle,
+          to_email: delivery.recipientEmail,
+        },
+      }),
+    })
+  } catch {
+    const message = 'Não foi possível acessar o serviço de e-mail.'
+    await updateDeliveryStatus(delivery, { errorMessage: message, status: 'failed' })
+    throw new Error(message)
+  }
 
   if (!response.ok) {
-    throw new Error(getResponseMessage(payload))
+    const message = (await response.text()).trim() || 'Falha ao enviar e-mail pelo EmailJS.'
+    await updateDeliveryStatus(delivery, { errorMessage: message, status: 'failed' })
+    throw new Error(message)
   }
 
-  const result = getProcessResult(payload)
+  await updateDeliveryStatus(delivery, { errorMessage: null, status: 'sent' })
 
-  if (!result) {
-    throw new Error('O worker retornou uma resposta de envio inválida.')
-  }
-
-  return result
+  return 'sent'
 }

@@ -349,14 +349,38 @@ export default {
       requestUrl.pathname === '/api/admin/process-manual-notification' &&
       request.method === 'POST'
     ) {
-      return handleProcessManualNotification(request, env)
+      try {
+        return await handleProcessManualNotification(request, env)
+      } catch (error) {
+        console.error('Falha no envio manual imediato.', error)
+
+        return jsonResponse(
+          {
+            error: 'manual_notification_internal_error',
+            message: getErrorMessage(error),
+          },
+          500,
+        )
+      }
     }
 
     if (
       requestUrl.pathname === '/api/admin/process-calendar-sync' &&
       request.method === 'POST'
     ) {
-      return handleProcessManualCalendarSync(request, env)
+      try {
+        return await handleProcessManualCalendarSync(request, env)
+      } catch (error) {
+        console.error('Falha na sincronização imediata da agenda.', error)
+
+        return jsonResponse(
+          {
+            error: 'calendar_sync_internal_error',
+            message: getErrorMessage(error),
+          },
+          500,
+        )
+      }
     }
 
     if (requestUrl.pathname === '/api/internal/process-calendar-sync') {
@@ -1417,7 +1441,7 @@ async function createGoogleCalendarEvent(
   eventId: string,
   payload: JsonObject,
 ) {
-  const response = await fetch(
+  let response = await fetch(
     `${googleCalendarBaseUrl}/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=all`,
     {
       method: 'POST',
@@ -1428,6 +1452,20 @@ async function createGoogleCalendarEvent(
       }),
     },
   )
+
+  if (await shouldRetryCalendarRequestWithoutAttendees(response)) {
+    response = await fetch(
+      `${googleCalendarBaseUrl}/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=none`,
+      {
+        method: 'POST',
+        headers: await buildGoogleApiHeaders(env),
+        body: JSON.stringify({
+          ...removeCalendarAttendees(payload),
+          id: eventId,
+        }),
+      },
+    )
+  }
 
   if (response.status === 409) {
     await updateGoogleCalendarEvent(env, calendarId, eventId, payload)
@@ -1465,7 +1503,7 @@ async function updateGoogleCalendarEvent(
   eventId: string,
   payload: JsonObject,
 ) {
-  const response = await fetch(
+  let response = await fetch(
     `${googleCalendarBaseUrl}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
     {
       method: 'PATCH',
@@ -1474,11 +1512,38 @@ async function updateGoogleCalendarEvent(
     },
   )
 
+  if (await shouldRetryCalendarRequestWithoutAttendees(response)) {
+    response = await fetch(
+      `${googleCalendarBaseUrl}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=none`,
+      {
+        method: 'PATCH',
+        headers: await buildGoogleApiHeaders(env),
+        body: JSON.stringify(removeCalendarAttendees(payload)),
+      },
+    )
+  }
+
   if (!response.ok) {
     const errorText = await response.text()
 
     throw new Error(`Falha ao atualizar evento no Google Calendar: ${errorText}`)
   }
+}
+
+async function shouldRetryCalendarRequestWithoutAttendees(response: Response) {
+  if (response.status !== 403) {
+    return false
+  }
+
+  const errorText = await response.clone().text()
+
+  return errorText.includes('forbiddenForServiceAccounts')
+}
+
+function removeCalendarAttendees(payload: JsonObject) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([key]) => key !== 'attendees'),
+  ) as JsonObject
 }
 
 async function deleteGoogleCalendarEvent(
@@ -3142,10 +3207,22 @@ function buildUpdateWrite(
       ? {
           exists: currentDocument,
         }
-      : currentDocument
+      : currentDocument.updateTime
+        ? {
+            updateTime: currentDocument.updateTime,
+          }
+        : typeof currentDocument.exists === 'boolean'
+          ? {
+              exists: currentDocument.exists,
+            }
+          : undefined
 
   return {
-    currentDocument: normalizedCurrentDocument,
+    ...(normalizedCurrentDocument
+      ? {
+          currentDocument: normalizedCurrentDocument,
+        }
+      : {}),
     update: {
       fields,
       name: buildDocumentName(env, path),

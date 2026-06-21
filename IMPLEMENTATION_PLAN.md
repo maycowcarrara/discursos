@@ -66,6 +66,7 @@
 * Navegação mobile com atalhos principais no rodapé e prioridade real para toque
 * Frontend padronizado para deploy em Firebase Hosting
 * PWA instalável com nome, ícones próprios e suporte ao shell offline
+* versão instalada visível no perfil do usuário, com verificação manual da versão publicada e atualização do app
 
 ### Autenticação
 
@@ -184,7 +185,7 @@
 
 * fila automática de `notifications` restrita ao lembrete de 4 dias; confirmações usam ação imediata
 * criação de designação passa a deixar notificações automáticas por e-mail desligadas por padrão, com ativação explícita no cadastro
-* envio manual de e-mail de confirmação é processado imediatamente pelo worker, uma única vez por revisão da designação; uma edição libera novo envio com os dados atualizados
+* envio manual de e-mail de confirmação é processado imediatamente pelo navegador via EmailJS, sem fila nem worker, uma única vez por revisão da designação; uma edição libera novo envio com os dados atualizados
 * falhas definitivas no envio manual não consomem a ação única; o painel permite tentar novamente até ocorrer envio ou existir uma solicitação pendente
 * ações de e-mail ficam bloqueadas no painel quando as chaves públicas do EmailJS não estão configuradas no frontend
 * botão de confirmação por WhatsApp disponível quando o orador possui WhatsApp, reutilizando a mesma mensagem completa no dashboard e na lista de designações
@@ -198,7 +199,7 @@
 * sincronização da fila preservando estado já processado quando a identidade de entrega não muda, e reabrindo o ciclo apenas quando a entrega realmente muda
 * edição de designação operacional com automação ativa reabre explicitamente a confirmação, usando `ATUALIZAÇÃO` no assunto sem depender da variação de `scheduledFor`
 * lembrete de 4 dias é cancelado quando a automação for ativada depois do horário oficial, sem disparo tardio com texto incorreto
-* botão de envio manual solicita processamento imediato em endpoint administrativo autenticado do worker, mantendo o cron como contingência
+* botão de envio manual chama o EmailJS diretamente e registra `sent` ou `failed` no Firestore na mesma ação; o cron não processa notificações `manual`
 * dashboard e Designações acompanham mudanças da fila em tempo real para refletir envio, falha e bloqueio sem recarregar a página
 * scripts `test:notifications`, `typecheck:worker`, `deploy:worker` e `worker:deploy` adicionados para a operação da fase
 
@@ -212,7 +213,7 @@
 * o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account já adotada na Fase 11
 * a tela de configurações passa a exibir a configuração e o último estado global de sincronização da Fase 12
 * o Google Calendar deixa de espelhar slots vazios e passa a publicar, mediante ação manual, qualquer designação operacional (`orador visitante`, `designação local` ou `discurso fora`), além de `evento especial`
-* quando o cadastro em `speakers` tiver `email`, o orador envolvido entra como convidado nas designações publicadas, com convites, updates e cancelamentos enviados pelo Google Calendar
+* quando o cadastro em `speakers` tiver `email`, o worker tenta incluir o orador como convidado; se a service account não tiver delegação no domínio, publica o evento sem convidado para não bloquear a sincronização manual
 * mudanças de configuração do Google Calendar reenfileiram eventos especiais ativos e eventos já publicados sem varrer todos os sábados materializados
 
 Impacto técnico desta abertura de fase:
@@ -717,7 +718,7 @@ Entregas realizadas:
 * sincronização automática da fila `notifications` a partir das mudanças em `assignments`
 * lembrete automático único de 4 dias com agendamento oficial; confirmação somente por ação imediata do botão
 * confirmação pública por link com validação no worker e escrita segura no Firestore
-* endpoint administrativo imediato para confirmação manual e cron exclusivo para `reminder4d`
+* envio manual direto do navegador para o EmailJS e cron exclusivo para `reminder4d`
 * segredos mantidos fora do frontend, via variáveis do worker e service account do Firebase
 * template único do EmailJS alimentado por `email_subject`, `to_email`, `reply_to`, `notification_type_label`, `organization_name`, `speaker_name`, `event_date`, `event_type_label`, `local_congregation_name`, `origin_congregation_name`, `theme_number`, `theme_title`, `status_label`, `notes` e `confirmation_url`
 

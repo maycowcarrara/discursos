@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { ChevronLeft, LogOut, MicVocal, X } from 'lucide-react'
+import { ChevronLeft, LoaderCircle, LogOut, MicVocal, RefreshCw, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { AvatarBadge } from '@/components/app/avatar-badge'
 import { useAuth } from '@/components/auth/use-auth'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/use-toast'
 import {
   Modal,
   ModalBody,
@@ -18,6 +19,11 @@ import {
 import { navigationItems } from '@/config/navigation'
 import { cn } from '@/lib/utils'
 import { logout } from '@/services/auth/auth-service'
+import {
+  appVersion,
+  getPublishedAppVersion,
+  refreshApp,
+} from '@/services/app/app-version-service'
 
 type AppSidebarProps = {
   mobile?: boolean
@@ -35,8 +41,10 @@ export function AppSidebar({
   onDesktopExpandedChange,
 }: AppSidebarProps) {
   const { user } = useAuth()
+  const toast = useToast()
   const [logoutConfirmationOpen, setLogoutConfirmationOpen] = useState(false)
   const [logoutPending, setLogoutPending] = useState(false)
+  const [versionCheckPending, setVersionCheckPending] = useState(false)
   const expanded = mobile || desktopExpanded
 
   async function handleConfirmLogout() {
@@ -50,6 +58,33 @@ export function AppSidebar({
       await logout()
     } catch {
       setLogoutPending(false)
+    }
+  }
+
+  async function handleVersionCheck() {
+    if (versionCheckPending) {
+      return
+    }
+
+    setVersionCheckPending(true)
+
+    try {
+      const publishedVersion = await getPublishedAppVersion()
+
+      if (publishedVersion === appVersion) {
+        toast.success(`Você já está usando a versão mais recente (${appVersion}).`)
+        setVersionCheckPending(false)
+        return
+      }
+
+      toast.success(`Nova versão ${publishedVersion} encontrada. Atualizando...`)
+      await refreshApp()
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Não foi possível verificar a versão agora.'
+      toast.error(message)
+      setVersionCheckPending(false)
     }
   }
 
@@ -172,6 +207,27 @@ export function AppSidebar({
                     {user?.email ?? 'admin@congregacao.org'}
                   </p>
                 </div>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 border-t border-blue-600/45 pt-2">
+                <span className="shrink-0 text-[10px] font-semibold text-blue-100">
+                  Versão {appVersion}
+                </span>
+                <button
+                  type="button"
+                  className="flex min-w-0 items-center gap-1 rounded px-1.5 py-1 text-[10px] font-semibold text-blue-100 transition-colors hover:bg-blue-700 hover:text-white disabled:cursor-wait disabled:opacity-70"
+                  onClick={() => void handleVersionCheck()}
+                  disabled={versionCheckPending}
+                  aria-label="Verificar versão e atualizar"
+                >
+                  {versionCheckPending ? (
+                    <LoaderCircle className="size-3 shrink-0 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-3 shrink-0" />
+                  )}
+                  <span className="truncate">
+                    {versionCheckPending ? 'Verificando...' : 'Verificar e atualizar'}
+                  </span>
+                </button>
               </div>
             </div>
           ) : null}

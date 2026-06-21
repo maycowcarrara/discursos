@@ -379,7 +379,7 @@ Observações:
 * slots regulares de `publicTalk` não precisam existir no Firestore para aparecer no Dashboard/Designações e também não devem ser publicados no Google Calendar enquanto estiverem sem designação
 * qualquer designação operacional `pending` ou `confirmed` — `orador visitante`, `designação local` ou `discurso fora` — pode ser publicada manualmente no Google Calendar
 * edições, cancelamentos e substituições exigem nova solicitação manual para atualizar ou remover o evento remoto já vinculado
-* quando houver publicação de uma designação, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e adicionar o orador como convidado no Google Calendar
+* quando houver publicação de uma designação, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e tentar adicionar o orador como convidado; se a service account não tiver delegação no domínio, o evento é publicado sem convidado
 * não criar coleção paralela como `events`, `schedules` ou `annualCalendar`
 
 ### 6. `assignments`
