@@ -206,7 +206,7 @@
 
 * `settings/calendar` passa a ser documento real do Firestore para ativação da integração, `calendarId`, horário padrão e duração padrão
 * `calendarEvents` passa a armazenar o vínculo remoto com Google Calendar e o estado oficial de sincronização
-* mudanças em `calendarEvents` continuam podendo marcar pendências técnicas, enquanto `assignments` operacionais passam a depender de solicitação manual pelo botão `Sincronizar com agenda`
+* mudanças em `calendarEvents` continuam registrando o estado técnico, enquanto `assignments` operacionais são sincronizadas imediatamente pelo botão `Sincronizar Agenda`
 * a última aprovação manual passa a ficar registrada em `calendarEvents.googleCalendarManualSyncRequestedAt`, para que publicação, atualização ou remoção operacional não aconteçam sem novo clique
 * `settings/calendar.configurationUpdatedAt` passa a distinguir alteração real de configuração dos ciclos internos do worker
 * o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account já adotada na Fase 11

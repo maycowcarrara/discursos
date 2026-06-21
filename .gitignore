@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 .firebase
+.wrangler
+**/.wrangler
 .env
 .env.*
 !.env.example
