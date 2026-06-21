@@ -1,7 +1,7 @@
 {
   "name": "discursos",
   "private": true,
-  "version": "1.0.20",
+  "version": "1.0.23",
   "type": "module",
   "scripts": {
     "dev": "node scripts/bump-version.mjs && vite",

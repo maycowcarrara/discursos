@@ -65,16 +65,20 @@ const commonCongregationFormFields = {
     .string()
     .trim()
     .regex(/^\d{2}:\d{2}$/, 'Informe o horário no formato HH:MM.'),
-  publicTalkCoordinatorContact: z.string().trim(),
+  publicTalkCoordinatorName: z.string().trim(),
+  publicTalkCoordinatorPhone: z
+    .string()
+    .trim()
+    .refine(validateOptionalPhone, 'Informe um telefone válido.'),
+  publicTalkCoordinatorEmail: z
+    .string()
+    .trim()
+    .refine(validateOptionalEmail, 'Informe um e-mail válido.'),
   notes: z.string().trim(),
 }
 
 const localCongregationFormSchema = z.object({
   ...commonCongregationFormFields,
-  publicTalkCoordinatorContact: z
-    .string()
-    .trim()
-    .min(3, 'Informe o contato do coordenador de discursos.'),
   isLocal: z.literal(true),
 })
 
@@ -125,6 +129,16 @@ const meetingDayOptions = [
   'Domingo',
 ] as const
 
+const emailValidationSchema = z.string().email()
+
+function validateOptionalEmail(value: string) {
+  return value.length === 0 || emailValidationSchema.safeParse(value).success
+}
+
+function validateOptionalPhone(value: string) {
+  return value.length === 0 || value.replace(/\D/g, '').length >= 8
+}
+
 const defaultLocalCongregationFormValues: LocalCongregationFormValues = {
   ...defaultCongregationFormValues,
   isLocal: true,
@@ -132,7 +146,6 @@ const defaultLocalCongregationFormValues: LocalCongregationFormValues = {
 
 const defaultExternalCongregationFormValues: ExternalCongregationFormValues = {
   ...defaultCongregationFormValues,
-  publicTalkCoordinatorContact: '',
   isLocal: false,
 }
 
@@ -166,6 +179,17 @@ function formatUpdatedAt(value: Date) {
   })
 }
 
+function getCoordinatorName(congregation: {
+  publicTalkCoordinatorContact: string
+  publicTalkCoordinatorName: string
+}) {
+  return congregation.publicTalkCoordinatorName || congregation.publicTalkCoordinatorContact
+}
+
+function getOptionalMetadataValue(value: string, fallback: string) {
+  return value.trim() || fallback
+}
+
 function toLocalCongregationFormValues(
   congregation: Parameters<typeof toCongregationFormValues>[0],
 ): LocalCongregationFormValues {
@@ -184,7 +208,6 @@ function toExternalCongregationFormValues(
 ): ExternalCongregationFormValues {
   return {
     ...toCongregationFormValues(congregation),
-    publicTalkCoordinatorContact: '',
     isLocal: false,
   }
 }
@@ -247,6 +270,9 @@ export function CongregationsPage() {
       item.state,
       item.address,
       item.meetingDay,
+      getCoordinatorName(item),
+      item.publicTalkCoordinatorPhone,
+      item.publicTalkCoordinatorEmail,
     ]
       .join(' ')
       .toLowerCase()
@@ -337,7 +363,6 @@ export function CongregationsPage() {
 
     const externalValues: ExternalCongregationFormValues = {
       ...values,
-      publicTalkCoordinatorContact: '',
       isLocal: false,
     }
 
@@ -608,6 +633,80 @@ export function CongregationsPage() {
                   </label>
                 </div>
 
+                <div className="rounded-2xl border border-border bg-muted/10 p-4">
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold text-foreground">
+                      Responsável pelo arranjo de discursos
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Campos opcionais para facilitar contato com a congregação.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-foreground">
+                        Nome
+                        <span className="font-normal text-muted-foreground">
+                          {' '}
+                          opcional
+                        </span>
+                      </span>
+                      <Input
+                        placeholder="Ex.: João Silva"
+                        {...registerExternal('publicTalkCoordinatorName')}
+                      />
+                      {externalErrors.publicTalkCoordinatorName ? (
+                        <p className="text-sm text-rose-600 dark:text-rose-300">
+                          {externalErrors.publicTalkCoordinatorName.message}
+                        </p>
+                      ) : null}
+                    </label>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">
+                          Telefone
+                          <span className="font-normal text-muted-foreground">
+                            {' '}
+                            opcional
+                          </span>
+                        </span>
+                        <Input
+                          inputMode="tel"
+                          placeholder="(63) 99999-0000"
+                          {...registerExternal('publicTalkCoordinatorPhone')}
+                        />
+                        {externalErrors.publicTalkCoordinatorPhone ? (
+                          <p className="text-sm text-rose-600 dark:text-rose-300">
+                            {externalErrors.publicTalkCoordinatorPhone.message}
+                          </p>
+                        ) : null}
+                      </label>
+
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">
+                          E-mail
+                          <span className="font-normal text-muted-foreground">
+                            {' '}
+                            opcional
+                          </span>
+                        </span>
+                        <Input
+                          type="email"
+                          placeholder="responsavel@exemplo.com"
+                          {...registerExternal('publicTalkCoordinatorEmail')}
+                        />
+                        {externalErrors.publicTalkCoordinatorEmail ? (
+                          <p className="text-sm text-rose-600 dark:text-rose-300">
+                            {externalErrors.publicTalkCoordinatorEmail.message}
+                          </p>
+                        ) : null}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Observações</span>
                   <Textarea
@@ -727,11 +826,18 @@ export function CongregationsPage() {
             !congregationsQuery.isError &&
             paginatedExternalCongregations.length > 0 ? (
               <div className="space-y-3">
-                {paginatedExternalCongregations.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-border bg-background p-4"
-                  >
+                {paginatedExternalCongregations.map((item) => {
+                  const coordinatorName = getCoordinatorName(item)
+                  const hasCoordinatorContact =
+                    coordinatorName ||
+                    item.publicTalkCoordinatorPhone ||
+                    item.publicTalkCoordinatorEmail
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-border bg-background p-4"
+                    >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="flex min-w-0 gap-4">
                         <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -753,6 +859,47 @@ export function CongregationsPage() {
                           <p className="mt-4 text-sm leading-6 text-muted-foreground">
                             {item.address}
                           </p>
+                          {hasCoordinatorContact ? (
+                            <div className="mt-4 rounded-xl border border-border/70 bg-muted/10 px-4 py-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Arranjo de discursos
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+                                <MetadataChip
+                                  label="Responsável"
+                                  value={getOptionalMetadataValue(
+                                    coordinatorName,
+                                    'Sem nome',
+                                  )}
+                                  tone={coordinatorName ? 'default' : 'pending'}
+                                />
+                                <MetadataChip
+                                  label="Telefone"
+                                  value={getOptionalMetadataValue(
+                                    item.publicTalkCoordinatorPhone,
+                                    'Sem telefone',
+                                  )}
+                                  tone={
+                                    item.publicTalkCoordinatorPhone
+                                      ? 'default'
+                                      : 'pending'
+                                  }
+                                />
+                                <MetadataChip
+                                  label="E-mail"
+                                  value={getOptionalMetadataValue(
+                                    item.publicTalkCoordinatorEmail,
+                                    'Sem e-mail',
+                                  )}
+                                  tone={
+                                    item.publicTalkCoordinatorEmail
+                                      ? 'default'
+                                      : 'pending'
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ) : null}
                           {item.notes ? (
                             <p className="mt-3 text-sm leading-6 text-muted-foreground">
                               {item.notes}
@@ -794,7 +941,8 @@ export function CongregationsPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             ) : null}
 
@@ -868,6 +1016,14 @@ export function CongregationsPage() {
                   <MetadataChip
                     label="Reunião"
                     value={`${localCongregation.meetingDay}, ${localCongregation.meetingTime}`}
+                  />
+                  <MetadataChip
+                    label="Responsável"
+                    value={getOptionalMetadataValue(
+                      getCoordinatorName(localCongregation),
+                      'Não informado',
+                    )}
+                    tone={getCoordinatorName(localCongregation) ? 'default' : 'pending'}
                   />
                   <MetadataChip
                     label="Atualizada"
@@ -993,20 +1149,79 @@ export function CongregationsPage() {
                     </label>
                   </div>
 
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">
-                      Contato do coordenador de discursos
-                    </span>
-                    <Input
-                      placeholder="Nome, telefone ou e-mail"
-                      {...registerLocal('publicTalkCoordinatorContact')}
-                    />
-                    {localErrors.publicTalkCoordinatorContact ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {localErrors.publicTalkCoordinatorContact.message}
+                  <div className="rounded-2xl border border-border bg-muted/10 p-4">
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold text-foreground">
+                        Responsável pelo arranjo de discursos
                       </p>
-                    ) : null}
-                  </label>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Campos opcionais para facilitar contato na operação.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4">
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">
+                          Nome
+                          <span className="font-normal text-muted-foreground">
+                            {' '}
+                            opcional
+                          </span>
+                        </span>
+                        <Input
+                          placeholder="Ex.: João Silva"
+                          {...registerLocal('publicTalkCoordinatorName')}
+                        />
+                        {localErrors.publicTalkCoordinatorName ? (
+                          <p className="text-sm text-rose-600 dark:text-rose-300">
+                            {localErrors.publicTalkCoordinatorName.message}
+                          </p>
+                        ) : null}
+                      </label>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="space-y-2">
+                          <span className="text-sm font-medium text-foreground">
+                            Telefone
+                            <span className="font-normal text-muted-foreground">
+                              {' '}
+                              opcional
+                            </span>
+                          </span>
+                          <Input
+                            inputMode="tel"
+                            placeholder="(63) 99999-0000"
+                            {...registerLocal('publicTalkCoordinatorPhone')}
+                          />
+                          {localErrors.publicTalkCoordinatorPhone ? (
+                            <p className="text-sm text-rose-600 dark:text-rose-300">
+                              {localErrors.publicTalkCoordinatorPhone.message}
+                            </p>
+                          ) : null}
+                        </label>
+
+                        <label className="space-y-2">
+                          <span className="text-sm font-medium text-foreground">
+                            E-mail
+                            <span className="font-normal text-muted-foreground">
+                              {' '}
+                              opcional
+                            </span>
+                          </span>
+                          <Input
+                            type="email"
+                            placeholder="responsavel@exemplo.com"
+                            {...registerLocal('publicTalkCoordinatorEmail')}
+                          />
+                          {localErrors.publicTalkCoordinatorEmail ? (
+                            <p className="text-sm text-rose-600 dark:text-rose-300">
+                              {localErrors.publicTalkCoordinatorEmail.message}
+                            </p>
+                          ) : null}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
 
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">Observações</span>

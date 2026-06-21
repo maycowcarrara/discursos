@@ -438,7 +438,9 @@ Campos:
 * mapsUrl
 * meetingDay
 * meetingTime
-* publicTalkCoordinatorContact
+* publicTalkCoordinatorName
+* publicTalkCoordinatorPhone
+* publicTalkCoordinatorEmail
 * observações
 * isLocal
 
@@ -461,6 +463,7 @@ Entregas realizadas:
 * exclusão lógica com remoção da base ativa apenas para congregações externas
 * proteção contra exclusão ou conversão da congregação local fixa
 * bloqueio de exclusão quando houver oradores vinculados
+* cadastro opcional do irmão responsável pelo arranjo de discursos com nome, telefone e e-mail separados
 * geração de auditoria para create, update e delete
 * remoção do campo `CEP` da UI e do schema oficial por não ter utilidade operacional nesta V1
 

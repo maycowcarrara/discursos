@@ -195,7 +195,9 @@ Campos:
   mapsUrl: string
   meetingDay: string
   meetingTime: string
-  publicTalkCoordinatorContact: string
+  publicTalkCoordinatorName: string
+  publicTalkCoordinatorPhone: string
+  publicTalkCoordinatorEmail: string
   notes: string
   isLocal: boolean
   isActive: boolean
@@ -210,7 +212,9 @@ Observações:
 
 * `name` é o nome oficial exibido na UI
 * `isLocal = true` identifica a única congregação local ativa da própria programação
-* a congregação local deve existir sempre, não deve ser excluída pela UI e concentra `publicTalkCoordinatorContact`
+* a congregação local deve existir sempre e não deve ser excluída pela UI
+* `publicTalkCoordinatorName`, `publicTalkCoordinatorPhone` e `publicTalkCoordinatorEmail` identificam, de forma opcional, o irmão responsável pelo arranjo de discursos da congregação
+* o campo legado `publicTalkCoordinatorContact`, quando existir em documentos antigos, deve ser usado apenas como fallback de leitura até o cadastro ser revisado; novas gravações devem usar os três campos explícitos acima
 * congregações externas/parceiras devem ser cadastradas com `isLocal = false` automaticamente, sem escolha manual de tipo na UI
 * `zipCode` deixou de fazer parte do schema oficial por não gerar valor operacional no fluxo administrativo da V1; bases legadas devem remover o campo com saneamento controlado
 * não criar campo alternativo como `nome`, `title` ou `congregationName` dentro desta coleção

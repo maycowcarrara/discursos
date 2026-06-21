@@ -28,7 +28,9 @@ export type CongregationFormValues = {
   mapsUrl: string
   meetingDay: string
   meetingTime: string
-  publicTalkCoordinatorContact: string
+  publicTalkCoordinatorName: string
+  publicTalkCoordinatorPhone: string
+  publicTalkCoordinatorEmail: string
   notes: string
   isLocal: boolean
 }
@@ -56,7 +58,9 @@ export const defaultCongregationFormValues: CongregationFormValues = {
   mapsUrl: '',
   meetingDay: '',
   meetingTime: '',
-  publicTalkCoordinatorContact: '',
+  publicTalkCoordinatorName: '',
+  publicTalkCoordinatorPhone: '',
+  publicTalkCoordinatorEmail: '',
   notes: '',
   isLocal: false,
 }
@@ -83,7 +87,10 @@ function buildCongregationPayload(
     mapsUrl: values.mapsUrl.trim(),
     meetingDay: values.meetingDay.trim(),
     meetingTime: values.meetingTime.trim(),
-    publicTalkCoordinatorContact: values.publicTalkCoordinatorContact.trim(),
+    publicTalkCoordinatorName: values.publicTalkCoordinatorName.trim(),
+    publicTalkCoordinatorPhone: values.publicTalkCoordinatorPhone.trim(),
+    publicTalkCoordinatorEmail: values.publicTalkCoordinatorEmail.trim().toLowerCase(),
+    publicTalkCoordinatorContact: '',
     notes: values.notes.trim(),
     isLocal: values.isLocal,
   }
@@ -152,7 +159,10 @@ export function toCongregationFormValues(
     mapsUrl: congregation.mapsUrl,
     meetingDay: congregation.meetingDay,
     meetingTime: congregation.meetingTime,
-    publicTalkCoordinatorContact: congregation.publicTalkCoordinatorContact,
+    publicTalkCoordinatorName:
+      congregation.publicTalkCoordinatorName || congregation.publicTalkCoordinatorContact,
+    publicTalkCoordinatorPhone: congregation.publicTalkCoordinatorPhone,
+    publicTalkCoordinatorEmail: congregation.publicTalkCoordinatorEmail,
     notes: congregation.notes,
     isLocal: congregation.isLocal,
   }

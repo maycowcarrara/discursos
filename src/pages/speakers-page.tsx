@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
+  AlertTriangle,
   ArrowRightLeft,
   Ban,
   CheckCircle2,
@@ -138,11 +139,27 @@ const speakerFilterOptions: Array<{
   { value: 'inactive', label: 'Inativos' },
 ]
 
+const emailValidationSchema = z.string().email()
+
+function validateOptionalEmail(value: string) {
+  return value.length === 0 || emailValidationSchema.safeParse(value).success
+}
+
+function validateOptionalPhone(value: string) {
+  return value.length === 0 || value.replace(/\D/g, '').length >= 8
+}
+
 const speakerFormSchema = z
   .object({
     name: z.string().trim().min(3, 'Informe o nome do orador.'),
-    email: z.string().trim().email('Informe um e-mail válido.'),
-    phone: z.string().trim().min(8, 'Informe um telefone válido.'),
+    email: z
+      .string()
+      .trim()
+      .refine(validateOptionalEmail, 'Informe um e-mail válido.'),
+    phone: z
+      .string()
+      .trim()
+      .refine(validateOptionalPhone, 'Informe um telefone válido.'),
     congregationId: z.string().trim().min(1, 'Selecione a congregação.'),
     type: z.enum(['local', 'visitor']),
     themeIds: z
@@ -243,6 +260,32 @@ function formatDateRange(start: Date, end: Date) {
   const endLabel = end.toLocaleDateString('pt-BR')
 
   return `${startLabel} até ${endLabel}`
+}
+
+function getMissingContactLabels(email: string, phone: string) {
+  const missingLabels: string[] = []
+
+  if (email.trim().length === 0) {
+    missingLabels.push('e-mail')
+  }
+
+  if (phone.trim().length === 0) {
+    missingLabels.push('telefone')
+  }
+
+  return missingLabels
+}
+
+function formatMissingContactLabels(labels: string[]) {
+  if (labels.length === 0) {
+    return ''
+  }
+
+  if (labels.length === 1) {
+    return labels[0]
+  }
+
+  return `${labels.slice(0, -1).join(', ')} e ${labels[labels.length - 1]}`
 }
 
 export function SpeakersPage() {
@@ -585,7 +628,10 @@ export function SpeakersPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">E-mail</span>
+                    <span className="text-sm font-medium text-foreground">
+                      E-mail
+                      <span className="font-normal text-muted-foreground"> opcional</span>
+                    </span>
                     <Input
                       type="email"
                       placeholder="orador@exemplo.com"
@@ -599,7 +645,10 @@ export function SpeakersPage() {
                   </label>
 
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">Telefone</span>
+                    <span className="text-sm font-medium text-foreground">
+                      Telefone
+                      <span className="font-normal text-muted-foreground"> opcional</span>
+                    </span>
                     <Input
                       inputMode="tel"
                       placeholder="(63) 99999-0000"
@@ -1079,6 +1128,10 @@ export function SpeakersPage() {
                   const unavailableEnd = speaker.unavailableEnd
                   const hasUnavailableWindow =
                     unavailableStart && unavailableEnd
+                  const missingContactLabels = getMissingContactLabels(
+                    speaker.email,
+                    speaker.phone,
+                  )
 
                   return (
                     <div
@@ -1108,11 +1161,31 @@ export function SpeakersPage() {
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
-                            <MetadataChip label="E-mail" value={speaker.email} />
-                            <MetadataChip label="Telefone" value={speaker.phone} />
+                            <MetadataChip
+                              label="E-mail"
+                              value={speaker.email.trim() || 'Sem e-mail'}
+                              tone={speaker.email.trim() ? 'default' : 'warning'}
+                            />
+                            <MetadataChip
+                              label="Telefone"
+                              value={speaker.phone.trim() || 'Sem telefone'}
+                              tone={speaker.phone.trim() ? 'default' : 'warning'}
+                            />
                           </div>
 
                           <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+                            {missingContactLabels.length > 0 ? (
+                              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                                <p className="leading-6">
+                                  Cadastro sem{' '}
+                                  {formatMissingContactLabels(missingContactLabels)}.
+                                  Complete os dados quando quiser liberar contato rápido,
+                                  lembretes por e-mail e convites da agenda.
+                                </p>
+                              </div>
+                            ) : null}
+
                             <div className="flex items-start gap-3">
                               <Mic2 className="mt-0.5 size-4 text-primary" />
                               <div>
