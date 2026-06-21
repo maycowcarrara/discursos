@@ -161,10 +161,6 @@ export function DashboardPage() {
   const nextAssignment = nextSaturdayEntry?.assignment ?? null
   const remainingSaturdayEntries = upcomingSaturdayEntries.slice(1)
   const nextSpeakerQuery = useSpeakerByIdQuery(nextAssignment?.speakerId)
-  const automaticConfirmationNotificationQuery = useNotificationByIdQuery(
-    nextAssignment ? `${nextAssignment.id}__confirmation` : '',
-    Boolean(nextAssignment),
-  )
   const manualConfirmationNotificationQuery = useNotificationByIdQuery(
     nextAssignment ? `${nextAssignment.id}__manual` : '',
     Boolean(nextAssignment),
@@ -198,19 +194,8 @@ export function DashboardPage() {
           speaker: nextSpeaker,
         })
       : null
-  const automaticConfirmationNotification =
-    automaticConfirmationNotificationQuery.data ?? null
   const manualConfirmationNotification =
     manualConfirmationNotificationQuery.data ?? null
-  const currentAutomaticConfirmationNotification =
-    automaticConfirmationNotification &&
-    nextAssignment &&
-    isTimestampInCurrentAssignmentRevision(
-      automaticConfirmationNotification.updatedAt,
-      nextAssignment.updatedAt,
-    )
-      ? automaticConfirmationNotification
-      : null
   const currentManualConfirmationNotification =
     manualConfirmationNotification &&
     nextAssignment &&
@@ -220,13 +205,8 @@ export function DashboardPage() {
     )
       ? manualConfirmationNotification
       : null
-  const automaticConfirmationStatus =
-    currentAutomaticConfirmationNotification?.status ?? null
   const manualConfirmationStatus =
     currentManualConfirmationNotification?.status ?? null
-  const automaticEmailAlreadySent = automaticConfirmationStatus === 'sent'
-  const automaticEmailQueued = automaticConfirmationStatus === 'pending'
-  const automaticEmailFailed = automaticConfirmationStatus === 'failed'
   const manualEmailFailed = manualConfirmationStatus === 'failed'
   const manualEmailAlreadyRequested = Boolean(
     nextAssignment &&
@@ -240,37 +220,30 @@ export function DashboardPage() {
     manualConfirmationStatus === 'pending' ||
     manualConfirmationStatus === 'sent'
   const emailActionResolved =
-    automaticEmailAlreadySent ||
     manualEmailAlreadyRequested ||
     manualEmailAlreadyQueuedOrSent
   const emailActionDisabled =
     requestManualEmailMutation.isPending ||
     !emailDeliveryConfigured ||
-    automaticEmailQueued ||
     emailActionResolved
   const EmailActionIcon =
-    automaticEmailFailed || manualEmailFailed
+    manualEmailFailed
       ? MailWarning
-      : automaticEmailAlreadySent ||
-          manualEmailAlreadyRequested ||
+      : manualEmailAlreadyRequested ||
           manualConfirmationStatus === 'sent'
       ? CheckCircle2
       : MailCheck
   const emailActionLabel = !emailDeliveryConfigured
     ? 'E-mail indisponível'
-    : automaticEmailFailed || manualEmailFailed
+    : manualEmailFailed
       ? 'Tentar novamente'
-      : automaticEmailAlreadySent
-        ? 'E-mail enviado'
-        : manualEmailAlreadyRequested || manualConfirmationStatus === 'sent'
-          ? 'E-mail solicitado'
-          : automaticEmailQueued
-            ? 'Enviando e-mail'
-            : 'E-mail'
+      : manualEmailAlreadyRequested || manualConfirmationStatus === 'sent'
+        ? 'E-mail solicitado'
+        : manualConfirmationStatus === 'pending'
+          ? 'Enviando e-mail'
+          : 'E-mail'
   const emailErrorMessage =
-    currentManualConfirmationNotification?.errorMessage?.trim() ||
-    currentAutomaticConfirmationNotification?.errorMessage?.trim() ||
-    ''
+    currentManualConfirmationNotification?.errorMessage?.trim() || ''
   const dashboardShortcuts = [
     {
       href: '/designacoes',
@@ -326,7 +299,7 @@ export function DashboardPage() {
       return
     }
 
-    const isRetry = automaticEmailFailed || manualEmailFailed
+    const isRetry = manualEmailFailed
     const confirmed = window.confirm(
       isRetry
         ? `Tentar enviar novamente o e-mail de confirmação para ${nextAssignment.speakerName}?`

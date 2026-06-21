@@ -682,10 +682,7 @@ export function AssignmentsPage() {
   )
   const assignmentNotificationIds = useMemo(
     () =>
-      assignments.flatMap((assignment) => [
-        `${assignment.id}__confirmation`,
-        `${assignment.id}__manual`,
-      ]),
+      assignments.map((assignment) => `${assignment.id}__manual`),
     [assignments],
   )
   const assignmentNotificationsQuery = useNotificationsByIdsQuery(
@@ -1589,13 +1586,8 @@ export function AssignmentsPage() {
       return
     }
 
-    const automaticNotification = notificationsById.get(
-      `${assignment.id}__confirmation`,
-    )
     const manualNotification = notificationsById.get(`${assignment.id}__manual`)
-    const isRetry =
-      automaticNotification?.status === 'failed' ||
-      manualNotification?.status === 'failed'
+    const isRetry = manualNotification?.status === 'failed'
     const confirmed = window.confirm(
       isRetry
         ? `Tentar enviar novamente o e-mail de confirmação para ${assignment.speakerName}?`
@@ -2550,20 +2542,9 @@ export function AssignmentsPage() {
                     assignment.status === 'pending' || assignment.status === 'confirmed'
                   const canRequestManualEmail =
                     isAssignmentCoveringCalendarSlot(assignment.status)
-                  const automaticConfirmationNotification = notificationsById.get(
-                    `${assignment.id}__confirmation`,
-                  )
                   const manualConfirmationNotification = notificationsById.get(
                     `${assignment.id}__manual`,
                   )
-                  const currentAutomaticConfirmationNotification =
-                    automaticConfirmationNotification &&
-                    isTimestampInCurrentAssignmentRevision(
-                      automaticConfirmationNotification.updatedAt,
-                      assignment.updatedAt,
-                    )
-                      ? automaticConfirmationNotification
-                      : null
                   const currentManualConfirmationNotification =
                     manualConfirmationNotification &&
                     isTimestampInCurrentAssignmentRevision(
@@ -2572,15 +2553,8 @@ export function AssignmentsPage() {
                     )
                       ? manualConfirmationNotification
                       : null
-                  const automaticConfirmationStatus =
-                    currentAutomaticConfirmationNotification?.status
                   const manualConfirmationStatus =
                     currentManualConfirmationNotification?.status
-                  const automaticEmailAlreadySent =
-                    automaticConfirmationStatus === 'sent'
-                  const automaticEmailQueued = automaticConfirmationStatus === 'pending'
-                  const automaticEmailFailed =
-                    automaticConfirmationStatus === 'failed'
                   const manualEmailFailed = manualConfirmationStatus === 'failed'
                   const manualEmailAlreadyRequested = Boolean(
                     isTimestampInCurrentAssignmentRevision(
@@ -2592,38 +2566,31 @@ export function AssignmentsPage() {
                     manualConfirmationStatus === 'pending' ||
                     manualConfirmationStatus === 'sent'
                   const manualEmailActionResolved =
-                    automaticEmailAlreadySent ||
                     manualEmailAlreadyRequested ||
                     manualEmailAlreadyQueuedOrSent
                   const manualEmailActionDisabled =
                     isSubmitting ||
                     !emailDeliveryConfigured ||
-                    automaticEmailQueued ||
                     manualEmailActionResolved
                   const ManualEmailActionIcon =
-                    automaticEmailFailed || manualEmailFailed
+                    manualEmailFailed
                       ? MailWarning
-                      : automaticEmailAlreadySent ||
-                          manualEmailAlreadyRequested ||
+                      : manualEmailAlreadyRequested ||
                           manualConfirmationStatus === 'sent'
                       ? CheckCircle2
                       : MailCheck
                   const manualEmailActionLabel = !emailDeliveryConfigured
                     ? 'E-mail indisponível'
-                    : automaticEmailFailed || manualEmailFailed
+                    : manualEmailFailed
                       ? 'Tentar novamente'
-                      : automaticEmailAlreadySent
-                        ? 'E-mail enviado'
-                        : manualEmailAlreadyRequested ||
-                            manualConfirmationStatus === 'sent'
-                          ? 'E-mail solicitado'
-                          : automaticEmailQueued
-                            ? 'Enviando e-mail'
-                            : 'E-mail agora'
+                      : manualEmailAlreadyRequested ||
+                          manualConfirmationStatus === 'sent'
+                        ? 'E-mail solicitado'
+                        : manualConfirmationStatus === 'pending'
+                          ? 'Enviando e-mail'
+                          : 'E-mail agora'
                   const emailErrorMessage =
-                    currentManualConfirmationNotification?.errorMessage?.trim() ||
-                    currentAutomaticConfirmationNotification?.errorMessage?.trim() ||
-                    ''
+                    currentManualConfirmationNotification?.errorMessage?.trim() || ''
                   const linkedCalendarEvent =
                     calendarEventsById.get(assignment.calendarEventId) ?? null
                   const assignmentSpeaker = speakersById.get(assignment.speakerId) ?? null
