@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/use-toast'
 import {
   useCongregationsQuery,
   useCreateCongregationMutation,
@@ -214,6 +215,7 @@ function toExternalCongregationFormValues(
 
 export function CongregationsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [editingExternalId, setEditingExternalId] = useState<string | null>(null)
@@ -309,10 +311,12 @@ export function CongregationsPage() {
 
   const submitLocalHandler = handleLocalSubmit(async (values) => {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -340,24 +344,30 @@ export function CongregationsPage() {
       }
 
       resetLocalForm(localValues)
+      const message = 'Congregação local salva com sucesso.'
       setFeedback({
         tone: 'success',
-        message: 'Congregação local salva com sucesso.',
+        message,
       })
+      toast.success(message)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   })
 
   const submitExternalHandler = handleExternalSubmit(async (values) => {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -377,10 +387,12 @@ export function CongregationsPage() {
           actorName,
         })
 
+        const message = 'Congregação externa atualizada com sucesso.'
         setFeedback({
           tone: 'success',
-          message: 'Congregação externa atualizada com sucesso.',
+          message,
         })
+        toast.success(message)
       } else {
         await createCongregationMutation.mutateAsync({
           ...externalValues,
@@ -388,29 +400,35 @@ export function CongregationsPage() {
           actorName,
         })
 
+        const message = 'Congregação externa criada com sucesso.'
         setFeedback({
           tone: 'success',
-          message: 'Congregação externa criada com sucesso.',
+          message,
         })
+        toast.success(message)
       }
 
       setEditingExternalId(null)
       resetExternalForm(defaultExternalCongregationFormValues)
       setCurrentPage(1)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   })
 
   async function handleDeleteExternal(id: string, name: string) {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -436,15 +454,19 @@ export function CongregationsPage() {
         resetExternalForm(defaultExternalCongregationFormValues)
       }
 
+      const message = 'Congregação externa excluída da base ativa com sucesso.'
       setFeedback({
         tone: 'success',
-        message: 'Congregação externa excluída da base ativa com sucesso.',
+        message,
       })
+      toast.success(message)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   }
 

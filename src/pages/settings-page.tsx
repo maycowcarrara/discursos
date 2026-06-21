@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/use-toast'
 import {
   useAppSettingsQuery,
   useCalendarSettingsQuery,
@@ -143,6 +144,7 @@ function getCalendarRunStatusClassName(status?: CalendarSyncRunStatus | null) {
 
 export function SettingsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const appSettingsQuery = useAppSettingsQuery()
   const calendarSettingsQuery = useCalendarSettingsQuery()
   const saveAppSettingsMutation = useSaveAppSettingsMutation()
@@ -180,25 +182,37 @@ export function SettingsPage() {
 
   const submitAppHandler = handleAppSubmit(async (values) => {
     if (!user) {
+      toast.error('Sua sessão expirou. Entre novamente para continuar.')
       return
     }
 
-    await saveAppSettingsMutation.mutateAsync({
-      ...values,
-      actorUid: user.uid,
-    })
+    try {
+      await saveAppSettingsMutation.mutateAsync({
+        ...values,
+        actorUid: user.uid,
+      })
+      toast.success('Ano padrão salvo com sucesso.')
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    }
   })
 
   const submitCalendarHandler = handleCalendarSubmit(async (values) => {
     if (!user) {
+      toast.error('Sua sessão expirou. Entre novamente para continuar.')
       return
     }
 
-    await saveCalendarSettingsMutation.mutateAsync({
-      ...values,
-      actorUid: user.uid,
-      actorName: user.displayName ?? user.email ?? null,
-    })
+    try {
+      await saveCalendarSettingsMutation.mutateAsync({
+        ...values,
+        actorUid: user.uid,
+        actorName: user.displayName ?? user.email ?? null,
+      })
+      toast.success('Ajustes do Google Calendar salvos com sucesso.')
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    }
   })
 
   const persistedSettings = appSettingsQuery.data

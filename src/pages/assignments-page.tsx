@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/use-toast'
 import { useAppSettingsQuery, useCalendarSettingsQuery } from '@/hooks/use-app-settings'
 import {
   useAssignmentsByYearQuery,
@@ -587,6 +588,7 @@ function getAssignmentGoogleCalendarSyncState(options: {
 
 export function AssignmentsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [referenceNow] = useState(() => Date.now())
   const [searchTerm, setSearchTerm] = useState('')
@@ -1359,10 +1361,12 @@ export function AssignmentsPage() {
 
   const submitHandler = handleSubmit(async (values) => {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -1370,10 +1374,12 @@ export function AssignmentsPage() {
 
     try {
       if (!editingAssignment && !creatableStatusValues.includes(values.status)) {
+        const message = 'Novas designações devem iniciar como pendentes ou confirmadas.'
         setFeedback({
           tone: 'error',
-          message: 'Novas designações devem iniciar como pendentes ou confirmadas.',
+          message,
         })
+        toast.error(message)
         return
       }
 
@@ -1385,15 +1391,17 @@ export function AssignmentsPage() {
           actorName,
         })
 
+        const message = buildAssignmentSaveFeedbackMessage(
+          values.status === 'confirmed'
+            ? 'Designação atualizada e confirmada com sucesso.'
+            : 'Designação atualizada com sucesso.',
+          movementType,
+        )
         setFeedback({
           tone: 'success',
-          message: buildAssignmentSaveFeedbackMessage(
-            values.status === 'confirmed'
-              ? 'Designação atualizada e confirmada com sucesso.'
-              : 'Designação atualizada com sucesso.',
-            movementType,
-          ),
+          message,
         })
+        toast.success(message)
       } else {
         await createAssignmentMutation.mutateAsync({
           ...values,
@@ -1401,17 +1409,19 @@ export function AssignmentsPage() {
           actorName,
         })
 
+        const message = buildAssignmentSaveFeedbackMessage(
+          willReplaceCurrentAssignment
+            ? 'Nova designação criada e a anterior foi marcada como substituída.'
+            : values.status === 'confirmed'
+              ? 'Designação criada já como confirmada.'
+              : 'Designação criada com sucesso.',
+          movementType,
+        )
         setFeedback({
           tone: 'success',
-          message: buildAssignmentSaveFeedbackMessage(
-            willReplaceCurrentAssignment
-              ? 'Nova designação criada e a anterior foi marcada como substituída.'
-              : values.status === 'confirmed'
-                ? 'Designação criada já como confirmada.'
-                : 'Designação criada com sucesso.',
-            movementType,
-          ),
+          message,
         })
+        toast.success(message)
       }
 
       setSearchParams({}, { replace: true })
@@ -1427,19 +1437,23 @@ export function AssignmentsPage() {
         ),
       )
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   })
 
   async function handleQuickConfirm(id: string) {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -1464,29 +1478,35 @@ export function AssignmentsPage() {
         )
       }
 
+      const message = buildAssignmentSaveFeedbackMessage(
+        'Designação confirmada com sucesso.',
+        assignmentToConfirm
+          ? inferAssignmentMovementType(assignmentToConfirm, congregationsById)
+          : 'local',
+      )
       setFeedback({
         tone: 'success',
-        message: buildAssignmentSaveFeedbackMessage(
-          'Designação confirmada com sucesso.',
-          assignmentToConfirm
-            ? inferAssignmentMovementType(assignmentToConfirm, congregationsById)
-            : 'local',
-        ),
+        message,
       })
+      toast.success(message)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   }
 
   async function handleQuickCancel(assignment: FirestoreRecord<AssignmentDocument>) {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -1521,18 +1541,22 @@ export function AssignmentsPage() {
         )
       }
 
+      const message = buildAssignmentSaveFeedbackMessage(
+        'Designação cancelada com sucesso.',
+        inferAssignmentMovementType(assignment, congregationsById),
+      )
       setFeedback({
         tone: 'success',
-        message: buildAssignmentSaveFeedbackMessage(
-          'Designação cancelada com sucesso.',
-          inferAssignmentMovementType(assignment, congregationsById),
-        ),
+        message,
       })
+      toast.success(message)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   }
 
@@ -1540,18 +1564,22 @@ export function AssignmentsPage() {
     assignment: FirestoreRecord<AssignmentDocument>,
   ) {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
     if (!calendarSettingsQuery.data?.enabled) {
+      const message = 'Ative a integração com Google Calendar nas configurações antes de sincronizar.'
       setFeedback({
         tone: 'error',
-        message: 'Ative a integração com Google Calendar nas configurações antes de sincronizar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -1564,15 +1592,20 @@ export function AssignmentsPage() {
         calendarEventId: assignment.calendarEventId,
       })
 
+      const message =
+        'Solicitação enviada para sincronização com Google Calendar. Ela será processada no próximo ciclo.'
       setFeedback({
         tone: 'success',
-        message: 'Solicitação enviada para sincronização com Google Calendar. Ela será processada no próximo ciclo.',
+        message,
       })
+      toast.success(message)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   }
 

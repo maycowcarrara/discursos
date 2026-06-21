@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/use-toast'
 import {
   useAddAdminUserMutation,
   useAdminUsersQuery,
@@ -29,6 +30,7 @@ function getErrorMessage(error: unknown) {
 
 export function AdminUsersCard() {
   const { user } = useAuth()
+  const toast = useToast()
   const [email, setEmail] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const adminUsersQuery = useAdminUsersQuery()
@@ -49,8 +51,19 @@ export function AdminUsersCard() {
     try {
       await addAdminUserMutation.mutateAsync(parsedEmail.data)
       setEmail('')
-    } catch {
+      toast.success('Administrador adicionado com sucesso.')
+    } catch (error) {
+      toast.error(getErrorMessage(error))
       return
+    }
+  }
+
+  async function handleRemoveAdminUser(emailToRemove: string) {
+    try {
+      await removeAdminUserMutation.mutateAsync(emailToRemove)
+      toast.success('Administrador removido com sucesso.')
+    } catch (error) {
+      toast.error(getErrorMessage(error))
     }
   }
 
@@ -162,7 +175,7 @@ export function AdminUsersCard() {
                   type="button"
                   disabled={isCurrentUser || isMutating}
                   onClick={() => {
-                    removeAdminUserMutation.mutate(adminUser.email)
+                    void handleRemoveAdminUser(adminUser.email)
                   }}
                 >
                   {removeAdminUserMutation.isPending ? (

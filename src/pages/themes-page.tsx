@@ -40,6 +40,7 @@ import {
   ModalTitle,
 } from '@/components/ui/modal'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/use-toast'
 import {
   useCreateThemeMutation,
   useDeleteThemeMutation,
@@ -125,6 +126,7 @@ function buildImportResultMessage(result: {
 
 export function ThemesPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<ThemeCategoryFilter>('all')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -210,10 +212,12 @@ export function ThemesPage() {
 
   const submitHandler = handleSubmit(async (values) => {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -228,10 +232,12 @@ export function ThemesPage() {
           actorName,
         })
 
+        const message = 'Tema atualizado com sucesso.'
         setFeedback({
           tone: 'success',
-          message: 'Tema atualizado com sucesso.',
+          message,
         })
+        toast.success(message)
       } else {
         await createThemeMutation.mutateAsync({
           ...values,
@@ -239,28 +245,34 @@ export function ThemesPage() {
           actorName,
         })
 
+        const message = 'Tema criado com sucesso.'
         setFeedback({
           tone: 'success',
-          message: 'Tema criado com sucesso.',
+          message,
         })
+        toast.success(message)
       }
 
       setEditingId(null)
       reset(defaultThemeFormValues)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   })
 
   async function handleDelete(id: string, title: string) {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -286,15 +298,19 @@ export function ThemesPage() {
         reset(defaultThemeFormValues)
       }
 
+      const message = 'Tema removido da base ativa com sucesso.'
       setFeedback({
         tone: 'success',
-        message: 'Tema removido da base ativa com sucesso.',
+        message,
       })
+      toast.success(message)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   }
 
@@ -332,7 +348,9 @@ export function ThemesPage() {
       const parsedCatalog = await parseThemeCatalogPdf(file)
       setImportCatalog(parsedCatalog)
     } catch (error) {
-      setImportError(getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setImportError(message)
+      toast.error(message)
     } finally {
       setIsParsingImport(false)
       event.target.value = ''
@@ -341,6 +359,9 @@ export function ThemesPage() {
 
   async function handleConfirmImport() {
     if (!user || !importCatalog) {
+      if (!user) {
+        toast.error('Sua sessão expirou. Entre novamente para continuar.')
+      }
       return
     }
 
@@ -355,16 +376,20 @@ export function ThemesPage() {
         sourceLabel: importCatalog.sourceLabel,
       })
 
+      const message = buildImportResultMessage(result)
       setFeedback({
         tone: 'success',
-        message: buildImportResultMessage(result),
+        message,
       })
+      toast.success(message)
       setIsImportModalOpen(false)
       setImportCatalog(null)
       setImportFileName('')
       setImportError(null)
     } catch (error) {
-      setImportError(getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setImportError(message)
+      toast.error(message)
     }
   }
 

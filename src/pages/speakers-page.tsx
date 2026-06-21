@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -38,6 +39,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/use-toast'
 import { useCongregationsQuery } from '@/hooks/use-congregations'
 import {
   useCreateSpeakerMutation,
@@ -288,8 +290,23 @@ function formatMissingContactLabels(labels: string[]) {
   return `${labels.slice(0, -1).join(', ')} e ${labels[labels.length - 1]}`
 }
 
+function parseCommaSeparatedThemeNumbers(value: string) {
+  if (!value.includes(',')) {
+    return []
+  }
+
+  const numbers = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => /^\d+$/.test(item))
+    .map((item) => Number(item))
+
+  return Array.from(new Set(numbers))
+}
+
 export function SpeakersPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<'all' | SpeakerType>('all')
   const [congregationFilter, setCongregationFilter] = useState('all')
@@ -346,17 +363,28 @@ export function SpeakersPage() {
       selectedType === 'local' ? congregation.isLocal : !congregation.isLocal,
   )
   const activeThemes = activeThemesQuery.data ?? []
+  const normalizedFormThemeSearch = formThemeSearch.trim().toLowerCase()
+  const formThemeSearchNumbers = parseCommaSeparatedThemeNumbers(
+    normalizedFormThemeSearch,
+  )
   const filteredFormThemes = activeThemes.filter((theme) => {
-    const term = formThemeSearch.trim().toLowerCase()
-    if (!term) return true
+    if (!normalizedFormThemeSearch) return true
+    if (formThemeSearchNumbers.length > 0) {
+      return formThemeSearchNumbers.includes(theme.number)
+    }
+
     return (
-      String(theme.number).includes(term) ||
-      theme.title.toLowerCase().includes(term)
+      String(theme.number).includes(normalizedFormThemeSearch) ||
+      theme.title.toLowerCase().includes(normalizedFormThemeSearch)
     )
   })
   const themesById = new Map(
     (themesManagementQuery.data ?? []).map((theme) => [theme.id, theme]),
   )
+  const selectedFormThemes = selectedThemeIds
+    .map((themeId) => themesById.get(themeId) ?? null)
+    .filter((theme): theme is NonNullable<typeof theme> => theme !== null)
+    .sort((firstTheme, secondTheme) => firstTheme.number - secondTheme.number)
   const inactiveSelectedThemes = selectedThemeIds
     .map((themeId) => themesById.get(themeId) ?? null)
     .filter(
@@ -404,15 +432,21 @@ export function SpeakersPage() {
   const actorName = user?.displayName ?? user?.email ?? null
   const needsUnavailableWindow =
     selectedStatus === 'vacation' || selectedStatus === 'unavailable'
+  const selectedTypeOption =
+    speakerTypeOptions.find((option) => option.value === selectedType) ?? null
+  const selectedStatusOption =
+    speakerStatusOptions.find((option) => option.value === selectedStatus) ?? null
   const hasInvalidSelectedThemes =
     inactiveSelectedThemes.length > 0 || missingSelectedThemeIds.length > 0
 
   const submitHandler = handleSubmit(async (values) => {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -427,10 +461,12 @@ export function SpeakersPage() {
           actorName,
         })
 
+        const message = 'Orador atualizado com sucesso.'
         setFeedback({
           tone: 'success',
-          message: 'Orador atualizado com sucesso.',
+          message,
         })
+        toast.success(message)
       } else {
         await createSpeakerMutation.mutateAsync({
           ...values,
@@ -438,20 +474,24 @@ export function SpeakersPage() {
           actorName,
         })
 
+        const message = 'Orador criado com sucesso.'
         setFeedback({
           tone: 'success',
-          message: 'Orador criado com sucesso.',
+          message,
         })
+        toast.success(message)
       }
 
       setEditingId(null)
       setFormThemeSearch('')
       reset(defaultSpeakerFormValues)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   })
 
@@ -496,10 +536,12 @@ export function SpeakersPage() {
 
   async function handleDelete(id: string, name: string) {
     if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
       setFeedback({
         tone: 'error',
-        message: 'Sua sessão expirou. Entre novamente para continuar.',
+        message,
       })
+      toast.error(message)
       return
     }
 
@@ -526,15 +568,19 @@ export function SpeakersPage() {
         reset(defaultSpeakerFormValues)
       }
 
+      const message = 'Orador removido da base ativa com sucesso.'
       setFeedback({
         tone: 'success',
-        message: 'Orador removido da base ativa com sucesso.',
+        message,
       })
+      toast.success(message)
     } catch (error) {
+      const message = getErrorMessage(error)
       setFeedback({
         tone: 'error',
-        message: getErrorMessage(error),
+        message,
       })
+      toast.error(message)
     }
   }
 
@@ -593,8 +639,8 @@ export function SpeakersPage() {
         }
       />
 
-      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card className="xl:order-2">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <Card className="min-w-0">
           <CardHeader className="gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -690,7 +736,7 @@ export function SpeakersPage() {
                   <span className="text-sm font-medium text-foreground">
                     Tipo de orador
                   </span>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/30 p-1">
                     {speakerTypeOptions.map((option) => {
                       const OptionIcon = option.icon
 
@@ -698,10 +744,10 @@ export function SpeakersPage() {
                       <button
                         key={option.value}
                         type="button"
-                        className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                        className={`flex min-h-10 min-w-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
                           selectedType === option.value
-                            ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                            : 'border-border bg-background text-muted-foreground hover:bg-accent'
+                            ? 'bg-background text-primary shadow-sm ring-1 ring-primary/25'
+                            : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
                         }`}
                         onClick={() =>
                           setValue('type', option.value, {
@@ -710,28 +756,22 @@ export function SpeakersPage() {
                           })
                         }
                       >
-                        <span
-                          className={`flex size-8 shrink-0 items-center justify-center rounded-md border ${
-                            selectedType === option.value
-                              ? 'border-primary/30 bg-primary/10 text-primary'
-                              : 'border-border bg-muted/60 text-muted-foreground'
-                          }`}
-                        >
-                          <OptionIcon className="size-4" />
-                        </span>
-                        <span>
-                          <span className="block font-medium text-foreground">{option.title}</span>
-                          <span className="block text-xs leading-5">{option.description}</span>
-                        </span>
+                        <OptionIcon className="size-4 shrink-0" />
+                        <span className="min-w-0 truncate font-medium">{option.title}</span>
                       </button>
                       )
                     })}
                   </div>
+                  {selectedTypeOption ? (
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {selectedTypeOption.description}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Status</span>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                     {speakerStatusOptions.map((option) => {
                       const OptionIcon = option.icon
 
@@ -739,7 +779,7 @@ export function SpeakersPage() {
                       <button
                         key={option.value}
                         type="button"
-                        className={`flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                        className={`flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition sm:text-sm ${
                           selectedStatus === option.value
                             ? 'border-primary bg-primary/10 text-foreground shadow-sm'
                             : 'border-border bg-background text-muted-foreground hover:bg-accent'
@@ -765,23 +805,23 @@ export function SpeakersPage() {
                           }
                         }}
                       >
-                        <span
-                          className={`flex size-8 shrink-0 items-center justify-center rounded-md border ${
+                        <OptionIcon
+                          className={`size-4 shrink-0 ${
                             selectedStatus === option.value
-                              ? 'border-primary/30 bg-primary/10 text-primary'
-                              : 'border-border bg-muted/60 text-muted-foreground'
+                              ? 'text-primary'
+                              : 'text-muted-foreground'
                           }`}
-                        >
-                          <OptionIcon className="size-4" />
-                        </span>
-                        <span>
-                          <span className="block font-medium text-foreground">{option.title}</span>
-                          <span className="block text-xs leading-5">{option.description}</span>
-                        </span>
+                        />
+                        <span className="min-w-0 truncate font-medium">{option.title}</span>
                       </button>
                       )
                     })}
                   </div>
+                  {selectedStatusOption ? (
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {selectedStatusOption.description}
+                    </p>
+                  ) : null}
                 </div>
 
                 {needsUnavailableWindow ? (
@@ -825,11 +865,28 @@ export function SpeakersPage() {
                     <Input
                       type="text"
                       className="pl-9 h-10 text-sm"
-                      placeholder="Buscar por número ou título do tema..."
+                      placeholder="Buscar por número, título ou lista: 40,55,70"
                       value={formThemeSearch}
                       onChange={(e) => setFormThemeSearch(e.target.value)}
                     />
                   </div>
+
+                  {selectedFormThemes.length > 0 ? (
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {selectedFormThemes.map((theme) => (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 text-xs font-medium text-primary transition hover:bg-primary/15"
+                          title={`Remover tema ${theme.number}: ${theme.title}`}
+                          onClick={() => handleRemoveTheme(theme.id)}
+                        >
+                          Tema {theme.number}
+                          <X className="size-3" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
 
                   {hasInvalidSelectedThemes ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
@@ -1005,7 +1062,7 @@ export function SpeakersPage() {
           </CardContent>
         </Card>
 
-        <Card className="xl:order-1">
+        <Card className="min-w-0">
           <CardHeader className="gap-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -1022,7 +1079,7 @@ export function SpeakersPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[1.1fr_180px_210px_220px]">
+            <div className="grid gap-3 md:grid-cols-2 min-[1500px]:grid-cols-[minmax(0,1fr)_180px_210px_220px]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -1136,90 +1193,34 @@ export function SpeakersPage() {
                   return (
                     <div
                       key={speaker.id}
-                      className="rounded-xl border border-border bg-background p-4"
+                      className="min-w-0 rounded-xl border border-border bg-background p-3 sm:p-4"
                     >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <AvatarBadge name={speaker.name} />
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="truncate text-xl font-semibold text-foreground">
-                                  {speaker.name}
-                                </h3>
-                                <Badge variant="outline">
-                                  {speakerTypeLabels[speaker.type]}
-                                </Badge>
-                                <Badge className={getStatusBadgeClassName(speaker.status)}>
-                                  {speakerStatusLabels[speaker.status]}
-                                </Badge>
-                              </div>
-                              <p className="mt-2 text-sm text-muted-foreground">
-                                {congregationName}
-                              </p>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <AvatarBadge name={speaker.name} size="sm" />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="truncate text-lg font-semibold text-foreground">
+                                {speaker.name}
+                              </h3>
+                              <Badge variant="outline">
+                                {speakerTypeLabels[speaker.type]}
+                              </Badge>
+                              <Badge className={getStatusBadgeClassName(speaker.status)}>
+                                {speakerStatusLabels[speaker.status]}
+                              </Badge>
                             </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
-                            <MetadataChip
-                              label="E-mail"
-                              value={speaker.email.trim() || 'Sem e-mail'}
-                              tone={speaker.email.trim() ? 'default' : 'warning'}
-                            />
-                            <MetadataChip
-                              label="Telefone"
-                              value={speaker.phone.trim() || 'Sem telefone'}
-                              tone={speaker.phone.trim() ? 'default' : 'warning'}
-                            />
-                          </div>
-
-                          <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                            {missingContactLabels.length > 0 ? (
-                              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                                <p className="leading-6">
-                                  Cadastro sem{' '}
-                                  {formatMissingContactLabels(missingContactLabels)}.
-                                  Complete os dados quando quiser liberar contato rápido,
-                                  lembretes por e-mail e convites da agenda.
-                                </p>
-                              </div>
-                            ) : null}
-
-                            <div className="flex items-start gap-3">
-                              <Mic2 className="mt-0.5 size-4 text-primary" />
-                              <div>
-                                <p className="text-foreground">Temas vinculados</p>
-                                <p>
-                                  {themeLabels.length > 0
-                                    ? themeLabels.join(', ')
-                                    : `${speaker.themeIds.length} tema(s) vinculado(s)`}
-                                </p>
-                              </div>
-                            </div>
-
-                            {hasUnavailableWindow ? (
-                              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                                Período informado:{' '}
-                                {formatDateRange(
-                                  unavailableStart.toDate(),
-                                  unavailableEnd.toDate(),
-                                )}
-                              </div>
-                            ) : null}
-
-                            <p className="leading-6">
-                              {speaker.notes || 'Sem observações cadastradas.'}
-                            </p>
-                            <p className="text-xs">
-                              Atualizado em {formatUpdatedAt(speaker.updatedAt.toDate())}
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {congregationName}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                        <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
                           <Button
                             variant="outline"
+                            size="sm"
+                            className="w-full sm:w-auto"
                             onClick={() => handleStartEdit(speaker.id)}
                             disabled={isSubmitting}
                           >
@@ -1228,6 +1229,8 @@ export function SpeakersPage() {
                           </Button>
                           <Button
                             variant="outline"
+                            size="sm"
+                            className="w-full sm:w-auto"
                             onClick={() => handleDelete(speaker.id, speaker.name)}
                             disabled={isSubmitting || !speaker.isActive}
                           >
@@ -1235,6 +1238,60 @@ export function SpeakersPage() {
                             Remover da base ativa
                           </Button>
                         </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-border/70 pt-2.5">
+                        <MetadataChip
+                          label="E-mail"
+                          value={speaker.email.trim() || 'Sem e-mail'}
+                          tone={speaker.email.trim() ? 'default' : 'warning'}
+                        />
+                        <MetadataChip
+                          label="Telefone"
+                          value={speaker.phone.trim() || 'Sem telefone'}
+                          tone={speaker.phone.trim() ? 'default' : 'warning'}
+                        />
+                      </div>
+
+                      <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                        {missingContactLabels.length > 0 ? (
+                          <div className="flex w-full items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                            <p>
+                              Cadastro sem{' '}
+                              {formatMissingContactLabels(missingContactLabels)}.
+                              Complete quando quiser liberar contato rápido,
+                              lembretes por e-mail e convites da agenda.
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <div className="flex min-w-0 items-start gap-2">
+                          <Mic2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                          <div className="min-w-0">
+                            <p className="text-foreground">Temas vinculados</p>
+                            <p>
+                              {themeLabels.length > 0
+                                ? themeLabels.join(', ')
+                                : `${speaker.themeIds.length} tema(s) vinculado(s)`}
+                            </p>
+                          </div>
+                        </div>
+
+                        {hasUnavailableWindow ? (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                            Período informado:{' '}
+                            {formatDateRange(
+                              unavailableStart.toDate(),
+                              unavailableEnd.toDate(),
+                            )}
+                          </div>
+                        ) : null}
+
+                        <p>{speaker.notes || 'Sem observações cadastradas.'}</p>
+                        <p className="text-xs">
+                          Atualizado em {formatUpdatedAt(speaker.updatedAt.toDate())}
+                        </p>
                       </div>
                     </div>
                   )
