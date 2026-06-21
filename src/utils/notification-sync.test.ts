@@ -4,7 +4,10 @@ import { Timestamp } from 'firebase/firestore'
 
 import type { NotificationDocument } from '../types/firestore.js'
 
-import { mergeNotificationDocumentForSync } from './notification-sync.js'
+import {
+  isTimestampInCurrentAssignmentRevision,
+  mergeNotificationDocumentForSync,
+} from './notification-sync.js'
 
 function createNotificationDocument(
   overrides: Partial<NotificationDocument> = {},
@@ -30,6 +33,32 @@ function createNotificationDocument(
     ...overrides,
   }
 }
+
+test('considera como atual uma notificação gravada na mesma revisão', () => {
+  const updatedAt = Timestamp.fromDate(new Date(2026, 4, 1, 10, 0, 0, 0))
+
+  assert.equal(
+    isTimestampInCurrentAssignmentRevision(updatedAt, updatedAt),
+    true,
+  )
+})
+
+test('não deixa uma notificação anterior bloquear a revisão editada', () => {
+  const notificationUpdatedAt = Timestamp.fromDate(
+    new Date(2026, 4, 1, 10, 0, 0, 0),
+  )
+  const assignmentUpdatedAt = Timestamp.fromDate(
+    new Date(2026, 4, 1, 10, 5, 0, 0),
+  )
+
+  assert.equal(
+    isTimestampInCurrentAssignmentRevision(
+      notificationUpdatedAt,
+      assignmentUpdatedAt,
+    ),
+    false,
+  )
+})
 
 test('preserva notificação já enviada quando a entrega continua a mesma', () => {
   const sentAt = Timestamp.fromDate(new Date(2026, 4, 1, 10, 5, 0, 0))
@@ -112,4 +141,70 @@ test('reabre uma notificação cancelada quando a designação volta a exigir en
   assert.equal(mergedNotification.status, 'pending')
   assert.equal(mergedNotification.errorMessage, null)
   assert.equal(mergedNotification.retryCount, 0)
+})
+
+test('preserva envio processado quando apenas scheduledFor muda', () => {
+  const existingNotification = createNotificationDocument({
+    status: 'sent',
+    sentAt: Timestamp.fromDate(new Date(2026, 4, 1, 10, 5, 0, 0)),
+  })
+  const nextNotification = createNotificationDocument({
+    scheduledFor: Timestamp.fromDate(new Date(2026, 4, 1, 10, 10, 0, 0)),
+    status: 'pending',
+  })
+
+  const mergedNotification = mergeNotificationDocumentForSync(
+    existingNotification,
+    nextNotification,
+  )
+
+  assert.equal(mergedNotification.status, 'sent')
+})
+
+test('reinicia confirmação processada quando uma edição força atualização', () => {
+  const existingNotification = createNotificationDocument({
+    status: 'sent',
+    sentAt: Timestamp.fromDate(new Date(2026, 4, 1, 10, 5, 0, 0)),
+  })
+  const nextNotification = createNotificationDocument({
+    scheduledFor: Timestamp.fromDate(new Date(2026, 4, 1, 10, 10, 0, 0)),
+    status: 'pending',
+    subject: 'ATUALIZAÇÃO - Confirmação de designação - Organização',
+  })
+
+  const mergedNotification = mergeNotificationDocumentForSync(
+    existingNotification,
+    nextNotification,
+    { forceRestart: true },
+  )
+
+  assert.equal(mergedNotification.status, 'pending')
+  assert.equal(mergedNotification.sentAt, null)
+  assert.equal(mergedNotification.retryCount, 0)
+})
+
+test('preserva envio concluído quando a automação é desligada', () => {
+  const sentAt = Timestamp.fromDate(new Date(2026, 4, 1, 10, 5, 0, 0))
+  const existingNotification = createNotificationDocument({
+    status: 'sent',
+    sentAt,
+  })
+  const nextNotification = createNotificationDocument({
+    scheduledFor: Timestamp.fromDate(new Date(2026, 4, 1, 10, 10, 0, 0)),
+    status: 'cancelled',
+    subject: 'ATUALIZAÇÃO - Confirmação de designação - Organização',
+  })
+
+  const mergedNotification = mergeNotificationDocumentForSync(
+    existingNotification,
+    nextNotification,
+    { forceRestart: true },
+  )
+
+  assert.equal(mergedNotification.status, 'sent')
+  assert.equal(mergedNotification.sentAt?.toMillis(), sentAt.toMillis())
+  assert.equal(
+    mergedNotification.subject,
+    'Confirmação de designação - Organização',
+  )
 })

@@ -1,5 +1,20 @@
 import type { NotificationDocument } from '../types/firestore.js'
 
+type TimestampLike = {
+  toMillis(): number
+}
+
+export function isTimestampInCurrentAssignmentRevision(
+  candidateTimestamp: TimestampLike | null | undefined,
+  assignmentUpdatedAt: TimestampLike,
+) {
+  return (
+    candidateTimestamp !== null &&
+    candidateTimestamp !== undefined &&
+    candidateTimestamp.toMillis() >= assignmentUpdatedAt.toMillis()
+  )
+}
+
 function hasNotificationDeliveryIdentityChanged(
   existingNotification: NotificationDocument,
   nextNotification: NotificationDocument,
@@ -7,20 +22,18 @@ function hasNotificationDeliveryIdentityChanged(
   return (
     existingNotification.recipientEmail !== nextNotification.recipientEmail ||
     existingNotification.subject !== nextNotification.subject ||
-    (existingNotification.speakerId ?? null) !== (nextNotification.speakerId ?? null) ||
-    existingNotification.scheduledFor.toMillis() !== nextNotification.scheduledFor.toMillis()
+    (existingNotification.speakerId ?? null) !== (nextNotification.speakerId ?? null)
   )
 }
 
 export function mergeNotificationDocumentForSync(
   existingNotification: NotificationDocument | null,
   nextNotification: NotificationDocument,
+  options: {
+    forceRestart?: boolean
+  } = {},
 ): NotificationDocument {
   if (!existingNotification) {
-    return nextNotification
-  }
-
-  if (hasNotificationDeliveryIdentityChanged(existingNotification, nextNotification)) {
     return nextNotification
   }
 
@@ -36,13 +49,16 @@ export function mergeNotificationDocumentForSync(
       existingNotification.status === 'failed' ||
       existingNotification.status === 'cancelled'
     ) {
-      return {
-        ...nextNotification,
-        ...mergedLifecycleState,
-        status: existingNotification.status,
-      }
+      return existingNotification
     }
 
+    return nextNotification
+  }
+
+  if (
+    options.forceRestart ||
+    hasNotificationDeliveryIdentityChanged(existingNotification, nextNotification)
+  ) {
     return nextNotification
   }
 

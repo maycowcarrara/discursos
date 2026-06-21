@@ -1,8 +1,63 @@
 export const maxCalendarRetryCount = 3
 export const calendarRetryDelayMinutes = 30
 
+export type GoogleCalendarAssignmentKind =
+  | 'incomingVisitor'
+  | 'localTalk'
+  | 'outgoingTalk'
+
+type ResolveGoogleCalendarAssignmentKindInput = {
+  destinationIsLocal: boolean | null
+  speakerType: 'local' | 'visitor'
+}
+
+type ShouldProcessManualCalendarSyncInput = {
+  hasLatestAssignment: boolean
+  hasRemoteEvent: boolean
+  hasSyncEntry: boolean
+  lastRelevantChangeAt: number
+  requestedAt: number
+}
+
 export function shouldPublishStandaloneCalendarEvent(type: string) {
   return type === 'special'
+}
+
+export function resolveGoogleCalendarAssignmentKind({
+  destinationIsLocal,
+  speakerType,
+}: ResolveGoogleCalendarAssignmentKindInput): GoogleCalendarAssignmentKind | null {
+  if (speakerType === 'visitor' && destinationIsLocal === true) {
+    return 'incomingVisitor'
+  }
+
+  if (speakerType === 'local' && destinationIsLocal === true) {
+    return 'localTalk'
+  }
+
+  if (speakerType === 'local' && destinationIsLocal === false) {
+    return 'outgoingTalk'
+  }
+
+  return null
+}
+
+export function shouldProcessManualCalendarSync({
+  hasLatestAssignment,
+  hasRemoteEvent,
+  hasSyncEntry,
+  lastRelevantChangeAt,
+  requestedAt,
+}: ShouldProcessManualCalendarSyncInput) {
+  if (!hasSyncEntry && !hasRemoteEvent) {
+    return false
+  }
+
+  if (!hasSyncEntry && hasRemoteEvent && !hasLatestAssignment) {
+    return true
+  }
+
+  return requestedAt >= lastRelevantChangeAt
 }
 
 export function resolveCalendarRetryDecision(retryCount: number, now: Date) {

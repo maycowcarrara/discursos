@@ -376,8 +376,10 @@ Observações:
 * `googleCalendarRetryCount` e `googleCalendarSyncScheduledFor` controlam retentativas sem perder a pendência após falha transitória
 * o ID enviado ao Google Calendar deve ser determinístico a partir de `calendarEvents/{id}`, para que uma retomada após falha não duplique o evento remoto
 * campos técnicos de sincronização não devem sobrescrever `updatedAt`, que continua representando mudança real feita no calendário administrativo
-* slots regulares de `publicTalk` não precisam existir no Firestore para aparecer no Dashboard/Designações e também não precisam existir no Google Calendar
-* quando houver publicação de `orador visitante` ou `discurso fora`, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e adicionar o orador como convidado no Google Calendar
+* slots regulares de `publicTalk` não precisam existir no Firestore para aparecer no Dashboard/Designações e também não devem ser publicados no Google Calendar enquanto estiverem sem designação
+* qualquer designação operacional `pending` ou `confirmed` — `orador visitante`, `designação local` ou `discurso fora` — pode ser publicada manualmente no Google Calendar
+* edições, cancelamentos e substituições exigem nova solicitação manual para atualizar ou remover o evento remoto já vinculado
+* quando houver publicação de uma designação, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e adicionar o orador como convidado no Google Calendar
 * não criar coleção paralela como `events`, `schedules` ou `annualCalendar`
 
 ### 6. `assignments`
@@ -422,7 +424,7 @@ Observações:
 * salvar snapshots mínimos como `speakerName`, `themeTitle` e `originCongregationName` é permitido para preservar histórico
 * nunca depender apenas do documento relacionado para reconstruir histórico antigo
 * `emailNotificationsEnabled` controla se a designação entra automaticamente na fila de confirmação e lembretes por e-mail; o padrão operacional é `false`
-* `manualConfirmationEmailRequestedAt` registra o disparo manual de e-mail de confirmação e impede nova solicitação manual para a mesma designação
+* `manualConfirmationEmailRequestedAt` registra a solicitação manual mais recente; na revisão atual da designação, notificação manual `pending` ou `sent` impede novo disparo, enquanto `failed` permite nova tentativa
 * `confirmationToken` só deve ser resolvido por fluxo público mediado por worker, nunca por escrita pública direta no frontend
 
 ### 7. `notifications`
@@ -457,6 +459,10 @@ Observações:
 * não expor segredos ou payloads sensíveis no frontend
 * a fila ativa deve usar IDs determinísticos por designação e tipo para evitar duplicidade de lembretes dentro da mesma operação
 * envios manuais de e-mail de confirmação também usam esta coleção, com ID determinístico por designação para impedir disparos repetidos pelo painel
+* uma edição operacional pode reabrir explicitamente a notificação automática de confirmação; o assunto deve identificar o reenvio com `ATUALIZAÇÃO`
+* `assignments.updatedAt` delimita a revisão operacional atual: uma notificação anterior a esse horário não bloqueia novo envio manual após edição; notificações criadas na mesma revisão continuam impedindo duplicidade
+* `scheduledFor` controla execução e retentativa, mas não deve ser usado isoladamente como identidade de entrega
+* lembretes cujo horário de quatro dias já passou devem permanecer cancelados
 * notificações legadas `reminder7d` e `reminder1d`, quando existirem, devem ser apenas encerradas durante nova sincronização; novas gravações usam `reminder4d`
 
 ### 8. `auditLogs`

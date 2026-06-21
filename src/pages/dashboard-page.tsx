@@ -41,6 +41,7 @@ import {
   calendarEventTypeLabels,
 } from '@/utils/calendar-events'
 import { buildAssignmentWhatsAppConfirmationUrl } from '@/utils/assignment-whatsapp'
+import { isTimestampInCurrentAssignmentRevision } from '@/utils/notification-sync'
 import {
   buildDashboardSaturdayEntries,
 } from '@/utils/dashboard'
@@ -201,21 +202,43 @@ export function DashboardPage() {
     automaticConfirmationNotificationQuery.data ?? null
   const manualConfirmationNotification =
     manualConfirmationNotificationQuery.data ?? null
+  const currentAutomaticConfirmationNotification =
+    automaticConfirmationNotification &&
+    nextAssignment &&
+    isTimestampInCurrentAssignmentRevision(
+      automaticConfirmationNotification.updatedAt,
+      nextAssignment.updatedAt,
+    )
+      ? automaticConfirmationNotification
+      : null
+  const currentManualConfirmationNotification =
+    manualConfirmationNotification &&
+    nextAssignment &&
+    isTimestampInCurrentAssignmentRevision(
+      manualConfirmationNotification.updatedAt,
+      nextAssignment.updatedAt,
+    )
+      ? manualConfirmationNotification
+      : null
   const automaticConfirmationStatus =
-    automaticConfirmationNotification?.status ?? null
+    currentAutomaticConfirmationNotification?.status ?? null
   const manualConfirmationStatus =
-    manualConfirmationNotification?.status ?? null
+    currentManualConfirmationNotification?.status ?? null
   const automaticEmailAlreadySent = automaticConfirmationStatus === 'sent'
   const automaticEmailQueued = automaticConfirmationStatus === 'pending'
   const automaticEmailFailed = automaticConfirmationStatus === 'failed'
   const manualEmailFailed = manualConfirmationStatus === 'failed'
   const manualEmailAlreadyRequested = Boolean(
-    nextAssignment?.manualConfirmationEmailRequestedAt,
+    nextAssignment &&
+      isTimestampInCurrentAssignmentRevision(
+        nextAssignment.manualConfirmationEmailRequestedAt,
+        nextAssignment.updatedAt,
+      ) &&
+      !manualEmailFailed,
   )
   const manualEmailAlreadyQueuedOrSent =
     manualConfirmationStatus === 'pending' ||
-    manualConfirmationStatus === 'sent' ||
-    manualConfirmationStatus === 'failed'
+    manualConfirmationStatus === 'sent'
   const emailActionResolved =
     automaticEmailAlreadySent ||
     manualEmailAlreadyRequested ||
@@ -236,7 +259,7 @@ export function DashboardPage() {
   const emailActionLabel = !emailDeliveryConfigured
     ? 'E-mail indisponível'
     : automaticEmailFailed || manualEmailFailed
-      ? 'Erro no e-mail'
+      ? 'Tentar novamente'
       : automaticEmailAlreadySent
         ? 'E-mail enviado'
         : manualEmailAlreadyRequested || manualConfirmationStatus === 'sent'
@@ -245,8 +268,8 @@ export function DashboardPage() {
             ? 'E-mail na fila'
             : 'E-mail'
   const emailErrorMessage =
-    manualConfirmationNotification?.errorMessage?.trim() ||
-    automaticConfirmationNotification?.errorMessage?.trim() ||
+    currentManualConfirmationNotification?.errorMessage?.trim() ||
+    currentAutomaticConfirmationNotification?.errorMessage?.trim() ||
     ''
   const dashboardShortcuts = [
     {
@@ -303,8 +326,11 @@ export function DashboardPage() {
       return
     }
 
+    const isRetry = automaticEmailFailed || manualEmailFailed
     const confirmed = window.confirm(
-      `Enviar agora o e-mail de confirmação para ${nextAssignment.speakerName}? Esta ação só pode ser feita uma vez para esta designação.`,
+      isRetry
+        ? `Tentar enviar novamente o e-mail de confirmação para ${nextAssignment.speakerName}?`
+        : `Enviar agora o e-mail de confirmação para ${nextAssignment.speakerName}? Depois de enviado, esta ação ficará indisponível para a designação.`,
     )
 
     if (!confirmed) {
@@ -312,12 +338,16 @@ export function DashboardPage() {
     }
 
     try {
-      await requestManualEmailMutation.mutateAsync({
+      const result = await requestManualEmailMutation.mutateAsync({
         id: nextAssignment.id,
         actorUid: user.uid,
         actorName: user.displayName ?? user.email ?? null,
       })
-      toast.success('E-mail de confirmação solicitado com sucesso.')
+      if (result === 'sent') {
+        toast.success('E-mail de confirmação enviado com sucesso.')
+      } else {
+        toast.error('O envio falhou temporariamente. Uma nova tentativa foi agendada.')
+      }
     } catch (error) {
       toast.error(getErrorMessage(error))
     }

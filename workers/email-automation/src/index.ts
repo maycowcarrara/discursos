@@ -1,7 +1,10 @@
 import {
   buildGoogleCalendarEventIdFromDigest,
+  resolveGoogleCalendarAssignmentKind,
   resolveCalendarRetryDecision,
+  shouldProcessManualCalendarSync,
   shouldPublishStandaloneCalendarEvent,
+  type GoogleCalendarAssignmentKind,
 } from './google-calendar-sync.js'
 
 type ExecutionContext = {
@@ -197,7 +200,7 @@ type SpeakerRecord = {
   name: string
 }
 
-type CalendarSyncEntryKind = 'incomingVisitor' | 'outgoingTalk' | 'specialEvent'
+type CalendarSyncEntryKind = GoogleCalendarAssignmentKind | 'specialEvent'
 
 type CalendarSyncEntry = {
   assignment: AssignmentRecord | null
@@ -340,6 +343,13 @@ export default {
       if (request.method === 'DELETE') {
         return handleRemoveAdminUser(request, env)
       }
+    }
+
+    if (
+      requestUrl.pathname === '/api/admin/process-manual-notification' &&
+      request.method === 'POST'
+    ) {
+      return handleProcessManualNotification(request, env)
     }
 
     if (requestUrl.pathname === '/api/internal/process-calendar-sync') {
@@ -991,7 +1001,15 @@ async function processSingleNotification(
     return 'failed'
   }
 
-  if (notification.type === 'confirmation' && assignment.status !== 'pending') {
+  const isConfirmationUpdate =
+    notification.type === 'confirmation' &&
+    notification.subject.startsWith('ATUALIZAÇÃO - ')
+
+  if (
+    notification.type === 'confirmation' &&
+    assignment.status !== 'pending' &&
+    !(isConfirmationUpdate && assignment.status === 'confirmed')
+  ) {
     await markNotificationCancelled(
       env,
       notification,
@@ -1004,7 +1022,7 @@ async function processSingleNotification(
     await markNotificationCancelled(
       env,
       notification,
-      'Lembrete cancelado porque a designação não está mais operacional.',
+      'Notificação cancelada porque a designação não está mais operacional.',
     )
     return 'cancelled'
   }
@@ -1016,7 +1034,7 @@ async function processSingleNotification(
     await markNotificationCancelled(
       env,
       notification,
-      'Lembrete cancelado porque a data do evento já passou.',
+      'Notificação cancelada porque a data do evento já passou.',
     )
     return 'cancelled'
   }
@@ -1086,21 +1104,17 @@ async function resolveCalendarSyncEntry(
     congregationCache,
   )
 
-  if (assignment.speakerType === 'visitor' && destinationCongregation?.isLocal) {
-    return {
-      assignment,
-      attendeeEmail,
-      congregation: destinationCongregation,
-      kind: 'incomingVisitor',
-    }
-  }
+  const assignmentKind = resolveGoogleCalendarAssignmentKind({
+    destinationIsLocal: destinationCongregation?.isLocal ?? null,
+    speakerType: assignment.speakerType,
+  })
 
-  if (assignment.speakerType === 'local' && destinationCongregation && !destinationCongregation.isLocal) {
+  if (assignmentKind) {
     return {
       assignment,
       attendeeEmail,
       congregation: destinationCongregation,
-      kind: 'outgoingTalk',
+      kind: assignmentKind,
     }
   }
 
@@ -1143,14 +1157,6 @@ function shouldProcessOperationalCalendarSync(
   )
   const relevantAssignment = resolveManualSyncRelevantAssignment(syncEntry, assignmentContext)
 
-  if (!syncEntry && !hasRemoteEvent) {
-    return false
-  }
-
-  if (!syncEntry && hasRemoteEvent && !assignmentContext.latestAssignment) {
-    return true
-  }
-
   const requestedAt = calendarEvent.googleCalendarManualSyncRequestedAt?.getTime() ?? 0
   const lastRelevantChangeAt = getLatestOperationalSyncRelevantChangeAt(
     calendarSettings,
@@ -1158,7 +1164,13 @@ function shouldProcessOperationalCalendarSync(
     relevantAssignment,
   )
 
-  return requestedAt >= lastRelevantChangeAt
+  return shouldProcessManualCalendarSync({
+    hasLatestAssignment: Boolean(assignmentContext.latestAssignment),
+    hasRemoteEvent,
+    hasSyncEntry: Boolean(syncEntry),
+    lastRelevantChangeAt,
+    requestedAt,
+  })
 }
 
 function buildGoogleCalendarEventPayload(
@@ -1220,6 +1232,10 @@ function buildGoogleCalendarSummary(
 
   if (syncEntry.kind === 'outgoingTalk' && syncEntry.assignment) {
     return `Discurso fora - Tema ${syncEntry.assignment.themeNumber} - ${syncEntry.assignment.speakerName}`
+  }
+
+  if (syncEntry.kind === 'localTalk' && syncEntry.assignment) {
+    return `Designação local - Tema ${syncEntry.assignment.themeNumber} - ${syncEntry.assignment.speakerName}`
   }
 
   return `Evento especial - ${calendarEvent.title}`
@@ -1314,6 +1330,10 @@ function getCalendarSyncKindLabel(kind: CalendarSyncEntryKind) {
 
   if (kind === 'outgoingTalk') {
     return 'Discurso fora'
+  }
+
+  if (kind === 'localTalk') {
+    return 'Designação local'
   }
 
   return 'Evento especial'
@@ -2364,6 +2384,99 @@ async function handleListAdminUsers(request: Request, env: Env) {
   return jsonResponse(await buildAdminUsersResponse(env))
 }
 
+async function handleProcessManualNotification(request: Request, env: Env) {
+  const caller = await getAuthorizedAdminCaller(request, env)
+
+  if (!caller) {
+    return buildUnauthorizedAdminResponse()
+  }
+
+  const notificationId = await readNotificationIdFromRequest(request)
+
+  if (!notificationId) {
+    return jsonResponse(
+      {
+        error: 'invalid_notification',
+        message: 'A notificação informada é inválida.',
+      },
+      400,
+    )
+  }
+
+  const notificationDocument = await getDocument(env, `notifications/${notificationId}`)
+
+  if (!notificationDocument) {
+    return jsonResponse(
+      {
+        error: 'notification_not_found',
+        message: 'A notificação de e-mail não foi encontrada.',
+      },
+      404,
+    )
+  }
+
+  const notification = parseNotificationDocument(notificationDocument)
+
+  if (notification.type !== 'manual') {
+    return jsonResponse(
+      {
+        error: 'invalid_notification_type',
+        message: 'Este endpoint processa apenas envios manuais.',
+      },
+      400,
+    )
+  }
+
+  if (notification.status === 'sent') {
+    return jsonResponse({ result: 'sent' })
+  }
+
+  if (notification.status !== 'pending') {
+    return jsonResponse(
+      {
+        error: 'notification_not_pending',
+        message: 'Este e-mail não está disponível para processamento.',
+      },
+      409,
+    )
+  }
+
+  const result = await processSingleNotification(env, notification)
+
+  if (result === 'sent') {
+    return jsonResponse({ result })
+  }
+
+  const updatedDocument = await getDocument(env, `notifications/${notificationId}`)
+  const errorMessage = updatedDocument
+    ? getNullableStringField(updatedDocument, 'errorMessage')
+    : null
+
+  if (result === 'requeued') {
+    return jsonResponse({
+      message:
+        errorMessage ??
+        'O provedor não concluiu o envio. Uma nova tentativa foi agendada.',
+      result,
+    }, 202)
+  }
+
+  return jsonResponse(
+    {
+      error: `notification_${result}`,
+      message:
+        errorMessage ??
+        (result === 'cancelled'
+          ? 'O envio foi cancelado porque a designação não está mais disponível.'
+          : result === 'skipped'
+            ? 'O e-mail já está sendo processado.'
+            : 'Não foi possível enviar o e-mail de confirmação.'),
+      result,
+    },
+    result === 'failed' ? 422 : 409,
+  )
+}
+
 async function handleAddAdminUser(request: Request, env: Env) {
   const caller = await getAuthorizedAdminCaller(request, env)
 
@@ -2540,6 +2653,23 @@ async function readAdminEmailFromRequest(request: Request) {
   const email = normalizeEmailValue(payload.email)
 
   return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null
+}
+
+async function readNotificationIdFromRequest(request: Request) {
+  const payload = (await request.json().catch(() => null)) as unknown
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('notificationId' in payload) ||
+    typeof payload.notificationId !== 'string'
+  ) {
+    return null
+  }
+
+  const notificationId = payload.notificationId.trim()
+
+  return /^[A-Za-z0-9_-]+__manual$/.test(notificationId) ? notificationId : null
 }
 
 async function getAdminAccessSettingsRecord(

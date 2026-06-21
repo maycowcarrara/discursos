@@ -21,6 +21,7 @@ export type AssignmentNotificationPlanInput = {
   recipient: AssignmentNotificationRecipient
   organizationName: string
   automaticEmailsEnabled: boolean
+  isAssignmentUpdate?: boolean
   now: Date
 }
 
@@ -62,15 +63,26 @@ export function buildAssignmentNotificationPlan(
     eventHasNotEnded &&
     recipientEmail.length > 0 &&
     input.automaticEmailsEnabled
+  const reminderScheduledFor = getReminderScheduledDate(input.eventDate)
+  const canScheduleReminder = reminderScheduledFor.getTime() >= input.now.getTime()
 
   return automatedNotificationTypes.map((type) => {
     const isConfirmation = type === 'confirmation'
-    const subject = getNotificationSubject(type, organizationName)
+    const subject = getNotificationSubject(
+      type,
+      organizationName,
+      isConfirmation && input.isAssignmentUpdate === true,
+    )
     const scheduledFor = canOperateNotifications
-      ? getScheduledDateForType(type, input.eventDate, input.now)
+      ? isConfirmation
+        ? new Date(input.now)
+        : reminderScheduledFor
       : input.now
     const shouldStayPending =
-      canOperateNotifications && (!isConfirmation || input.status === 'pending')
+      canOperateNotifications &&
+      (isConfirmation
+        ? input.status === 'pending' || input.isAssignmentUpdate === true
+        : canScheduleReminder)
 
     return {
       documentId: getAssignmentNotificationDocumentId(input.assignmentId, type),
@@ -86,30 +98,21 @@ export function buildAssignmentNotificationPlan(
 function getNotificationSubject(
   type: AutomatedNotificationType,
   organizationName: string,
+  isUpdate: boolean,
 ) {
   if (type === 'confirmation') {
-    return `Confirmação de designação - ${organizationName}`
+    const prefix = isUpdate ? 'ATUALIZAÇÃO - ' : ''
+
+    return `${prefix}Confirmação de designação - ${organizationName}`
   }
 
   return `Lembrete de designação em 4 dias - ${organizationName}`
 }
 
-function getScheduledDateForType(
-  type: AutomatedNotificationType,
-  eventDate: Date,
-  now: Date,
-) {
-  if (type === 'confirmation') {
-    return new Date(now)
-  }
-
+function getReminderScheduledDate(eventDate: Date) {
   const reminderDate = new Date(eventDate)
   reminderDate.setDate(reminderDate.getDate() - 4)
   reminderDate.setHours(reminderSendHour, 0, 0, 0)
-
-  if (reminderDate.getTime() < now.getTime()) {
-    return new Date(now)
-  }
 
   return reminderDate
 }

@@ -39,7 +39,10 @@ import {
   isAssignmentCoveringCalendarSlot,
   toLocalDateKey,
 } from '@/utils/calendar-events'
-import { mergeNotificationDocumentForSync } from '@/utils/notification-sync'
+import {
+  isTimestampInCurrentAssignmentRevision,
+  mergeNotificationDocumentForSync,
+} from '@/utils/notification-sync'
 
 import { appendAuditLogToBatch } from './audit-logs-service'
 import {
@@ -329,6 +332,7 @@ function buildNotificationDocuments(options: {
   organizationName: string
   recipientEmail: string
   speakerName: string
+  isAssignmentUpdate?: boolean
   now: Timestamp
 }) {
   const notificationPlan = buildAssignmentNotificationPlan({
@@ -341,11 +345,16 @@ function buildNotificationDocuments(options: {
     },
     organizationName: options.organizationName,
     automaticEmailsEnabled: options.assignment.emailNotificationsEnabled,
+    isAssignmentUpdate: options.isAssignmentUpdate,
     now: options.now.toDate(),
   })
 
   const activeNotificationDocuments = notificationPlan.map((notification) => ({
     id: notification.documentId,
+    forceRestart:
+      options.isAssignmentUpdate === true &&
+      notification.type === 'confirmation' &&
+      notification.status === 'pending',
     document: {
       type: notification.type,
       channel: 'email' as const,
@@ -367,13 +376,14 @@ function buildNotificationDocuments(options: {
   const legacyCancelledDocuments = (['reminder7d', 'reminder1d'] as const).map(
     (type) => ({
       id: `${options.assignment.id}__${type}`,
+      forceRestart: false,
       document: {
         type,
         channel: 'email' as const,
         assignmentId: options.assignment.id,
         speakerId: options.assignment.speakerId,
         recipientEmail: options.recipientEmail.trim(),
-    subject: `Lembrete legado cancelado - ${options.organizationName.trim() || 'Organização'}`,
+        subject: `Lembrete legado cancelado - ${options.organizationName.trim() || 'Organização'}`,
         status: 'cancelled' as const,
         scheduledFor: options.now,
         sentAt: null,
@@ -400,6 +410,7 @@ function mergeNotificationSyncDocuments(
     document: mergeNotificationDocumentForSync(
       existingNotificationsById.get(notification.id) ?? null,
       notification.document,
+      { forceRestart: notification.forceRestart },
     ),
   }))
 }
@@ -1072,6 +1083,7 @@ export async function updateAssignment({
       organizationName,
       recipientEmail: speakerForNotifications.email,
       speakerName: updatedAssignment.speakerName,
+      isAssignmentUpdate: true,
       now,
     })
     const batch = writeBatch(firebaseDb)
@@ -1138,6 +1150,7 @@ export async function updateAssignment({
             organizationName,
             recipientEmail: speakerForNotifications.email,
             speakerName: updatedAssignment.speakerName,
+            isAssignmentUpdate: true,
             now,
           })
 
@@ -1184,6 +1197,7 @@ export async function updateAssignment({
       organizationName,
       recipientEmail: speakerForNotifications.email,
       speakerName: updatedAssignment.speakerName,
+      isAssignmentUpdate: true,
       now,
     })
     const batch = writeBatch(firebaseDb)
@@ -1256,6 +1270,7 @@ export async function updateAssignment({
             organizationName,
             recipientEmail: entities.speaker.email,
             speakerName: updatedAssignment.speakerName,
+            isAssignmentUpdate: true,
             now,
           })
 
@@ -1304,6 +1319,7 @@ export async function updateAssignment({
       organizationName,
       recipientEmail: entities.speaker.email,
       speakerName: updatedAssignment.speakerName,
+      isAssignmentUpdate: true,
       now,
     })
     const batch = writeBatch(firebaseDb)
@@ -1430,10 +1446,6 @@ export async function requestManualAssignmentConfirmationEmail({
       throw new Error('Envie e-mail apenas para designações pendentes ou confirmadas.')
     }
 
-    if (assignment.manualConfirmationEmailRequestedAt) {
-      throw new Error('O e-mail de confirmação já foi solicitado para esta designação.')
-    }
-
     const automaticConfirmationRef = getAssignmentNotificationRef(id, 'confirmation')
     const manualNotificationRef = getAssignmentNotificationRef(id, 'manual')
     const [automaticConfirmationSnapshot, manualNotificationSnapshot] =
@@ -1446,10 +1458,16 @@ export async function requestManualAssignmentConfirmationEmail({
       const automaticConfirmation = notificationSchema.parse(
         automaticConfirmationSnapshot.data(),
       )
+      const isCurrentAutomaticConfirmation =
+        isTimestampInCurrentAssignmentRevision(
+          automaticConfirmation.updatedAt,
+          assignment.updatedAt,
+        )
 
       if (
-        automaticConfirmation.status === 'sent' ||
-        automaticConfirmation.status === 'pending'
+        isCurrentAutomaticConfirmation &&
+        (automaticConfirmation.status === 'sent' ||
+          automaticConfirmation.status === 'pending')
       ) {
         throw new Error(
           automaticConfirmation.status === 'sent'
@@ -1464,9 +1482,29 @@ export async function requestManualAssignmentConfirmationEmail({
         manualNotificationSnapshot.data(),
       )
 
-      if (manualNotification.status !== 'cancelled') {
-        throw new Error('O e-mail de confirmação manual já foi solicitado.')
+      if (
+        isTimestampInCurrentAssignmentRevision(
+          manualNotification.updatedAt,
+          assignment.updatedAt,
+        ) &&
+        (
+          manualNotification.status === 'pending' ||
+          manualNotification.status === 'sent'
+        )
+      ) {
+        throw new Error(
+          manualNotification.status === 'sent'
+            ? 'O e-mail de confirmação manual já foi enviado.'
+            : 'O e-mail de confirmação manual já está na fila.',
+        )
       }
+    } else if (
+      isTimestampInCurrentAssignmentRevision(
+        assignment.manualConfirmationEmailRequestedAt,
+        assignment.updatedAt,
+      )
+    ) {
+      throw new Error('O e-mail de confirmação já foi solicitado para esta designação.')
     }
 
     const now = Timestamp.now()
@@ -1509,4 +1547,6 @@ export async function requestManualAssignmentConfirmationEmail({
       createdAt: now,
     })
   })
+
+  return getAssignmentNotificationRef(id, 'manual').id
 }

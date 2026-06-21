@@ -48,7 +48,7 @@
 * redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
 * reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
 * simplificação dos status de oradores para `ativo`, `indisponível` e `inativo`, consolidando férias como indisponibilidade temporária e transferidos como inativos preservados no histórico
-* controle explícito de e-mails por designação, mantendo notificações automáticas desligadas por padrão, um único lembrete automático 4 dias antes e envio manual de confirmação como ação única
+* controle explícito de e-mails por revisão da designação, mantendo notificações automáticas desligadas por padrão, um único lembrete automático 4 dias antes e envio manual de confirmação como ação única até a próxima edição
 * confirmação por WhatsApp com mensagem completa de data, discurso, origem, destino, endereço, dia e horário da reunião
 * validação visual em larguras desktop e mobile antes do aceite final do lançamento
 
@@ -183,7 +183,8 @@
 
 * fila automática de `notifications` sincronizada junto com create, update, confirmação e substituição de `assignments`
 * criação de designação passa a deixar notificações automáticas por e-mail desligadas por padrão, com ativação explícita no cadastro
-* envio manual de e-mail de confirmação pode ser solicitado uma única vez por designação operacional, usando a fila `notifications`
+* envio manual de e-mail de confirmação pode ser concluído uma única vez por revisão da designação operacional, usando a fila `notifications`; uma edição libera um novo envio com os dados atualizados
+* falhas definitivas no envio manual não consomem a ação única; o painel permite tentar novamente até ocorrer envio ou existir uma solicitação pendente
 * ações de e-mail ficam bloqueadas no painel quando as chaves públicas do EmailJS não estão configuradas no frontend
 * botão de confirmação por WhatsApp disponível quando o orador possui WhatsApp, reutilizando a mesma mensagem completa no dashboard e na lista de designações
 * lembrete único de 4 dias programado por utilitário tipado e coberto por teste dedicado
@@ -194,6 +195,10 @@
 * autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
 * template único do EmailJS reaproveitado para confirmação e lembretes com parâmetros padronizados
 * sincronização da fila preservando estado já processado quando a identidade de entrega não muda, e reabrindo o ciclo apenas quando a entrega realmente muda
+* edição de designação operacional com automação ativa reabre explicitamente a confirmação, usando `ATUALIZAÇÃO` no assunto sem depender da variação de `scheduledFor`
+* lembrete de 4 dias é cancelado quando a automação for ativada depois do horário oficial, sem disparo tardio com texto incorreto
+* botão de envio manual solicita processamento imediato em endpoint administrativo autenticado do worker, mantendo o cron como contingência
+* dashboard e Designações acompanham mudanças da fila em tempo real para refletir envio, falha e bloqueio sem recarregar a página
 * scripts `test:notifications`, `typecheck:worker`, `deploy:worker` e `worker:deploy` adicionados para a operação da fase
 
 ### Google Calendar — fechamento da Fase 12
@@ -205,8 +210,8 @@
 * `settings/calendar.configurationUpdatedAt` passa a distinguir alteração real de configuração dos ciclos internos do worker
 * o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account já adotada na Fase 11
 * a tela de configurações passa a exibir a configuração e o último estado global de sincronização da Fase 12
-* o Google Calendar deixa de espelhar slots vazios e passa a publicar apenas `orador visitante`, `discurso fora` e `evento especial`
-* quando o cadastro em `speakers` tiver `email`, o orador envolvido entra como convidado em `orador visitante` e `discurso fora`, com convites, updates e cancelamentos enviados pelo Google Calendar
+* o Google Calendar deixa de espelhar slots vazios e passa a publicar, mediante ação manual, qualquer designação operacional (`orador visitante`, `designação local` ou `discurso fora`), além de `evento especial`
+* quando o cadastro em `speakers` tiver `email`, o orador envolvido entra como convidado nas designações publicadas, com convites, updates e cancelamentos enviados pelo Google Calendar
 * mudanças de configuração do Google Calendar reenfileiram eventos especiais ativos e eventos já publicados sem varrer todos os sábados materializados
 
 Impacto técnico desta abertura de fase:
@@ -718,12 +723,14 @@ Fluxo operacional oficial da Fase 11:
 
 * `pending`: gera `confirmation` e `reminder4d` em `notifications` quando a designação continua operacional, o evento ainda não passou, existe e-mail válido e as notificações automáticas foram ativadas
 * notificações automáticas só entram como `pending` quando `assignments.emailNotificationsEnabled = true`; quando desligadas, os documentos determinísticos permanecem cancelados
-* o disparo manual de confirmação usa notificação `manual` com agendamento imediato, grava `manualConfirmationEmailRequestedAt` na designação e não reabre outro disparo depois de solicitado
+* o disparo manual de confirmação usa notificação `manual` com agendamento imediato e grava `manualConfirmationEmailRequestedAt`; na mesma revisão, nova solicitação só é permitida após falha definitiva, nunca enquanto estiver pendente ou depois de enviada
+* toda edição operacional inicia uma nova revisão para o controle de e-mail: notificações e solicitações anteriores permanecem no histórico, mas deixam de bloquear um novo envio manual; se a automação estiver ativa, a confirmação atualizada entra na fila e continua bloqueando duplicidade nessa nova revisão
 * o botão manual fica bloqueado quando a confirmação automática já foi enviada ou já está na fila, evitando duplicidade de e-mail
 * `confirmed`: mantém lembretes futuros ativos e encerra a automação de confirmação
 * `declined`, `cancelled` e `replaced`: encerram as automações pendentes da designação, preservando o histórico
-* edição sem mudança real de entrega preserva status já processado da notificação, evitando reenvio indevido
-* edição com mudança real de entrega reinicia o ciclo da notificação correspondente
+* sincronizações de status sem edição preservam notificações já processadas, sem usar `scheduledFor` como identidade de entrega
+* edição operacional com automação ativa reinicia explicitamente a confirmação automática e prefixa o assunto com `ATUALIZAÇÃO`
+* lembrete de 4 dias não é enviado quando seu horário oficial já passou
 * o worker faz `claim` temporário da notificação antes de enviar para reduzir duplicidade em concorrência
 * retentativas usam novo `scheduledFor`; após o limite, a notificação passa para `failed`
 * falhas permanentes de configuração do EmailJS são registradas em `notifications.errorMessage` e exibidas nas telas operacionais
@@ -751,11 +758,12 @@ Entregas desta fase:
 
 * `settings/calendar` com persistência real para `enabled`, `calendarId`, horário padrão e duração padrão
 * estado de sincronização do Google Calendar registrado diretamente em `calendarEvents`
-* publicação manual de designações operacionais por botão `Sincronizar com agenda`, sem envio automático ao Google Calendar logo após salvar
+* publicação manual de qualquer designação operacional — `orador visitante`, `designação local` ou `discurso fora` — por botão `Sincronizar com agenda`, sem envio automático ao Google Calendar logo após salvar
 * aprovação manual persistida no próprio `calendarEvents`, impedindo republicação operacional sem novo pedido
 * alinhamento entre UI e worker para usar a designação operacional vigente como referência da ação manual
 * worker preparado para criar, atualizar e excluir eventos no Google Calendar por cron e trigger interno
-* calendário remoto restrito a eventos operacionais reais, sem publicar sábados vazios
+* calendário remoto restrito a eventos operacionais reais, aceitando designações pendentes ou confirmadas e sem publicar sábados vazios
+* edições exigem nova solicitação manual; cancelamentos e substituições exigem nova solicitação para atualizar ou remover o evento remoto
 
 Fechamento técnico entregue:
 

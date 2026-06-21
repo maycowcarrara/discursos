@@ -20,6 +20,7 @@ import {
   type RequestManualAssignmentConfirmationEmailInput,
   type UpdateAssignmentInput,
 } from '@/services/firestore/assignments-service'
+import { processManualNotificationImmediately } from '@/services/notifications/email-delivery-service'
 
 export function useAssignmentsByYearQuery(year: number, enabled = true) {
   return useQuery({
@@ -123,9 +124,12 @@ export function useRequestManualAssignmentConfirmationEmailMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: RequestManualAssignmentConfirmationEmailInput) =>
-      requestManualAssignmentConfirmationEmail(input),
-    onSuccess: async () => {
+    mutationFn: async (input: RequestManualAssignmentConfirmationEmailInput) => {
+      const notificationId = await requestManualAssignmentConfirmationEmail(input)
+
+      return processManualNotificationImmediately(notificationId)
+    },
+    onSettled: async () => {
       await invalidateAssignmentQueries(queryClient)
     },
   })

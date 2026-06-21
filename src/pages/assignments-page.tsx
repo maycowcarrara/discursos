@@ -89,6 +89,7 @@ import {
   type AssignmentMovementType,
 } from '@/utils/assignment-history'
 import { buildAssignmentWhatsAppConfirmationUrl } from '@/utils/assignment-whatsapp'
+import { isTimestampInCurrentAssignmentRevision } from '@/utils/notification-sync'
 import {
   assignmentStatusLabels,
   buildOperationalAssignmentMapByCalendarEventId,
@@ -397,7 +398,11 @@ function buildCreateFormValues(
 }
 
 function isGoogleCalendarCandidateMovement(movementType: MovementType) {
-  return movementType === 'incoming' || movementType === 'outgoing'
+  return (
+    movementType === 'incoming' ||
+    movementType === 'local' ||
+    movementType === 'outgoing'
+  )
 }
 
 function buildGoogleCalendarActionOwnerMapByCalendarEventId(
@@ -1584,18 +1589,17 @@ export function AssignmentsPage() {
       return
     }
 
-    if (assignment.manualConfirmationEmailRequestedAt) {
-      const message = 'O e-mail de confirmação já foi solicitado para esta designação.'
-      setFeedback({
-        tone: 'success',
-        message,
-      })
-      toast.success(message)
-      return
-    }
-
+    const automaticNotification = notificationsById.get(
+      `${assignment.id}__confirmation`,
+    )
+    const manualNotification = notificationsById.get(`${assignment.id}__manual`)
+    const isRetry =
+      automaticNotification?.status === 'failed' ||
+      manualNotification?.status === 'failed'
     const confirmed = window.confirm(
-      `Enviar agora o e-mail de confirmação para ${assignment.speakerName}? Esta ação só pode ser feita uma vez para esta designação.`,
+      isRetry
+        ? `Tentar enviar novamente o e-mail de confirmação para ${assignment.speakerName}?`
+        : `Enviar agora o e-mail de confirmação para ${assignment.speakerName}? Depois de enviado, esta ação ficará indisponível para a designação.`,
     )
 
     if (!confirmed) {
@@ -1605,18 +1609,25 @@ export function AssignmentsPage() {
     setFeedback(null)
 
     try {
-      await requestManualEmailMutation.mutateAsync({
+      const result = await requestManualEmailMutation.mutateAsync({
         id: assignment.id,
         actorUid: user.uid,
         actorName,
       })
 
-      const message = 'E-mail de confirmação solicitado com sucesso.'
+      const message =
+        result === 'sent'
+          ? 'E-mail de confirmação enviado com sucesso.'
+          : 'O envio falhou temporariamente. Uma nova tentativa foi agendada.'
       setFeedback({
-        tone: 'success',
+        tone: result === 'sent' ? 'success' : 'error',
         message,
       })
-      toast.success(message)
+      if (result === 'sent') {
+        toast.success(message)
+      } else {
+        toast.error(message)
+      }
     } catch (error) {
       const message = getErrorMessage(error)
       setFeedback({
@@ -2543,10 +2554,26 @@ export function AssignmentsPage() {
                   const manualConfirmationNotification = notificationsById.get(
                     `${assignment.id}__manual`,
                   )
+                  const currentAutomaticConfirmationNotification =
+                    automaticConfirmationNotification &&
+                    isTimestampInCurrentAssignmentRevision(
+                      automaticConfirmationNotification.updatedAt,
+                      assignment.updatedAt,
+                    )
+                      ? automaticConfirmationNotification
+                      : null
+                  const currentManualConfirmationNotification =
+                    manualConfirmationNotification &&
+                    isTimestampInCurrentAssignmentRevision(
+                      manualConfirmationNotification.updatedAt,
+                      assignment.updatedAt,
+                    )
+                      ? manualConfirmationNotification
+                      : null
                   const automaticConfirmationStatus =
-                    automaticConfirmationNotification?.status
+                    currentAutomaticConfirmationNotification?.status
                   const manualConfirmationStatus =
-                    manualConfirmationNotification?.status
+                    currentManualConfirmationNotification?.status
                   const automaticEmailAlreadySent =
                     automaticConfirmationStatus === 'sent'
                   const automaticEmailQueued = automaticConfirmationStatus === 'pending'
@@ -2554,12 +2581,14 @@ export function AssignmentsPage() {
                     automaticConfirmationStatus === 'failed'
                   const manualEmailFailed = manualConfirmationStatus === 'failed'
                   const manualEmailAlreadyRequested = Boolean(
-                    assignment.manualConfirmationEmailRequestedAt,
+                    isTimestampInCurrentAssignmentRevision(
+                      assignment.manualConfirmationEmailRequestedAt,
+                      assignment.updatedAt,
+                    ) && !manualEmailFailed,
                   )
                   const manualEmailAlreadyQueuedOrSent =
                     manualConfirmationStatus === 'pending' ||
-                    manualConfirmationStatus === 'sent' ||
-                    manualConfirmationStatus === 'failed'
+                    manualConfirmationStatus === 'sent'
                   const manualEmailActionResolved =
                     automaticEmailAlreadySent ||
                     manualEmailAlreadyRequested ||
@@ -2580,7 +2609,7 @@ export function AssignmentsPage() {
                   const manualEmailActionLabel = !emailDeliveryConfigured
                     ? 'E-mail indisponível'
                     : automaticEmailFailed || manualEmailFailed
-                      ? 'Erro no e-mail'
+                      ? 'Tentar novamente'
                       : automaticEmailAlreadySent
                         ? 'E-mail enviado'
                         : manualEmailAlreadyRequested ||
@@ -2590,8 +2619,8 @@ export function AssignmentsPage() {
                             ? 'E-mail na fila'
                             : 'E-mail agora'
                   const emailErrorMessage =
-                    manualConfirmationNotification?.errorMessage?.trim() ||
-                    automaticConfirmationNotification?.errorMessage?.trim() ||
+                    currentManualConfirmationNotification?.errorMessage?.trim() ||
+                    currentAutomaticConfirmationNotification?.errorMessage?.trim() ||
                     ''
                   const linkedCalendarEvent =
                     calendarEventsById.get(assignment.calendarEventId) ?? null

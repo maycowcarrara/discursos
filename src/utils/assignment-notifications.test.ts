@@ -93,3 +93,50 @@ test('cancela automações quando o orador não possui e-mail válido', () => {
 
   assert.equal(plan.every((item) => item.status === 'cancelled'), true)
 })
+
+test('marca confirmação de edição como atualização e permite reenvio de confirmado', () => {
+  const now = new Date(2026, 4, 1, 10, 0, 0, 0)
+  const plan = buildAssignmentNotificationPlan({
+    assignmentId: 'assignment-4',
+    eventDate: new Date(2026, 4, 20, 12, 0, 0, 0),
+    status: 'confirmed',
+    recipient: {
+      email: 'local@example.com',
+      speakerName: 'Orador Local',
+    },
+    organizationName: 'Congregação Central',
+    automaticEmailsEnabled: true,
+    isAssignmentUpdate: true,
+    now,
+  })
+  const confirmation = plan.find((item) => item.type === 'confirmation')
+
+  assert.equal(confirmation?.status, 'pending')
+  assert.equal(
+    confirmation?.subject,
+    'ATUALIZAÇÃO - Confirmação de designação - Congregação Central',
+  )
+})
+
+test('não envia lembrete tardio quando o horário de quatro dias já passou', () => {
+  const now = new Date(2026, 4, 7, 10, 0, 0, 0)
+  const plan = buildAssignmentNotificationPlan({
+    assignmentId: 'assignment-5',
+    eventDate: new Date(2026, 4, 9, 12, 0, 0, 0),
+    status: 'pending',
+    recipient: {
+      email: 'visitante@example.com',
+      speakerName: 'Orador Visitante',
+    },
+    organizationName: 'Congregação Central',
+    automaticEmailsEnabled: true,
+    now,
+  })
+  const reminder = plan.find((item) => item.type === 'reminder4d')
+
+  assert.equal(reminder?.status, 'cancelled')
+  assert.equal(
+    reminder?.scheduledFor.getTime(),
+    new Date(2026, 4, 5, 9, 0, 0, 0).getTime(),
+  )
+})

@@ -161,9 +161,12 @@ Próxima etapa obrigatória:
 
 * fila automática de `notifications` sincronizada junto com create, update, confirmação e substituição de `assignments`
 * notificações automáticas por e-mail ficam desligadas por padrão em cada designação
-* envio manual de e-mail de confirmação pode ser solicitado uma única vez por designação operacional
+* envio manual de e-mail de confirmação pode ser concluído uma única vez por revisão da designação operacional; editar libera um novo envio com os dados atualizados
+* falha definitiva libera nova tentativa manual; envio concluído ou ainda pendente continua bloqueando duplicidade
 * confirmação por WhatsApp abre mensagem completa com data, discurso, origem, destino, endereço, dia e horário da reunião
 * lembrete único de 4 dias com agendamento tipado e cobertura por teste
+* edição operacional com automação ativa reenvia a confirmação com `ATUALIZAÇÃO` no assunto, sem duplicar envios em sincronizações de status
+* o botão manual aciona processamento imediato no worker e as telas acompanham o resultado da fila em tempo real
 * confirmação pública por link em rota dedicada do frontend, com boa leitura em desktop e mobile
 * worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
 * confirmação por link validada no worker antes de gravar `confirmedAt`, `responseAt` e auditoria
@@ -182,8 +185,8 @@ Próxima etapa obrigatória:
 * `settings/calendar.configurationUpdatedAt` passa a separar mudança real de configuração dos ciclos rotineiros do worker
 * o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account da Fase 11
 * a tela de configurações passa a exibir a configuração e o último estado global de sincronização
-* o Google Calendar passa a publicar apenas `orador visitante`, `discurso fora` e `evento especial`, sem espelhar slots vazios
-* quando `speakers.email` existir, `orador visitante` e `discurso fora` passam a incluir o orador como convidado, com convite, atualização e cancelamento enviados pelo Google Calendar
+* o Google Calendar passa a publicar, mediante ação manual, qualquer designação operacional (`orador visitante`, `designação local` ou `discurso fora`), além de `evento especial`, sem espelhar slots vazios
+* quando `speakers.email` existir, as designações publicadas passam a incluir o orador como convidado, com convite, atualização e cancelamento enviados pelo Google Calendar
 * fila leve protegida com `claim` temporário, retentativa persistida e ID remoto determinístico
 * regras do Firestore e frontend restritos à custom claim `admin = true`
 * ciclos técnicos do worker deixam de sobrescrever `calendarEvents.updatedAt`
@@ -335,7 +338,8 @@ Antes de publicar o acesso administrativo:
 Fluxo operacional do Google Calendar:
 
 * `calendarEvents` continua sendo a fila oficial, sem coleção paralela
-* designações operacionais entram na fila apenas após o clique em `Sincronizar com agenda`
+* designações operacionais pendentes ou confirmadas, inclusive locais, entram na fila apenas após o clique em `Sincronizar com agenda`
+* edições, cancelamentos e substituições exigem novo clique para atualizar ou remover o evento remoto
 * eventos especiais entram automaticamente na fila técnica
 * o worker faz `claim` temporário antes de processar cada item
 * falhas transitórias voltam para `pending` com novo horário; após o limite, ficam em `error`

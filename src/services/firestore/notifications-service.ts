@@ -3,6 +3,7 @@ import {
   doc,
   documentId,
   limit,
+  onSnapshot,
   orderBy,
   query,
   where,
@@ -33,6 +34,27 @@ export async function getNotificationById(
   return notification
 }
 
+export function subscribeToNotificationById(
+  id: string,
+  onValue: (notification: FirestoreRecord<NotificationDocument> | null) => void,
+  onError: (error: Error) => void,
+) {
+  return onSnapshot(
+    doc(firebaseDb, 'notifications', id),
+    (snapshot) => {
+      onValue(
+        snapshot.exists()
+          ? {
+              id: snapshot.id,
+              ...notificationSchema.parse(snapshot.data()),
+            }
+          : null,
+      )
+    },
+    onError,
+  )
+}
+
 export async function listNotificationsByIds(
   ids: string[],
 ): Promise<Array<FirestoreRecord<NotificationDocument>>> {
@@ -59,6 +81,65 @@ export async function listNotificationsByIds(
   }
 
   return notifications
+}
+
+export function subscribeToNotificationsByIds(
+  ids: string[],
+  onValue: (notifications: Array<FirestoreRecord<NotificationDocument>>) => void,
+  onError: (error: Error) => void,
+) {
+  const normalizedIds = Array.from(
+    new Set(ids.map((item) => item.trim()).filter(Boolean)),
+  )
+
+  if (normalizedIds.length === 0) {
+    onValue([])
+    return () => undefined
+  }
+
+  const chunks = Array.from(
+    { length: Math.ceil(normalizedIds.length / 10) },
+    (_, index) => normalizedIds.slice(index * 10, index * 10 + 10),
+  )
+  const initializedChunks = new Set<number>()
+  const notificationsByChunk = new Map<
+    number,
+    Array<FirestoreRecord<NotificationDocument>>
+  >()
+
+  const unsubscribers = chunks.map((currentChunk, chunkIndex) => {
+    const notificationsQuery = query(
+      collection(firebaseDb, 'notifications'),
+      where(documentId(), 'in', currentChunk),
+    )
+
+    return onSnapshot(
+      notificationsQuery,
+      (snapshot) => {
+        notificationsByChunk.set(
+          chunkIndex,
+          snapshot.docs.map((notificationSnapshot) => ({
+            id: notificationSnapshot.id,
+            ...notificationSchema.parse(notificationSnapshot.data()),
+          })),
+        )
+        initializedChunks.add(chunkIndex)
+
+        if (initializedChunks.size === chunks.length) {
+          onValue(
+            Array.from(notificationsByChunk.values())
+              .flat()
+              .sort((left, right) => left.id.localeCompare(right.id)),
+          )
+        }
+      },
+      onError,
+    )
+  })
+
+  return () => {
+    unsubscribers.forEach((unsubscribe) => unsubscribe())
+  }
 }
 
 export async function listNotificationsByStatus(
