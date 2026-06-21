@@ -2615,6 +2615,12 @@ export function AssignmentsPage() {
                     isLatestAssignmentForEvent,
                     movementType: movementTypeForAssignment,
                   })
+                  const hasCommunicationActions = Boolean(
+                    googleCalendarSyncState?.canShowAction ||
+                      canRequestManualEmail ||
+                      emailErrorMessage ||
+                      whatsappConfirmationUrl,
+                  )
 
                   return (
                     <div
@@ -2730,98 +2736,129 @@ export function AssignmentsPage() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                          {googleCalendarSyncState?.canShowAction ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRequestManualGoogleCalendarSync(assignment)}
-                              disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
-                            >
-                              <GoogleCalendarButtonMark />
-                              Sincronizar Agenda
-                            </Button>
+                        <div className="grid gap-3 border-t border-border pt-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                          {hasCommunicationActions ? (
+                            <div className="min-w-0 space-y-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Comunicação
+                              </p>
+                              <div
+                                className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap"
+                                role="group"
+                                aria-label="Ações de comunicação"
+                              >
+                                {googleCalendarSyncState?.canShowAction ? (
+                                  <Button
+                                    className="w-full lg:w-auto"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleRequestManualGoogleCalendarSync(assignment)}
+                                    disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
+                                  >
+                                    <GoogleCalendarButtonMark />
+                                    Sincronizar Agenda
+                                  </Button>
+                                ) : null}
+                                {canRequestManualEmail && emailDeliveryConfigured ? (
+                                  <Button
+                                    className="w-full lg:w-auto"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleRequestManualConfirmationEmail(assignment)}
+                                    disabled={manualEmailActionDisabled}
+                                  >
+                                    <ManualEmailActionIcon className="size-4" />
+                                    {manualEmailActionLabel}
+                                  </Button>
+                                ) : null}
+                                {emailErrorMessage ? (
+                                  <span
+                                    className="inline-flex min-h-9 min-w-0 items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 sm:col-span-2 lg:w-auto dark:bg-rose-950/30 dark:text-rose-200"
+                                    title={emailErrorMessage}
+                                  >
+                                    <MailWarning className="size-4 shrink-0" />
+                                    <span className="truncate">Falha no e-mail: {emailErrorMessage}</span>
+                                  </span>
+                                ) : !emailDeliveryConfigured && canRequestManualEmail ? (
+                                  <span
+                                    className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 sm:col-span-2 lg:w-auto dark:bg-amber-950/30 dark:text-amber-200"
+                                    title={emailDeliveryUnavailableMessage}
+                                  >
+                                    <MailWarning className="size-4 shrink-0" />
+                                    E-mail indisponível
+                                  </span>
+                                ) : null}
+                                {whatsappConfirmationUrl ? (
+                                  <a
+                                    className="inline-flex h-9 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-blue-700 sm:col-span-2 lg:w-auto dark:bg-card dark:text-foreground dark:hover:bg-accent"
+                                    href={whatsappConfirmationUrl}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    <MessageCircle className="size-4" />
+                                    Confirmar por WhatsApp
+                                  </a>
+                                ) : null}
+                              </div>
+                            </div>
                           ) : null}
-                          {canRequestManualEmail && emailDeliveryConfigured ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRequestManualConfirmationEmail(assignment)}
-                              disabled={manualEmailActionDisabled}
+
+                          <div className="space-y-2 lg:justify-self-end">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:text-right">
+                              Gerenciar
+                            </p>
+                            <div
+                              className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end"
+                              role="group"
+                              aria-label="Ações da designação"
                             >
-                              <ManualEmailActionIcon className="size-4" />
-                              {manualEmailActionLabel}
-                            </Button>
-                          ) : null}
-                          {emailErrorMessage ? (
-                            <span
-                              className="inline-flex min-h-9 min-w-0 items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 dark:bg-rose-950/30 dark:text-rose-200"
-                              title={emailErrorMessage}
-                            >
-                              <MailWarning className="size-4 shrink-0" />
-                              <span className="max-w-64 truncate">Falha no e-mail: {emailErrorMessage}</span>
-                            </span>
-                          ) : !emailDeliveryConfigured && canRequestManualEmail ? (
-                            <span
-                              className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
-                              title={emailDeliveryUnavailableMessage}
-                            >
-                              <MailWarning className="size-4 shrink-0" />
-                              E-mail indisponível
-                            </span>
-                          ) : null}
-                          {whatsappConfirmationUrl ? (
-                            <a
-                              className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-blue-700 dark:bg-card dark:text-foreground dark:hover:bg-accent"
-                              href={whatsappConfirmationUrl}
-                              rel="noreferrer"
-                              target="_blank"
-                            >
-                              <MessageCircle className="size-4" />
-                              Confirmar por WhatsApp
-                            </a>
-                          ) : null}
-                          {hasQuickConfirm ? (
-                            <Button
-                              size="sm"
-                              onClick={() => handleQuickConfirm(assignment.id)}
-                              disabled={isSubmitting}
-                            >
-                              <CheckCircle2 className="size-4" />
-                              Confirmar
-                            </Button>
-                          ) : null}
-                          {canQuickCancel ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQuickCancel(assignment)}
-                              disabled={isSubmitting}
-                            >
-                              <XCircle className="size-4" />
-                              Cancelar
-                            </Button>
-                          ) : null}
-                          {isAssignmentCoveringCalendarSlot(assignment.status) ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleStartReplacement(assignment)}
-                              disabled={isSubmitting}
-                            >
-                              <ArrowRightLeft className="size-4" />
-                              Substituir
-                            </Button>
-                          ) : null}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStartEdit(assignment.id)}
-                            disabled={isSubmitting}
-                          >
-                            <PencilLine className="size-4" />
-                            Editar
-                          </Button>
+                              {hasQuickConfirm ? (
+                                <Button
+                                  className="w-full lg:w-auto"
+                                  size="sm"
+                                  onClick={() => handleQuickConfirm(assignment.id)}
+                                  disabled={isSubmitting}
+                                >
+                                  <CheckCircle2 className="size-4" />
+                                  Confirmar
+                                </Button>
+                              ) : null}
+                              {canQuickCancel ? (
+                                <Button
+                                  className="w-full lg:w-auto"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleQuickCancel(assignment)}
+                                  disabled={isSubmitting}
+                                >
+                                  <XCircle className="size-4" />
+                                  Cancelar
+                                </Button>
+                              ) : null}
+                              {isAssignmentCoveringCalendarSlot(assignment.status) ? (
+                                <Button
+                                  className="w-full lg:w-auto"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleStartReplacement(assignment)}
+                                  disabled={isSubmitting}
+                                >
+                                  <ArrowRightLeft className="size-4" />
+                                  Substituir
+                                </Button>
+                              ) : null}
+                              <Button
+                                className="w-full lg:w-auto"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleStartEdit(assignment.id)}
+                                disabled={isSubmitting}
+                              >
+                                <PencilLine className="size-4" />
+                                Editar
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>

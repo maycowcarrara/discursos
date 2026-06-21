@@ -180,36 +180,8 @@ export function PublicAssignmentConfirmationPage() {
 
   return (
     <div className="min-h-screen bg-transparent px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-5xl items-center">
-        <div className="grid w-full gap-5 lg:grid-cols-[0.92fr_1.08fr]">
-          <section className="rounded-xl border border-sidebar-border bg-sidebar p-6 text-white shadow-sm">
-            <div className="inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold tracking-[0.22em] text-white uppercase">
-              Confirmação por link
-            </div>
-            <h1 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-              Revise os dados e confirme a designação em poucos segundos.
-            </h1>
-            <p className="mt-4 text-sm leading-7 text-white/74 sm:text-base">
-              Esta página mostra somente o resumo essencial da designação para que
-              a resposta seja rápida, tanto no computador quanto no celular.
-            </p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-white/8 bg-white/6 px-4 py-3.5">
-                <p className="text-sm font-medium text-white">Leitura rápida</p>
-                <p className="mt-2 text-sm leading-6 text-white/68">
-                  Orador, data, congregação e tema ficam visíveis antes da confirmação.
-                </p>
-              </div>
-              <div className="rounded-xl border border-white/8 bg-white/6 px-4 py-3.5">
-                <p className="text-sm font-medium text-white">Status confiável</p>
-                <p className="mt-2 text-sm leading-6 text-white/68">
-                  Se a programação já mudou, o painel avisa e impede uma confirmação fora de contexto.
-                </p>
-              </div>
-            </div>
-          </section>
-
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-3xl items-center">
+        <div className="w-full">
           <Card className="rounded-xl border-border bg-card shadow-sm">
             <CardHeader className="gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
