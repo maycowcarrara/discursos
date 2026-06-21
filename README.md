@@ -160,7 +160,10 @@ Próxima etapa obrigatória:
 ### Fechamento da Fase 11
 
 * fila automática de `notifications` sincronizada junto com create, update, confirmação e substituição de `assignments`
-* lembretes de 7 dias e 1 dia com agendamento tipado e cobertura por teste
+* notificações automáticas por e-mail ficam desligadas por padrão em cada designação
+* envio manual de e-mail de confirmação pode ser solicitado uma única vez por designação operacional
+* confirmação por WhatsApp abre mensagem completa com data, discurso, origem, destino, endereço, dia e horário da reunião
+* lembrete único de 4 dias com agendamento tipado e cobertura por teste
 * confirmação pública por link em rota dedicada do frontend, com boa leitura em desktop e mobile
 * worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
 * confirmação por link validada no worker antes de gravar `confirmedAt`, `responseAt` e auditoria
@@ -272,10 +275,11 @@ Regra do projeto:
 Para ativar a automação de e-mails:
 
 * configure `VITE_PUBLIC_NOTIFICATION_WORKER_URL` no frontend para a URL pública do worker
-* preencha as variáveis não sensíveis em [workers/email-automation/wrangler.jsonc](/C:/Projetos/discursos/workers/email-automation/wrangler.jsonc)
-* preencha os segredos locais em [workers/email-automation/.dev.vars.example](/C:/Projetos/discursos/workers/email-automation/.dev.vars.example), usando `EMAILJS_PRIVATE_KEY` e a service account do Firebase
+* configure `VITE_EMAILJS_SERVICE_ID`, `VITE_EMAILJS_TEMPLATE_ID` e `VITE_EMAILJS_PUBLIC_KEY` no frontend; sem essas chaves, os botões e controles de e-mail ficam desabilitados
+* configure `EMAILJS_PRIVATE_KEY`, `EMAILJS_PUBLIC_KEY`, `EMAILJS_SERVICE_ID` e `EMAILJS_TEMPLATE_ID` no ambiente do worker; sem essas credenciais, a notificação vira `failed` e o erro aparece nas telas operacionais
+* preencha os segredos locais em [workers/email-automation/.dev.vars.example](/C:/Projetos/discursos/workers/email-automation/.dev.vars.example), usando também a service account do Firebase
 * a integração atual usa um único `EMAILJS_TEMPLATE_ID` para confirmação e lembretes
-* publique o worker com `npm.cmd run worker:deploy`
+* publique o worker com `npm.cmd run worker:deploy`; o script usa `--keep-vars` para preservar credenciais configuradas fora do repositório
 
 URL pública atual do worker:
 
@@ -301,7 +305,9 @@ Parâmetros atuais do template único do EmailJS:
 
 Fluxo operacional atual da fila:
 
-* `pending`: agenda `confirmation`, `reminder7d` e `reminder1d` quando a designação cobre o slot, a data ainda não passou e o orador tem e-mail válido
+* `pending`: agenda `confirmation` e `reminder4d` quando a designação cobre o slot, a data ainda não passou, o orador tem e-mail válido e as notificações automáticas estão ativadas na designação
+* `manual`: agenda envio imediato pelo botão de e-mail, grava a solicitação na designação e bloqueia novo disparo manual
+* quando a confirmação automática já foi enviada ou está na fila, o botão manual fica bloqueado para evitar duplicidade
 * `confirmed`: cancela a automação de confirmação e mantém os lembretes futuros ativos
 * `declined`, `cancelled` e `replaced`: cancelam as automações da designação, preservando o histórico do documento
 * mudanças administrativas que não alteram a identidade de entrega preservam `sentAt`, `retryCount`, `errorMessage` e o status já processado da notificação

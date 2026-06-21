@@ -8,9 +8,11 @@ import {
   Clock3,
   LogIn,
   LogOut,
+  MailCheck,
   MailWarning,
   MapPin,
   MapPinned,
+  MessageCircle,
   Mic2,
   PencilLine,
   Plus,
@@ -42,12 +44,17 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
+import {
+  emailDeliveryUnavailableMessage,
+  isEmailDeliveryConfigured,
+} from '@/config/email'
 import { useAppSettingsQuery, useCalendarSettingsQuery } from '@/hooks/use-app-settings'
 import {
   useAssignmentsByYearQuery,
   useConfirmAssignmentMutation,
   useCreateAssignmentMutation,
   useRecentAssignmentsQuery,
+  useRequestManualAssignmentConfirmationEmailMutation,
   useUpdateAssignmentMutation,
 } from '@/hooks/use-assignments'
 import {
@@ -55,6 +62,7 @@ import {
   useRequestManualGoogleCalendarSyncMutation,
 } from '@/hooks/use-calendar-events'
 import { useCongregationsManagementQuery } from '@/hooks/use-congregations'
+import { useNotificationsByIdsQuery } from '@/hooks/use-notifications'
 import { useSpeakersManagementQuery } from '@/hooks/use-speakers'
 import { useThemesManagementQuery } from '@/hooks/use-themes'
 import {
@@ -80,6 +88,7 @@ import {
   inferAssignmentMovementType,
   type AssignmentMovementType,
 } from '@/utils/assignment-history'
+import { buildAssignmentWhatsAppConfirmationUrl } from '@/utils/assignment-whatsapp'
 import {
   assignmentStatusLabels,
   buildOperationalAssignmentMapByCalendarEventId,
@@ -94,6 +103,7 @@ type ThemeCategoryFilter = 'all' | ThemeCategory
 
 const selectClassName =
   'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70'
+const emailDeliveryConfigured = isEmailDeliveryConfigured()
 
 const assignmentFormSchema = z.object({
   calendarEventId: z.string().trim().min(1, 'Selecione o sábado da designação.'),
@@ -105,6 +115,7 @@ const assignmentFormSchema = z.object({
   themeId: z.string().trim().min(1, 'Selecione o tema.'),
   status: z.enum(['pending', 'confirmed', 'declined', 'cancelled', 'replaced']),
   notes: z.string().trim(),
+  emailNotificationsEnabled: z.boolean(),
 })
 
 type FeedbackState =
@@ -638,6 +649,8 @@ export function AssignmentsPage() {
   const createAssignmentMutation = useCreateAssignmentMutation()
   const updateAssignmentMutation = useUpdateAssignmentMutation()
   const confirmAssignmentMutation = useConfirmAssignmentMutation()
+  const requestManualEmailMutation =
+    useRequestManualAssignmentConfirmationEmailMutation()
   const requestManualGoogleCalendarSyncMutation = useRequestManualGoogleCalendarSyncMutation()
 
   const assignments = useMemo(
@@ -661,6 +674,28 @@ export function AssignmentsPage() {
       requestedYearAssignmentsQuery.data,
       shouldLoadRequestedCalendarEventYear,
     ],
+  )
+  const assignmentNotificationIds = useMemo(
+    () =>
+      assignments.flatMap((assignment) => [
+        `${assignment.id}__confirmation`,
+        `${assignment.id}__manual`,
+      ]),
+    [assignments],
+  )
+  const assignmentNotificationsQuery = useNotificationsByIdsQuery(
+    assignmentNotificationIds,
+    assignmentNotificationIds.length > 0,
+  )
+  const notificationsById = useMemo(
+    () =>
+      new Map(
+        (assignmentNotificationsQuery.data ?? []).map((notification) => [
+          notification.id,
+          notification,
+        ]),
+      ),
+    [assignmentNotificationsQuery.data],
   )
   const recentAssignments = useMemo(
     () =>
@@ -859,6 +894,11 @@ export function AssignmentsPage() {
       control,
       name: 'status',
     }) ?? 'pending'
+  const watchedEmailNotificationsEnabled =
+    useWatch({
+      control,
+      name: 'emailNotificationsEnabled',
+    }) ?? false
   const speakerFieldRegistration = register('speakerId', {
     onChange: () => setThemeSearchTerm(''),
   })
@@ -1066,6 +1106,7 @@ export function AssignmentsPage() {
     createAssignmentMutation.isPending ||
     updateAssignmentMutation.isPending ||
     confirmAssignmentMutation.isPending ||
+    requestManualEmailMutation.isPending ||
     requestManualGoogleCalendarSyncMutation.isPending
 
   const totalQueryErrors = [
@@ -1074,6 +1115,7 @@ export function AssignmentsPage() {
     recentAssignmentsQuery.error,
     calendarEventsQuery.error,
     requestedYearCalendarEventsQuery.error,
+    assignmentNotificationsQuery.error,
     calendarSettingsQuery.error,
     congregationsQuery.error,
     speakersQuery.error,
@@ -1204,6 +1246,27 @@ export function AssignmentsPage() {
       })
     }
   }, [setValue, speakerThemeOptions, watchedThemeId])
+
+  useEffect(() => {
+    if (
+      !watchedEmailNotificationsEnabled ||
+      (isAssignmentCoveringCalendarSlot(watchedStatus) &&
+        !selectedSpeakerMissingEmail &&
+        emailDeliveryConfigured)
+    ) {
+      return
+    }
+
+    setValue('emailNotificationsEnabled', false, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }, [
+    selectedSpeakerMissingEmail,
+    setValue,
+    watchedEmailNotificationsEnabled,
+    watchedStatus,
+  ])
 
   function handleMovementTypeChange(nextMovementType: MovementType) {
     setMovementTypeOverride(nextMovementType)
@@ -1484,6 +1547,71 @@ export function AssignmentsPage() {
           ? inferAssignmentMovementType(assignmentToConfirm, congregationsById)
           : 'local',
       )
+      setFeedback({
+        tone: 'success',
+        message,
+      })
+      toast.success(message)
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+    }
+  }
+
+  async function handleRequestManualConfirmationEmail(
+    assignment: FirestoreRecord<AssignmentDocument>,
+  ) {
+    if (!emailDeliveryConfigured) {
+      setFeedback({
+        tone: 'error',
+        message: emailDeliveryUnavailableMessage,
+      })
+      toast.error(emailDeliveryUnavailableMessage)
+      return
+    }
+
+    if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    if (assignment.manualConfirmationEmailRequestedAt) {
+      const message = 'O e-mail de confirmação já foi solicitado para esta designação.'
+      setFeedback({
+        tone: 'success',
+        message,
+      })
+      toast.success(message)
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Enviar agora o e-mail de confirmação para ${assignment.speakerName}? Esta ação só pode ser feita uma vez para esta designação.`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setFeedback(null)
+
+    try {
+      await requestManualEmailMutation.mutateAsync({
+        id: assignment.id,
+        actorUid: user.uid,
+        actorName,
+      })
+
+      const message = 'E-mail de confirmação solicitado com sucesso.'
       setFeedback({
         tone: 'success',
         message,
@@ -2142,6 +2270,40 @@ export function AssignmentsPage() {
                   ) : null}
                 </div>
 
+                <label className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 rounded border-border text-primary focus:ring-primary"
+                    disabled={
+                      !isAssignmentCoveringCalendarSlot(watchedStatus) ||
+                      selectedSpeakerMissingEmail ||
+                      !emailDeliveryConfigured
+                    }
+                    {...register('emailNotificationsEnabled')}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-foreground">
+                      Ativar notificações automáticas por e-mail
+                    </span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                      Quando ligado, o sistema agenda a confirmação automática e um lembrete 4 dias antes da reunião. Por padrão fica desligado.
+                    </span>
+                    {!isAssignmentCoveringCalendarSlot(watchedStatus) ? (
+                      <span className="mt-1 block text-xs text-amber-700 dark:text-amber-200">
+                        Disponível apenas para designações pendentes ou confirmadas.
+                      </span>
+                    ) : selectedSpeakerMissingEmail ? (
+                      <span className="mt-1 block text-xs text-amber-700 dark:text-amber-200">
+                        Cadastre o e-mail do orador para ativar notificações automáticas.
+                      </span>
+                    ) : !emailDeliveryConfigured ? (
+                      <span className="mt-1 block text-xs text-amber-700 dark:text-amber-200">
+                        {emailDeliveryUnavailableMessage}
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Observações</span>
                   <Textarea
@@ -2373,8 +2535,76 @@ export function AssignmentsPage() {
                   const hasQuickConfirm = assignment.status === 'pending'
                   const canQuickCancel =
                     assignment.status === 'pending' || assignment.status === 'confirmed'
+                  const canRequestManualEmail =
+                    isAssignmentCoveringCalendarSlot(assignment.status)
+                  const automaticConfirmationNotification = notificationsById.get(
+                    `${assignment.id}__confirmation`,
+                  )
+                  const manualConfirmationNotification = notificationsById.get(
+                    `${assignment.id}__manual`,
+                  )
+                  const automaticConfirmationStatus =
+                    automaticConfirmationNotification?.status
+                  const manualConfirmationStatus =
+                    manualConfirmationNotification?.status
+                  const automaticEmailAlreadySent =
+                    automaticConfirmationStatus === 'sent'
+                  const automaticEmailQueued = automaticConfirmationStatus === 'pending'
+                  const automaticEmailFailed =
+                    automaticConfirmationStatus === 'failed'
+                  const manualEmailFailed = manualConfirmationStatus === 'failed'
+                  const manualEmailAlreadyRequested = Boolean(
+                    assignment.manualConfirmationEmailRequestedAt,
+                  )
+                  const manualEmailAlreadyQueuedOrSent =
+                    manualConfirmationStatus === 'pending' ||
+                    manualConfirmationStatus === 'sent' ||
+                    manualConfirmationStatus === 'failed'
+                  const manualEmailActionResolved =
+                    automaticEmailAlreadySent ||
+                    manualEmailAlreadyRequested ||
+                    manualEmailAlreadyQueuedOrSent
+                  const manualEmailActionDisabled =
+                    isSubmitting ||
+                    !emailDeliveryConfigured ||
+                    automaticEmailQueued ||
+                    manualEmailActionResolved
+                  const ManualEmailActionIcon =
+                    automaticEmailFailed || manualEmailFailed
+                      ? MailWarning
+                      : automaticEmailAlreadySent ||
+                          manualEmailAlreadyRequested ||
+                          manualConfirmationStatus === 'sent'
+                      ? CheckCircle2
+                      : MailCheck
+                  const manualEmailActionLabel = !emailDeliveryConfigured
+                    ? 'E-mail indisponível'
+                    : automaticEmailFailed || manualEmailFailed
+                      ? 'Erro no e-mail'
+                      : automaticEmailAlreadySent
+                        ? 'E-mail enviado'
+                        : manualEmailAlreadyRequested ||
+                            manualConfirmationStatus === 'sent'
+                          ? 'E-mail solicitado'
+                          : automaticEmailQueued
+                            ? 'E-mail na fila'
+                            : 'E-mail agora'
+                  const emailErrorMessage =
+                    manualConfirmationNotification?.errorMessage?.trim() ||
+                    automaticConfirmationNotification?.errorMessage?.trim() ||
+                    ''
                   const linkedCalendarEvent =
                     calendarEventsById.get(assignment.calendarEventId) ?? null
+                  const assignmentSpeaker = speakersById.get(assignment.speakerId) ?? null
+                  const assignmentDestinationCongregation =
+                    congregationsById.get(assignment.localCongregationId) ?? null
+                  const whatsappConfirmationUrl = assignmentSpeaker
+                    ? buildAssignmentWhatsAppConfirmationUrl({
+                        assignment,
+                        destinationCongregation: assignmentDestinationCongregation,
+                        speaker: assignmentSpeaker,
+                      })
+                    : null
                   const isLatestAssignmentForEvent =
                     googleCalendarActionOwnerByCalendarEventId.get(assignment.calendarEventId)?.id ===
                     assignment.id
@@ -2391,10 +2621,10 @@ export function AssignmentsPage() {
                   return (
                     <div
                       key={assignment.id}
-                      className="rounded-xl border border-border bg-background p-4"
+                      className="rounded-xl border border-border bg-background p-3.5 sm:p-4"
                     >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex-1">
+                      <div className="space-y-4">
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline">{movementLabel}</Badge>
                             <Badge className={getStatusClassName(assignment.status)}>
@@ -2409,8 +2639,8 @@ export function AssignmentsPage() {
                             {assignment.speakerName}
                           </h3>
 
-                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-xl border border-border bg-background px-4 py-3.5">
+                          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
+                            <div className="rounded-lg bg-muted/40 px-3 py-2.5">
                               <div className="flex items-start gap-3">
                                 <CalendarDays className="mt-0.5 size-4 text-primary" />
                                 <div>
@@ -2427,7 +2657,7 @@ export function AssignmentsPage() {
                               </div>
                             </div>
 
-                            <div className="rounded-xl border border-border bg-background px-4 py-3.5">
+                            <div className="rounded-lg bg-muted/40 px-3 py-2.5">
                               <div className="flex items-start gap-3">
                                 <MapPinned className="mt-0.5 size-4 text-primary" />
                                 <div>
@@ -2502,9 +2732,10 @@ export function AssignmentsPage() {
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+                        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
                           {googleCalendarSyncState?.canShowAction ? (
                             <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => handleRequestManualGoogleCalendarSync(assignment)}
                               disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
@@ -2513,8 +2744,48 @@ export function AssignmentsPage() {
                               Enviar ao Google Calendar
                             </Button>
                           ) : null}
+                          {canRequestManualEmail && emailDeliveryConfigured ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRequestManualConfirmationEmail(assignment)}
+                              disabled={manualEmailActionDisabled}
+                            >
+                              <ManualEmailActionIcon className="size-4" />
+                              {manualEmailActionLabel}
+                            </Button>
+                          ) : null}
+                          {emailErrorMessage ? (
+                            <span
+                              className="inline-flex min-h-9 min-w-0 items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 dark:bg-rose-950/30 dark:text-rose-200"
+                              title={emailErrorMessage}
+                            >
+                              <MailWarning className="size-4 shrink-0" />
+                              <span className="max-w-64 truncate">Falha no e-mail: {emailErrorMessage}</span>
+                            </span>
+                          ) : !emailDeliveryConfigured && canRequestManualEmail ? (
+                            <span
+                              className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                              title={emailDeliveryUnavailableMessage}
+                            >
+                              <MailWarning className="size-4 shrink-0" />
+                              E-mail indisponível
+                            </span>
+                          ) : null}
+                          {whatsappConfirmationUrl ? (
+                            <a
+                              className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-border bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-blue-700 dark:bg-card dark:text-foreground dark:hover:bg-accent"
+                              href={whatsappConfirmationUrl}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              <MessageCircle className="size-4" />
+                              Confirmar por WhatsApp
+                            </a>
+                          ) : null}
                           {hasQuickConfirm ? (
                             <Button
+                              size="sm"
                               onClick={() => handleQuickConfirm(assignment.id)}
                               disabled={isSubmitting}
                             >
@@ -2524,6 +2795,7 @@ export function AssignmentsPage() {
                           ) : null}
                           {canQuickCancel ? (
                             <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => handleQuickCancel(assignment)}
                               disabled={isSubmitting}
@@ -2534,6 +2806,7 @@ export function AssignmentsPage() {
                           ) : null}
                           {isAssignmentCoveringCalendarSlot(assignment.status) ? (
                             <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => handleStartReplacement(assignment)}
                               disabled={isSubmitting}
@@ -2543,6 +2816,7 @@ export function AssignmentsPage() {
                             </Button>
                           ) : null}
                           <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handleStartEdit(assignment.id)}
                             disabled={isSubmitting}

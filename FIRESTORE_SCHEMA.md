@@ -404,6 +404,8 @@ Campos:
   themeTitle: string
   status: "pending" | "confirmed" | "declined" | "cancelled" | "replaced"
   notes: string
+  emailNotificationsEnabled: boolean
+  manualConfirmationEmailRequestedAt?: Timestamp | null
   confirmationToken?: string | null
   confirmedAt?: Timestamp | null
   responseAt?: Timestamp | null
@@ -419,6 +421,8 @@ Observações:
 * esta coleção concentra o histórico operacional dos discursos
 * salvar snapshots mínimos como `speakerName`, `themeTitle` e `originCongregationName` é permitido para preservar histórico
 * nunca depender apenas do documento relacionado para reconstruir histórico antigo
+* `emailNotificationsEnabled` controla se a designação entra automaticamente na fila de confirmação e lembretes por e-mail; o padrão operacional é `false`
+* `manualConfirmationEmailRequestedAt` registra o disparo manual de e-mail de confirmação e impede nova solicitação manual para a mesma designação
 * `confirmationToken` só deve ser resolvido por fluxo público mediado por worker, nunca por escrita pública direta no frontend
 
 ### 7. `notifications`
@@ -430,7 +434,7 @@ Campos:
 
 ```ts
 {
-  type: "reminder7d" | "reminder1d" | "confirmation" | "manual"
+  type: "reminder4d" | "confirmation" | "manual"
   channel: "email"
   assignmentId?: string | null
   speakerId?: string | null
@@ -451,7 +455,9 @@ Observações:
 
 * Workers e cron devem operar sobre esta coleção
 * não expor segredos ou payloads sensíveis no frontend
-* a fila ativa pode usar IDs determinísticos por designação e tipo para evitar duplicidade de lembretes dentro da mesma operação
+* a fila ativa deve usar IDs determinísticos por designação e tipo para evitar duplicidade de lembretes dentro da mesma operação
+* envios manuais de e-mail de confirmação também usam esta coleção, com ID determinístico por designação para impedir disparos repetidos pelo painel
+* notificações legadas `reminder7d` e `reminder1d`, quando existirem, devem ser apenas encerradas durante nova sincronização; novas gravações usam `reminder4d`
 
 ### 8. `auditLogs`
 

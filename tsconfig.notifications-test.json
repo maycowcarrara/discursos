@@ -19,5 +19,6 @@
     "src/utils/assignment-notifications.test.ts",
     "src/utils/notification-sync.ts",
     "src/utils/notification-sync.test.ts"
-  ]
+  ],
+  "exclude": []
 }

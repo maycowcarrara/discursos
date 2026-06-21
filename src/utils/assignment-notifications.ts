@@ -6,7 +6,7 @@ import type {
 
 type AutomatedNotificationType = Extract<
   NotificationType,
-  'confirmation' | 'reminder7d' | 'reminder1d'
+  'confirmation' | 'reminder4d'
 >
 
 export type AssignmentNotificationRecipient = {
@@ -20,6 +20,7 @@ export type AssignmentNotificationPlanInput = {
   status: AssignmentStatus
   recipient: AssignmentNotificationRecipient
   organizationName: string
+  automaticEmailsEnabled: boolean
   now: Date
 }
 
@@ -34,8 +35,7 @@ export type AssignmentNotificationPlanItem = {
 
 const automatedNotificationTypes: AutomatedNotificationType[] = [
   'confirmation',
-  'reminder7d',
-  'reminder1d',
+  'reminder4d',
 ]
 
 const reminderSendHour = 9
@@ -55,12 +55,13 @@ export function buildAssignmentNotificationPlan(
   input: AssignmentNotificationPlanInput,
 ): AssignmentNotificationPlanItem[] {
   const recipientEmail = input.recipient.email.trim()
-  const organizationName = input.organizationName.trim() || 'Organizacao'
+  const organizationName = input.organizationName.trim() || 'Organização'
   const eventHasNotEnded = toStartOfLocalDay(input.eventDate) >= toStartOfLocalDay(input.now)
   const canOperateNotifications =
     isAssignmentCoveringCalendarSlot(input.status) &&
     eventHasNotEnded &&
-    recipientEmail.length > 0
+    recipientEmail.length > 0 &&
+    input.automaticEmailsEnabled
 
   return automatedNotificationTypes.map((type) => {
     const isConfirmation = type === 'confirmation'
@@ -87,14 +88,10 @@ function getNotificationSubject(
   organizationName: string,
 ) {
   if (type === 'confirmation') {
-    return `Confirmacao de designacao - ${organizationName}`
+    return `Confirmação de designação - ${organizationName}`
   }
 
-  if (type === 'reminder7d') {
-    return `Lembrete de designacao em 7 dias - ${organizationName}`
-  }
-
-  return `Lembrete de designacao para amanha - ${organizationName}`
+  return `Lembrete de designação em 4 dias - ${organizationName}`
 }
 
 function getScheduledDateForType(
@@ -107,7 +104,7 @@ function getScheduledDateForType(
   }
 
   const reminderDate = new Date(eventDate)
-  reminderDate.setDate(reminderDate.getDate() - (type === 'reminder7d' ? 7 : 1))
+  reminderDate.setDate(reminderDate.getDate() - 4)
   reminderDate.setHours(reminderSendHour, 0, 0, 0)
 
   if (reminderDate.getTime() < now.getTime()) {

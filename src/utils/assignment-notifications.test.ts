@@ -3,7 +3,7 @@ import { test } from 'node:test'
 
 import { buildAssignmentNotificationPlan } from './assignment-notifications.js'
 
-test('agenda confirmacao imediata e lembretes futuros para designacao pendente', () => {
+test('agenda confirmação imediata e lembrete 4 dias antes quando automação está ligada', () => {
   const now = new Date(2026, 4, 1, 10, 0, 0, 0)
   const eventDate = new Date(2026, 4, 9, 12, 0, 0, 0)
 
@@ -15,23 +15,42 @@ test('agenda confirmacao imediata e lembretes futuros para designacao pendente',
       email: 'visitante@example.com',
       speakerName: 'Orador Visitante',
     },
-    organizationName: 'Congregacao Central',
+    organizationName: 'Congregação Central',
+    automaticEmailsEnabled: true,
     now,
   })
 
-  assert.equal(plan.length, 3)
+  assert.equal(plan.length, 2)
   assert.equal(plan[0]?.type, 'confirmation')
   assert.equal(plan[0]?.status, 'pending')
   assert.equal(plan[0]?.scheduledFor.getTime(), now.getTime())
-  assert.equal(plan[1]?.type, 'reminder7d')
+  assert.equal(plan[1]?.type, 'reminder4d')
   assert.equal(plan[1]?.status, 'pending')
-  assert.equal(plan[1]?.scheduledFor.getTime(), new Date(2026, 4, 2, 9, 0, 0, 0).getTime())
-  assert.equal(plan[2]?.type, 'reminder1d')
-  assert.equal(plan[2]?.status, 'pending')
-  assert.equal(plan[2]?.scheduledFor.getTime(), new Date(2026, 4, 8, 9, 0, 0, 0).getTime())
+  assert.equal(plan[1]?.scheduledFor.getTime(), new Date(2026, 4, 5, 9, 0, 0, 0).getTime())
 })
 
-test('cancela confirmacao automatica quando a designacao ja esta confirmada', () => {
+test('mantém automações canceladas por padrão quando a flag está desligada', () => {
+  const now = new Date(2026, 4, 1, 10, 0, 0, 0)
+  const eventDate = new Date(2026, 4, 9, 12, 0, 0, 0)
+
+  const plan = buildAssignmentNotificationPlan({
+    assignmentId: 'assignment-1',
+    eventDate,
+    status: 'pending',
+    recipient: {
+      email: 'visitante@example.com',
+      speakerName: 'Orador Visitante',
+    },
+    organizationName: 'Congregação Central',
+    automaticEmailsEnabled: false,
+    now,
+  })
+
+  assert.equal(plan.length, 2)
+  assert.equal(plan.every((item) => item.status === 'cancelled'), true)
+})
+
+test('cancela confirmação automática quando a designação já está confirmada', () => {
   const now = new Date(2026, 4, 1, 10, 0, 0, 0)
   const eventDate = new Date(2026, 4, 20, 12, 0, 0, 0)
 
@@ -43,18 +62,19 @@ test('cancela confirmacao automatica quando a designacao ja esta confirmada', ()
       email: 'local@example.com',
       speakerName: 'Orador Local',
     },
-    organizationName: 'Congregacao Central',
+    organizationName: 'Congregação Central',
+    automaticEmailsEnabled: true,
     now,
   })
 
   const confirmation = plan.find((item) => item.type === 'confirmation')
-  const reminder1d = plan.find((item) => item.type === 'reminder1d')
+  const reminder4d = plan.find((item) => item.type === 'reminder4d')
 
   assert.equal(confirmation?.status, 'cancelled')
-  assert.equal(reminder1d?.status, 'pending')
+  assert.equal(reminder4d?.status, 'pending')
 })
 
-test('cancela automacoes quando o orador nao possui email valido', () => {
+test('cancela automações quando o orador não possui e-mail válido', () => {
   const now = new Date(2026, 4, 1, 10, 0, 0, 0)
   const eventDate = new Date(2026, 4, 9, 12, 0, 0, 0)
 
@@ -66,7 +86,8 @@ test('cancela automacoes quando o orador nao possui email valido', () => {
       email: '   ',
       speakerName: 'Sem Email',
     },
-    organizationName: 'Congregacao Central',
+    organizationName: 'Congregação Central',
+    automaticEmailsEnabled: true,
     now,
   })
 

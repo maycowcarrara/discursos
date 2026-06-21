@@ -1,7 +1,7 @@
 {
   "name": "discursos",
   "private": true,
-  "version": "1.0.24",
+  "version": "1.2.29",
   "type": "module",
   "scripts": {
     "dev": "node scripts/bump-version.mjs && vite",
@@ -20,7 +20,7 @@
     "congregations:remove-zip-code": "node scripts/remove-congregation-zip-code.mjs",
     "speakers:normalize-statuses": "node scripts/normalize-speaker-statuses.mjs",
     "preview": "vite preview",
-    "deploy:worker": "npm run typecheck:worker && npm run test:calendar-sync && npx wrangler deploy --config workers/email-automation/wrangler.jsonc",
+    "deploy:worker": "npm run typecheck:worker && npm run test:calendar-sync && npx wrangler deploy --config workers/email-automation/wrangler.jsonc --keep-vars",
     "worker:deploy": "npm run deploy:worker",
     "deploy:firestore": "node scripts/bump-version.mjs && firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:hosting": "node scripts/bump-version.mjs && npm run verify && firebase deploy --only hosting",

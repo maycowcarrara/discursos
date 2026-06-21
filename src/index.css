@@ -37,31 +37,31 @@
 
 .dark {
   color-scheme: dark;
-  --background: #0f172a;
-  --foreground: #e5e7eb;
-  --card: #111827;
-  --card-foreground: #e5e7eb;
-  --popover: #111827;
-  --popover-foreground: #e5e7eb;
+  --background: #182235;
+  --foreground: #eef2f7;
+  --card: #202c40;
+  --card-foreground: #eef2f7;
+  --popover: #202c40;
+  --popover-foreground: #eef2f7;
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
-  --secondary: #1f2937;
-  --secondary-foreground: #e5e7eb;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #1e3a8a;
+  --secondary: #253449;
+  --secondary-foreground: #eef2f7;
+  --muted: #2a394f;
+  --muted-foreground: #b4c0cf;
+  --accent: #284a83;
   --accent-foreground: #dbeafe;
   --destructive: #f87171;
-  --border: #334155;
-  --input: #475569;
+  --border: #3a4a61;
+  --input: #53647a;
   --ring: #60a5fa;
-  --sidebar: #1e3a8a;
+  --sidebar: #2d528d;
   --sidebar-foreground: #eff6ff;
-  --sidebar-primary: #1d4ed8;
+  --sidebar-primary: #2f67c6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1e40af;
+  --sidebar-accent: #315fa8;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgb(147 197 253 / 0.22);
+  --sidebar-border: rgb(191 219 254 / 0.28);
 }
 
 @theme inline {
@@ -162,7 +162,7 @@
   }
 
   .dark .app-surface {
-    background-color: #0f172a;
+    background-color: #182235;
   }
 
   .route-transition {

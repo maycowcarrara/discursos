@@ -24,23 +24,23 @@ function createNotificationDocument(
     sentAt: null,
     speakerId: 'speaker-1',
     status: 'pending',
-    subject: 'Confirmacao de designacao - Organizacao',
+    subject: 'Confirmação de designação - Organização',
     type: 'confirmation',
     updatedAt: createdAt,
     ...overrides,
   }
 }
 
-test('preserva notificacao ja enviada quando a entrega continua a mesma', () => {
+test('preserva notificação já enviada quando a entrega continua a mesma', () => {
   const sentAt = Timestamp.fromDate(new Date(2026, 4, 1, 10, 5, 0, 0))
   const existingNotification = createNotificationDocument({
     sentAt,
     status: 'sent',
-    type: 'reminder7d',
+    type: 'reminder4d',
   })
   const nextNotification = createNotificationDocument({
     status: 'pending',
-    type: 'reminder7d',
+    type: 'reminder4d',
   })
 
   const mergedNotification = mergeNotificationDocumentForSync(
@@ -52,7 +52,7 @@ test('preserva notificacao ja enviada quando a entrega continua a mesma', () => 
   assert.equal(mergedNotification.sentAt?.toMillis(), sentAt.toMillis())
 })
 
-test('cancela uma notificacao ainda pendente quando a nova sincronizacao exige cancelamento', () => {
+test('cancela uma notificação ainda pendente quando a nova sincronização exige cancelamento', () => {
   const existingNotification = createNotificationDocument({
     status: 'pending',
   })
@@ -69,7 +69,7 @@ test('cancela uma notificacao ainda pendente quando a nova sincronizacao exige c
   assert.equal(mergedNotification.sentAt, null)
 })
 
-test('reinicia o ciclo quando o destinatario muda', () => {
+test('reinicia o ciclo quando o destinatário muda', () => {
   const sentAt = Timestamp.fromDate(new Date(2026, 4, 1, 10, 5, 0, 0))
   const existingNotification = createNotificationDocument({
     recipientEmail: 'anterior@example.com',
@@ -94,7 +94,7 @@ test('reinicia o ciclo quando o destinatario muda', () => {
   assert.equal(mergedNotification.sentAt, null)
 })
 
-test('reabre uma notificacao cancelada quando a designacao volta a exigir envio', () => {
+test('reabre uma notificação cancelada quando a designação volta a exigir envio', () => {
   const existingNotification = createNotificationDocument({
     errorMessage: 'Cancelada anteriormente.',
     status: 'cancelled',

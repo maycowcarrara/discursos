@@ -53,7 +53,7 @@ function getWorkerBaseUrl() {
 
   if (!workerBaseUrl) {
     throw new Error(
-      'Configure VITE_PUBLIC_NOTIFICATION_WORKER_URL para habilitar a confirmacao publica por link.',
+      'Configure VITE_PUBLIC_NOTIFICATION_WORKER_URL para habilitar a confirmação pública por link.',
     )
   }
 
@@ -76,7 +76,7 @@ async function parseResponse(response: Response) {
   const payload = (await response.json()) as unknown
 
   if (!isStructuredConfirmationResponse(payload)) {
-    throw new Error('Resposta invalida do worker de confirmacao publica.')
+    throw new Error('Resposta inválida do worker de confirmação pública.')
   }
 
   if (!response.ok && payload.state !== 'invalid' && payload.state !== 'conflict') {

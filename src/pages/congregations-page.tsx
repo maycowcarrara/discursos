@@ -70,7 +70,7 @@ const commonCongregationFormFields = {
   publicTalkCoordinatorPhone: z
     .string()
     .trim()
-    .refine(validateOptionalPhone, 'Informe um telefone válido.'),
+    .refine(validateOptionalPhone, 'Informe um WhatsApp válido.'),
   publicTalkCoordinatorEmail: z
     .string()
     .trim()
@@ -688,7 +688,7 @@ export function CongregationsPage() {
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="space-y-2">
                         <span className="text-sm font-medium text-foreground">
-                          Telefone
+                          WhatsApp
                           <span className="font-normal text-muted-foreground">
                             {' '}
                             opcional
@@ -896,10 +896,10 @@ export function CongregationsPage() {
                                   tone={coordinatorName ? 'default' : 'pending'}
                                 />
                                 <MetadataChip
-                                  label="Telefone"
+                                  label="WhatsApp"
                                   value={getOptionalMetadataValue(
                                     item.publicTalkCoordinatorPhone,
-                                    'Sem telefone',
+                                    'Sem WhatsApp',
                                   )}
                                   tone={
                                     item.publicTalkCoordinatorPhone
@@ -1204,7 +1204,7 @@ export function CongregationsPage() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <label className="space-y-2">
                           <span className="text-sm font-medium text-foreground">
-                            Telefone
+                            WhatsApp
                             <span className="font-normal text-muted-foreground">
                               {' '}
                               opcional

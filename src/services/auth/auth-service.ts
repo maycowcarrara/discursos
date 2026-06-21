@@ -28,7 +28,7 @@ async function assertAdminAccess(user: User) {
   await signOut(firebaseAuth).catch(() => undefined)
 
   throw new AdminAccessRequiredError(
-    'A conta autenticada nao possui acesso administrativo.',
+    'A conta autenticada não possui acesso administrativo.',
   )
 }
 

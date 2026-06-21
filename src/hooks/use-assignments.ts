@@ -11,11 +11,13 @@ import {
   listAssignmentHistoryPage,
   listAssignmentsByYear,
   listRecentAssignments,
+  requestManualAssignmentConfirmationEmail,
   updateAssignment,
   type AssignmentHistoryCursor,
   type ConfirmAssignmentInput,
   type CreateAssignmentInput,
   type ListAssignmentHistoryInput,
+  type RequestManualAssignmentConfirmationEmailInput,
   type UpdateAssignmentInput,
 } from '@/services/firestore/assignments-service'
 
@@ -75,6 +77,12 @@ async function invalidateAssignmentQueries(
     queryClient.invalidateQueries({
       queryKey: ['firestore', 'auditLogs'],
     }),
+    queryClient.invalidateQueries({
+      queryKey: ['firestore', 'notifications'],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['firestore', 'dashboard'],
+    }),
   ])
 }
 
@@ -105,6 +113,18 @@ export function useConfirmAssignmentMutation() {
 
   return useMutation({
     mutationFn: (input: ConfirmAssignmentInput) => confirmAssignment(input),
+    onSuccess: async () => {
+      await invalidateAssignmentQueries(queryClient)
+    },
+  })
+}
+
+export function useRequestManualAssignmentConfirmationEmailMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: RequestManualAssignmentConfirmationEmailInput) =>
+      requestManualAssignmentConfirmationEmail(input),
     onSuccess: async () => {
       await invalidateAssignmentQueries(queryClient)
     },

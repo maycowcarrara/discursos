@@ -143,7 +143,7 @@ const speakerFormSchema = z
     phone: z
       .string()
       .trim()
-      .refine(validateOptionalPhone, 'Informe um telefone válido.'),
+      .refine(validateOptionalPhone, 'Informe um WhatsApp válido.'),
     congregationId: z.string().trim().min(1, 'Selecione a congregação.'),
     type: z.enum(['local', 'visitor']),
     themeIds: z
@@ -288,7 +288,7 @@ function getMissingContactLabels(email: string, phone: string) {
   }
 
   if (phone.trim().length === 0) {
-    missingLabels.push('telefone')
+    missingLabels.push('WhatsApp')
   }
 
   return missingLabels
@@ -734,7 +734,7 @@ export function SpeakersPage() {
 
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
-                      Telefone
+                      WhatsApp
                       <span className="font-normal text-muted-foreground"> opcional</span>
                     </span>
                     <Input
@@ -1137,7 +1137,7 @@ export function SpeakersPage() {
                 <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-11"
-                  placeholder="Buscar por nome, e-mail, telefone..."
+                  placeholder="Buscar por nome, e-mail, WhatsApp..."
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
@@ -1300,8 +1300,8 @@ export function SpeakersPage() {
                           tone={speaker.email.trim() ? 'default' : 'warning'}
                         />
                         <MetadataChip
-                          label="Telefone"
-                          value={speaker.phone.trim() || 'Sem telefone'}
+                          label="WhatsApp"
+                          value={speaker.phone.trim() || 'Sem WhatsApp'}
                           tone={speaker.phone.trim() ? 'default' : 'warning'}
                         />
                       </div>

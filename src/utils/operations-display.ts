@@ -7,8 +7,9 @@ import type {
 } from '@/types/firestore'
 
 export const notificationTypeLabels: Record<NotificationType, string> = {
-  reminder7d: 'Lembrete 7 dias',
-  reminder1d: 'Lembrete 1 dia',
+  reminder4d: 'Lembrete 4 dias',
+  reminder7d: 'Lembrete legado 7 dias',
+  reminder1d: 'Lembrete legado 1 dia',
   confirmation: 'Confirmação',
   manual: 'Manual',
 }

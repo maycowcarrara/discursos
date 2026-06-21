@@ -25,7 +25,7 @@ function getWorkerBaseUrl() {
 
   if (!workerBaseUrl) {
     throw new Error(
-      'Configure VITE_PUBLIC_NOTIFICATION_WORKER_URL para habilitar a gestao administrativa.',
+      'Configure VITE_PUBLIC_NOTIFICATION_WORKER_URL para habilitar a gestão administrativa.',
     )
   }
 
@@ -71,7 +71,7 @@ function getWorkerErrorMessage(payload: unknown) {
     return payload.message
   }
 
-  return 'Nao foi possivel concluir a operacao administrativa.'
+  return 'Não foi possível concluir a operação administrativa.'
 }
 
 async function requestAdminUsers(

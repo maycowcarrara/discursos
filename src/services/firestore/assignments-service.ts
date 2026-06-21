@@ -55,6 +55,7 @@ export type AssignmentFormValues = {
   themeId: string
   status: AssignmentStatus
   notes: string
+  emailNotificationsEnabled: boolean
 }
 
 export type CreateAssignmentInput = AssignmentFormValues & {
@@ -67,6 +68,12 @@ export type UpdateAssignmentInput = CreateAssignmentInput & {
 }
 
 export type ConfirmAssignmentInput = {
+  id: string
+  actorUid: string
+  actorName?: string | null
+}
+
+export type RequestManualAssignmentConfirmationEmailInput = {
   id: string
   actorUid: string
   actorName?: string | null
@@ -99,6 +106,7 @@ export const defaultAssignmentFormValues: AssignmentFormValues = {
   themeId: '',
   status: 'pending',
   notes: '',
+  emailNotificationsEnabled: false,
 }
 
 type ResolvedAssignmentEntities = {
@@ -119,6 +127,10 @@ function getAssignmentRef(id: string) {
 
 function getNotificationRef(id: string) {
   return doc(firebaseDb, 'notifications', id)
+}
+
+function getAssignmentNotificationRef(assignmentId: string, type: string) {
+  return getNotificationRef(`${assignmentId}__${type}`)
 }
 
 function getCalendarEventRef(id: string) {
@@ -152,7 +164,7 @@ async function resolveOrganizationName() {
     return legacyOrganizationName.trim()
   }
 
-  return 'Congregacao local'
+  return 'Congregação local'
 }
 
 function parseDateBoundaryValue(value: string) {
@@ -166,7 +178,7 @@ function parseDateBoundaryValue(value: string) {
     !Number.isInteger(month) ||
     !Number.isInteger(day)
   ) {
-    throw new Error('Informe um periodo valido para consultar o historico.')
+    throw new Error('Informe um período válido para consultar o histórico.')
   }
 
   const parsedDate = new Date(year, month - 1, day, 12, 0, 0, 0)
@@ -176,7 +188,7 @@ function parseDateBoundaryValue(value: string) {
     parsedDate.getMonth() !== month - 1 ||
     parsedDate.getDate() !== day
   ) {
-    throw new Error('Informe um periodo valido para consultar o historico.')
+    throw new Error('Informe um período válido para consultar o histórico.')
   }
 
   return parsedDate
@@ -296,6 +308,9 @@ function buildAssignmentPayload(
     themeTitle: entities.theme.title,
     status: values.status,
     notes: values.notes.trim(),
+    emailNotificationsEnabled: values.emailNotificationsEnabled,
+    manualConfirmationEmailRequestedAt:
+      existingAssignment?.manualConfirmationEmailRequestedAt ?? null,
     confirmationToken: isAssignmentCoveringCalendarSlot(values.status)
       ? existingAssignment?.confirmationToken ?? crypto.randomUUID()
       : null,
@@ -307,7 +322,7 @@ function buildAssignmentPayload(
 function buildNotificationDocuments(options: {
   assignment: Pick<
     AssignmentDocument,
-    'eventDate' | 'status' | 'speakerId' | 'createdAt'
+    'emailNotificationsEnabled' | 'eventDate' | 'status' | 'speakerId' | 'createdAt'
   > & {
     id: string
   }
@@ -325,10 +340,11 @@ function buildNotificationDocuments(options: {
       speakerName: options.speakerName,
     },
     organizationName: options.organizationName,
+    automaticEmailsEnabled: options.assignment.emailNotificationsEnabled,
     now: options.now.toDate(),
   })
 
-  return notificationPlan.map((notification) => ({
+  const activeNotificationDocuments = notificationPlan.map((notification) => ({
     id: notification.documentId,
     document: {
       type: notification.type,
@@ -347,6 +363,30 @@ function buildNotificationDocuments(options: {
       updatedAt: options.now,
     },
   }))
+
+  const legacyCancelledDocuments = (['reminder7d', 'reminder1d'] as const).map(
+    (type) => ({
+      id: `${options.assignment.id}__${type}`,
+      document: {
+        type,
+        channel: 'email' as const,
+        assignmentId: options.assignment.id,
+        speakerId: options.assignment.speakerId,
+        recipientEmail: options.recipientEmail.trim(),
+    subject: `Lembrete legado cancelado - ${options.organizationName.trim() || 'Organização'}`,
+        status: 'cancelled' as const,
+        scheduledFor: options.now,
+        sentAt: null,
+        errorMessage: null,
+        retryCount: 0,
+        provider: 'emailjs' as const,
+        createdAt: options.assignment.createdAt,
+        updatedAt: options.now,
+      },
+    }),
+  )
+
+  return [...activeNotificationDocuments, ...legacyCancelledDocuments]
 }
 
 type NotificationSyncDocument = ReturnType<typeof buildNotificationDocuments>[number]
@@ -447,8 +487,9 @@ function cancelAutomatedNotificationsInTransaction(
   transaction: Transaction,
   assignmentId: string,
   now: Timestamp,
-  types: Array<'confirmation' | 'reminder7d' | 'reminder1d'> = [
+  types: Array<'confirmation' | 'reminder4d' | 'reminder7d' | 'reminder1d'> = [
     'confirmation',
+    'reminder4d',
     'reminder7d',
     'reminder1d',
   ],
@@ -472,6 +513,7 @@ function buildExistingAssignmentStatusUpdate(
   notes: string,
   now: Timestamp,
   actorUid: string,
+  emailNotificationsEnabled = assignment.emailNotificationsEnabled,
 ) {
   const statusFields = buildStatusFields(status, now, assignment)
 
@@ -479,6 +521,7 @@ function buildExistingAssignmentStatusUpdate(
     ...stripRecordId(assignment),
     status,
     notes: notes.trim(),
+    emailNotificationsEnabled,
     confirmationToken: isAssignmentCoveringCalendarSlot(status)
       ? assignment.confirmationToken ?? crypto.randomUUID()
       : null,
@@ -496,7 +539,7 @@ async function assertActiveCongregationExists(id: string) {
   )
 
   if (!congregation || !congregation.isActive) {
-    throw new Error('A congregacao selecionada nao esta disponivel na base ativa.')
+    throw new Error('A congregação selecionada não está disponível na base ativa.')
   }
 
   return congregation
@@ -506,7 +549,7 @@ async function assertActiveThemeExists(id: string) {
   const theme = await getTypedDocument(doc(firebaseDb, 'themes', id), themeSchema)
 
   if (!theme || !theme.isActive) {
-    throw new Error('O tema selecionado nao esta mais disponivel na base ativa.')
+    throw new Error('O tema selecionado não está mais disponível na base ativa.')
   }
 
   return theme
@@ -516,11 +559,11 @@ async function assertSpeakerExists(id: string) {
   const speaker = await getTypedDocument(doc(firebaseDb, 'speakers', id), speakerSchema)
 
   if (!speaker) {
-    throw new Error('O orador selecionado nao foi encontrado.')
+    throw new Error('O orador selecionado não foi encontrado.')
   }
 
   if (!speaker.isActive || speaker.status === 'inactive') {
-    throw new Error('O orador selecionado nao esta disponivel para novas designacoes.')
+    throw new Error('O orador selecionado não está disponível para novas designações.')
   }
 
   return speaker
@@ -530,7 +573,7 @@ async function getSpeakerForNotifications(id: string) {
   const speaker = await getTypedDocument(doc(firebaseDb, 'speakers', id), speakerSchema)
 
   if (!speaker) {
-    throw new Error('O orador vinculado a esta designacao nao foi encontrado.')
+    throw new Error('O orador vinculado a esta designação não foi encontrado.')
   }
 
   return speaker
@@ -552,10 +595,34 @@ async function assertCalendarEventExists(id: string) {
   const implicitCalendarEvent = buildImplicitCalendarEventFromId(id)
 
   if (!implicitCalendarEvent) {
-    throw new Error('O sábado selecionado nao esta mais disponivel no calendário ativo.')
+    throw new Error('O sábado selecionado não está mais disponível no calendário ativo.')
   }
 
   return implicitCalendarEvent
+}
+
+function buildManualConfirmationEmailNotificationDocument(options: {
+  assignment: FirestoreRecord<AssignmentDocument>
+  organizationName: string
+  recipientEmail: string
+  now: Timestamp
+}) {
+  return {
+    type: 'manual' as const,
+    channel: 'email' as const,
+    assignmentId: options.assignment.id,
+    speakerId: options.assignment.speakerId,
+    recipientEmail: options.recipientEmail.trim(),
+    subject: `Confirmação de designação - ${options.organizationName.trim() || 'Organização'}`,
+    status: 'pending' as const,
+    scheduledFor: options.now,
+    sentAt: null,
+    errorMessage: null,
+    retryCount: 0,
+    provider: 'emailjs' as const,
+    createdAt: options.now,
+    updatedAt: options.now,
+  }
 }
 
 function assertThemeBelongsToSpeaker(
@@ -563,7 +630,7 @@ function assertThemeBelongsToSpeaker(
   theme: FirestoreRecord<ThemeDocument>,
 ) {
   if (!speaker.themeIds.includes(theme.id)) {
-    throw new Error('RN001: o tema selecionado nao pertence ao cadastro deste orador.')
+    throw new Error('RN001: o tema selecionado não pertence ao cadastro deste orador.')
   }
 }
 
@@ -577,7 +644,7 @@ function assertSpeakerAvailability(
 
   if (!speaker.unavailableStart || !speaker.unavailableEnd) {
     throw new Error(
-      'O orador esta marcado como indisponivel, mas o periodo cadastrado precisa ser revisado antes da designacao.',
+      'O orador está marcado como indisponível, mas o período cadastrado precisa ser revisado antes da designação.',
     )
   }
 
@@ -587,7 +654,7 @@ function assertSpeakerAvailability(
 
   if (unavailableStartKey > unavailableEndKey) {
     throw new Error(
-      'O periodo de indisponibilidade do orador esta invertido e precisa ser corrigido no cadastro.',
+      'O período de indisponibilidade do orador está invertido e precisa ser corrigido no cadastro.',
     )
   }
 
@@ -596,7 +663,7 @@ function assertSpeakerAvailability(
     eventDateKey <= unavailableEndKey
   ) {
     throw new Error(
-      `RN006: ${speaker.name} esta indisponivel em ${getUnavailableWindowLabel(
+      `RN006: ${speaker.name} está indisponível em ${getUnavailableWindowLabel(
         speaker.unavailableStart,
         speaker.unavailableEnd,
       )}.`,
@@ -641,7 +708,7 @@ function assertCalendarEventAllowsAssignments(
   calendarEvent: FirestoreRecord<CalendarEventDocument>,
 ) {
   if (!calendarEvent.isActive) {
-    throw new Error('O sábado selecionado nao esta mais disponivel no calendário ativo.')
+    throw new Error('O sábado selecionado não está mais disponível no calendário ativo.')
   }
 
   if (calendarEvent.blocksAssignments) {
@@ -672,7 +739,7 @@ async function runAssignmentSlotTransaction(options: {
       : buildImplicitCalendarEventFromId(options.calendarEventId)
 
     if (!lockedCalendarEvent) {
-      throw new Error('O sábado selecionado nao esta mais disponivel no calendário ativo.')
+      throw new Error('O sábado selecionado não está mais disponível no calendário ativo.')
     }
 
     assertCalendarEventAllowsAssignments(lockedCalendarEvent)
@@ -734,6 +801,7 @@ export function toAssignmentFormValues(
     themeId: assignment.themeId,
     status: assignment.status,
     notes: assignment.notes,
+    emailNotificationsEnabled: assignment.emailNotificationsEnabled,
   }
 }
 
@@ -860,7 +928,7 @@ export async function createAssignment({
 }: CreateAssignmentInput) {
   if (values.status === 'replaced') {
     throw new Error(
-      'Use a substituicao automatica da tela em vez de criar uma designacao ja substituida.',
+      'Use a substituição automática da tela em vez de criar uma designação já substituída.',
     )
   }
 
@@ -897,6 +965,7 @@ export async function createAssignment({
           eventDate: assignmentDocument.eventDate,
           status: assignmentDocument.status,
           speakerId: assignmentDocument.speakerId,
+          emailNotificationsEnabled: assignmentDocument.emailNotificationsEnabled,
           createdAt: assignmentDocument.createdAt,
         },
         organizationName,
@@ -968,7 +1037,7 @@ export async function updateAssignment({
   const existingAssignment = await getTypedDocument(assignmentRef, assignmentSchema)
 
   if (!existingAssignment) {
-    throw new Error('A designacao selecionada nao foi encontrada.')
+    throw new Error('A designação selecionada não foi encontrada.')
   }
 
   const isIdentityUnchanged =
@@ -979,16 +1048,36 @@ export async function updateAssignment({
   let updatedAssignment: AssignmentDocument
 
   if (isIdentityUnchanged && existingAssignment.status === values.status) {
+    const [speakerForNotifications, organizationName] = await Promise.all([
+      getSpeakerForNotifications(existingAssignment.speakerId),
+      resolveOrganizationName(),
+    ])
     const now = Timestamp.now()
     updatedAssignment = {
       ...stripRecordId(existingAssignment),
       notes: values.notes.trim(),
+      emailNotificationsEnabled: values.emailNotificationsEnabled,
       updatedAt: now,
       updatedBy: actorUid,
     }
+    const notificationDocuments = buildNotificationDocuments({
+      assignment: {
+        id,
+        eventDate: updatedAssignment.eventDate,
+        status: updatedAssignment.status,
+        speakerId: updatedAssignment.speakerId,
+        emailNotificationsEnabled: updatedAssignment.emailNotificationsEnabled,
+        createdAt: updatedAssignment.createdAt,
+      },
+      organizationName,
+      recipientEmail: speakerForNotifications.email,
+      speakerName: updatedAssignment.speakerName,
+      now,
+    })
     const batch = writeBatch(firebaseDb)
 
     batch.set(assignmentRef, updatedAssignment)
+    await syncNotificationDocumentsInBatch(batch, notificationDocuments)
     appendAuditLogToBatch(batch, {
       entityType: 'assignment',
       entityId: id,
@@ -1025,7 +1114,7 @@ export async function updateAssignment({
 
           if (conflictingOperationalAssignments.length > 0) {
             throw new Error(
-              'Ja existe uma designacao operacional neste evento. Use uma nova designacao para substituir a atual.',
+              'Já existe uma designação operacional neste evento. Use uma nova designação para substituir a atual.',
             )
           }
 
@@ -1035,6 +1124,7 @@ export async function updateAssignment({
             values.notes,
             now,
             actorUid,
+            values.emailNotificationsEnabled,
           )
           const notificationDocuments = buildNotificationDocuments({
             assignment: {
@@ -1042,6 +1132,7 @@ export async function updateAssignment({
               eventDate: updatedAssignment.eventDate,
               status: updatedAssignment.status,
               speakerId: updatedAssignment.speakerId,
+              emailNotificationsEnabled: updatedAssignment.emailNotificationsEnabled,
               createdAt: updatedAssignment.createdAt,
             },
             organizationName,
@@ -1079,6 +1170,7 @@ export async function updateAssignment({
       values.notes,
       now,
       actorUid,
+      values.emailNotificationsEnabled,
     )
     const notificationDocuments = buildNotificationDocuments({
       assignment: {
@@ -1086,6 +1178,7 @@ export async function updateAssignment({
         eventDate: updatedAssignment.eventDate,
         status: updatedAssignment.status,
         speakerId: updatedAssignment.speakerId,
+        emailNotificationsEnabled: updatedAssignment.emailNotificationsEnabled,
         createdAt: updatedAssignment.createdAt,
       },
       organizationName,
@@ -1130,7 +1223,7 @@ export async function updateAssignment({
 
           if (conflictingOperationalAssignments.length > 0) {
             throw new Error(
-              'Ja existe uma designacao operacional neste evento. Use uma nova designacao para substituir a atual.',
+              'Já existe uma designação operacional neste evento. Use uma nova designação para substituir a atual.',
             )
           }
 
@@ -1157,6 +1250,7 @@ export async function updateAssignment({
               eventDate: updatedAssignment.eventDate,
               status: updatedAssignment.status,
               speakerId: updatedAssignment.speakerId,
+              emailNotificationsEnabled: updatedAssignment.emailNotificationsEnabled,
               createdAt: updatedAssignment.createdAt,
             },
             organizationName,
@@ -1204,6 +1298,7 @@ export async function updateAssignment({
         eventDate: updatedAssignment.eventDate,
         status: updatedAssignment.status,
         speakerId: updatedAssignment.speakerId,
+        emailNotificationsEnabled: updatedAssignment.emailNotificationsEnabled,
         createdAt: updatedAssignment.createdAt,
       },
       organizationName,
@@ -1244,7 +1339,7 @@ export async function confirmAssignment({
   const existingAssignment = await getTypedDocument(assignmentRef, assignmentSchema)
 
   if (!existingAssignment) {
-    throw new Error('A designacao selecionada nao foi encontrada.')
+    throw new Error('A designação selecionada não foi encontrada.')
   }
 
   if (existingAssignment.status === 'confirmed') {
@@ -1262,7 +1357,7 @@ export async function confirmAssignment({
 
       if (conflictingOperationalAssignments.length > 0) {
         throw new Error(
-          'Ja existe outra designacao operacional neste evento. Revise a substituicao antes de confirmar.',
+          'Já existe outra designação operacional neste evento. Revise a substituição antes de confirmar.',
         )
       }
 
@@ -1291,5 +1386,127 @@ export async function confirmAssignment({
         createdAt: now,
       })
     },
+  })
+}
+
+export async function requestManualAssignmentConfirmationEmail({
+  id,
+  actorName,
+  actorUid,
+}: RequestManualAssignmentConfirmationEmailInput) {
+  const assignmentRef = getAssignmentRef(id)
+  const existingAssignment = await getTypedDocument(assignmentRef, assignmentSchema)
+
+  if (!existingAssignment) {
+    throw new Error('A designação selecionada não foi encontrada.')
+  }
+
+  if (!isAssignmentCoveringCalendarSlot(existingAssignment.status)) {
+    throw new Error('Envie e-mail apenas para designações pendentes ou confirmadas.')
+  }
+
+  const [speakerForNotifications, organizationName] = await Promise.all([
+    getSpeakerForNotifications(existingAssignment.speakerId),
+    resolveOrganizationName(),
+  ])
+
+  if (speakerForNotifications.email.trim().length === 0) {
+    throw new Error('Cadastre o e-mail do orador antes de solicitar o envio.')
+  }
+
+  await runTransaction(firebaseDb, async (transaction) => {
+    const assignmentSnapshot = await transaction.get(assignmentRef)
+
+    if (!assignmentSnapshot.exists()) {
+      throw new Error('A designação selecionada não foi encontrada.')
+    }
+
+    const assignment = {
+      id: assignmentSnapshot.id,
+      ...assignmentSchema.parse(assignmentSnapshot.data()),
+    } satisfies FirestoreRecord<AssignmentDocument>
+
+    if (!isAssignmentCoveringCalendarSlot(assignment.status)) {
+      throw new Error('Envie e-mail apenas para designações pendentes ou confirmadas.')
+    }
+
+    if (assignment.manualConfirmationEmailRequestedAt) {
+      throw new Error('O e-mail de confirmação já foi solicitado para esta designação.')
+    }
+
+    const automaticConfirmationRef = getAssignmentNotificationRef(id, 'confirmation')
+    const manualNotificationRef = getAssignmentNotificationRef(id, 'manual')
+    const [automaticConfirmationSnapshot, manualNotificationSnapshot] =
+      await Promise.all([
+        transaction.get(automaticConfirmationRef),
+        transaction.get(manualNotificationRef),
+      ])
+
+    if (automaticConfirmationSnapshot.exists()) {
+      const automaticConfirmation = notificationSchema.parse(
+        automaticConfirmationSnapshot.data(),
+      )
+
+      if (
+        automaticConfirmation.status === 'sent' ||
+        automaticConfirmation.status === 'pending'
+      ) {
+        throw new Error(
+          automaticConfirmation.status === 'sent'
+            ? 'O e-mail de confirmação já foi enviado automaticamente.'
+            : 'O e-mail de confirmação já está na fila automática.',
+        )
+      }
+    }
+
+    if (manualNotificationSnapshot.exists()) {
+      const manualNotification = notificationSchema.parse(
+        manualNotificationSnapshot.data(),
+      )
+
+      if (manualNotification.status !== 'cancelled') {
+        throw new Error('O e-mail de confirmação manual já foi solicitado.')
+      }
+    }
+
+    const now = Timestamp.now()
+    const assignmentWithManualRequest: AssignmentDocument = {
+      ...stripRecordId(assignment),
+      confirmationToken: assignment.confirmationToken ?? crypto.randomUUID(),
+      manualConfirmationEmailRequestedAt: now,
+      updatedAt: now,
+      updatedBy: actorUid,
+    }
+
+    transaction.set(assignmentRef, assignmentWithManualRequest)
+    transaction.set(
+      manualNotificationRef,
+      buildManualConfirmationEmailNotificationDocument({
+        assignment,
+        organizationName,
+        recipientEmail: speakerForNotifications.email,
+        now,
+      }),
+    )
+    transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
+      entityType: 'notification',
+      entityId: manualNotificationRef.id,
+      action: 'sync',
+      actorUid,
+      actorName: actorName ?? null,
+      before: manualNotificationSnapshot.exists()
+        ? notificationSchema.parse(manualNotificationSnapshot.data())
+        : null,
+      after: {
+        status: 'pending',
+        type: 'manual',
+        assignmentId: id,
+      },
+      metadata: {
+        source: 'assignments-phase-11',
+        trigger: 'manual-confirmation-email-button',
+      },
+      createdAt: now,
+    })
   })
 }

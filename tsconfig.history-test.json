@@ -17,5 +17,6 @@
     "src/types/firestore.ts",
     "src/utils/assignment-history.ts",
     "src/utils/assignment-history.test.ts"
-  ]
+  ],
+  "exclude": []
 }

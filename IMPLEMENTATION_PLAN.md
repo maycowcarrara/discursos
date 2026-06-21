@@ -48,6 +48,8 @@
 * redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
 * reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
 * simplificação dos status de oradores para `ativo`, `indisponível` e `inativo`, consolidando férias como indisponibilidade temporária e transferidos como inativos preservados no histórico
+* controle explícito de e-mails por designação, mantendo notificações automáticas desligadas por padrão, um único lembrete automático 4 dias antes e envio manual de confirmação como ação única
+* confirmação por WhatsApp com mensagem completa de data, discurso, origem, destino, endereço, dia e horário da reunião
 * validação visual em larguras desktop e mobile antes do aceite final do lançamento
 
 ## Entregas já realizadas
@@ -180,7 +182,11 @@
 ### EmailJS — fechamento da Fase 11
 
 * fila automática de `notifications` sincronizada junto com create, update, confirmação e substituição de `assignments`
-* lembretes de 7 dias e 1 dia programados por utilitário tipado e cobertos por teste dedicado
+* criação de designação passa a deixar notificações automáticas por e-mail desligadas por padrão, com ativação explícita no cadastro
+* envio manual de e-mail de confirmação pode ser solicitado uma única vez por designação operacional, usando a fila `notifications`
+* ações de e-mail ficam bloqueadas no painel quando as chaves públicas do EmailJS não estão configuradas no frontend
+* botão de confirmação por WhatsApp disponível quando o orador possui WhatsApp, reutilizando a mesma mensagem completa no dashboard e na lista de designações
+* lembrete único de 4 dias programado por utilitário tipado e coberto por teste dedicado
 * confirmação pública por link em rota do frontend, com fluxo validado para desktop e mobile
 * worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
 * confirmação pública grava `confirmedAt`, `responseAt` e auditoria no Firestore após validação do token
@@ -464,7 +470,7 @@ Entregas realizadas:
 * exclusão lógica com remoção da base ativa apenas para congregações externas
 * proteção contra exclusão ou conversão da congregação local fixa
 * bloqueio de exclusão quando houver oradores vinculados
-* cadastro opcional do irmão responsável pelo arranjo de discursos com nome, telefone e e-mail separados
+* cadastro opcional do irmão responsável pelo arranjo de discursos com nome, WhatsApp e e-mail separados
 * geração de auditoria para create, update e delete
 * remoção do campo `CEP` da UI e do schema oficial por não ter utilidade operacional nesta V1
 
@@ -525,7 +531,7 @@ Campos:
 
 * nome
 * email
-* telefone
+* WhatsApp
 * congregationId
 * type
 * themeIds[]
@@ -691,8 +697,7 @@ Status atual:
 Implementar:
 
 * envio automático
-* lembrete 7 dias
-* lembrete 1 dia
+* lembrete 4 dias antes da reunião
 * confirmação via link
 
 Utilizar:
@@ -703,7 +708,7 @@ Utilizar:
 Entregas realizadas:
 
 * sincronização automática da fila `notifications` a partir das mudanças em `assignments`
-* confirmação imediata, lembrete 7 dias e lembrete 1 dia com agendamento oficial
+* confirmação automática imediata opt-in e lembrete único de 4 dias com agendamento oficial
 * confirmação pública por link com validação no worker e escrita segura no Firestore
 * trigger manual e cron no worker para processar envios EmailJS
 * segredos mantidos fora do frontend, via variáveis do worker e service account do Firebase
@@ -711,13 +716,17 @@ Entregas realizadas:
 
 Fluxo operacional oficial da Fase 11:
 
-* `pending`: gera `confirmation`, `reminder7d` e `reminder1d` em `notifications` quando a designação continua operacional, o evento ainda não passou e existe e-mail válido
+* `pending`: gera `confirmation` e `reminder4d` em `notifications` quando a designação continua operacional, o evento ainda não passou, existe e-mail válido e as notificações automáticas foram ativadas
+* notificações automáticas só entram como `pending` quando `assignments.emailNotificationsEnabled = true`; quando desligadas, os documentos determinísticos permanecem cancelados
+* o disparo manual de confirmação usa notificação `manual` com agendamento imediato, grava `manualConfirmationEmailRequestedAt` na designação e não reabre outro disparo depois de solicitado
+* o botão manual fica bloqueado quando a confirmação automática já foi enviada ou já está na fila, evitando duplicidade de e-mail
 * `confirmed`: mantém lembretes futuros ativos e encerra a automação de confirmação
 * `declined`, `cancelled` e `replaced`: encerram as automações pendentes da designação, preservando o histórico
 * edição sem mudança real de entrega preserva status já processado da notificação, evitando reenvio indevido
 * edição com mudança real de entrega reinicia o ciclo da notificação correspondente
 * o worker faz `claim` temporário da notificação antes de enviar para reduzir duplicidade em concorrência
 * retentativas usam novo `scheduledFor`; após o limite, a notificação passa para `failed`
+* falhas permanentes de configuração do EmailJS são registradas em `notifications.errorMessage` e exibidas nas telas operacionais
 
 IMPORTANTE:
 

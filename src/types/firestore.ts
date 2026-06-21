@@ -6,7 +6,7 @@ import { themeCategoryValues } from '../lib/theme-categories.js'
 export const timestampSchema = z.custom<Timestamp>(
   (value) => value instanceof Timestamp,
   {
-    message: 'Timestamp invalido do Firestore',
+    message: 'Timestamp inválido do Firestore',
   },
 )
 
@@ -49,6 +49,7 @@ export const assignmentStatusSchema = z.enum([
 ])
 
 export const notificationTypeSchema = z.enum([
+  'reminder4d',
   'reminder7d',
   'reminder1d',
   'confirmation',
@@ -191,6 +192,8 @@ export const assignmentSchema = baseDocumentSchema
     themeTitle: z.string(),
     status: assignmentStatusSchema,
     notes: z.string(),
+    emailNotificationsEnabled: z.boolean().optional().default(false),
+    manualConfirmationEmailRequestedAt: timestampSchema.nullable().optional(),
     confirmationToken: z.string().nullable().optional(),
     confirmedAt: timestampSchema.nullable().optional(),
     responseAt: timestampSchema.nullable().optional(),

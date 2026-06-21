@@ -68,6 +68,7 @@ function makeAssignment(
     themeTitle: 'Tema 101',
     status: 'confirmed',
     notes: '',
+    emailNotificationsEnabled: false,
     confirmationToken: null,
     confirmedAt: timestamp,
     responseAt: timestamp,
@@ -109,7 +110,7 @@ test('classifica discurso fora quando orador local fala em congregacao parceira'
   assert.equal(getAssignmentMovementLabel(movementType), 'Discurso fora')
 })
 
-test('mantem designacao local como fallback seguro quando o destino nao esta carregado', () => {
+test('mantém designação local como fallback seguro quando o destino não está carregado', () => {
   const congregationsById = new Map<string, FirestoreRecord<CongregationDocument>>()
   const assignment = makeAssignment('assignment-3', {
     speakerType: 'visitor',
@@ -119,5 +120,5 @@ test('mantem designacao local como fallback seguro quando o destino nao esta car
   const movementType = inferAssignmentMovementType(assignment, congregationsById)
 
   assert.equal(movementType, 'local')
-  assert.equal(getAssignmentMovementLabel(movementType), 'Designacao local')
+  assert.equal(getAssignmentMovementLabel(movementType), 'Designação local')
 })

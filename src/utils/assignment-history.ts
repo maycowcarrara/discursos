@@ -34,5 +34,5 @@ export function getAssignmentMovementLabel(
     return 'Discurso fora'
   }
 
-  return 'Designacao local'
+  return 'Designação local'
 }

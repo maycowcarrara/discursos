@@ -4,9 +4,10 @@ import {
   ClipboardList,
   Clock3,
   LoaderCircle,
-  Mail,
+  MailCheck,
+  MailWarning,
+  MessageCircle,
   Mic2,
-  Phone,
   Plus,
   Sparkles,
   UsersRound,
@@ -16,21 +17,30 @@ import { Link } from 'react-router-dom'
 import { EmptyState } from '@/components/app/empty-state'
 import { MetadataChip } from '@/components/app/metadata-chip'
 import { StatusPill } from '@/components/app/status-pill'
+import { useAuth } from '@/components/auth/use-auth'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { useToast } from '@/components/ui/use-toast'
+import {
+  emailDeliveryUnavailableMessage,
+  isEmailDeliveryConfigured,
+} from '@/config/email'
 import { useAppSettingsQuery } from '@/hooks/use-app-settings'
+import { useRequestManualAssignmentConfirmationEmailMutation } from '@/hooks/use-assignments'
 import { useCongregationsQuery } from '@/hooks/use-congregations'
 import { useDashboardSnapshotQuery } from '@/hooks/use-dashboard'
+import { useNotificationByIdQuery } from '@/hooks/use-notifications'
 import { useSpeakerByIdQuery } from '@/hooks/use-speakers'
 import { cn } from '@/lib/utils'
 import {
   assignmentStatusLabels,
   calendarEventTypeLabels,
 } from '@/utils/calendar-events'
+import { buildAssignmentWhatsAppConfirmationUrl } from '@/utils/assignment-whatsapp'
 import {
   buildDashboardSaturdayEntries,
 } from '@/utils/dashboard'
@@ -105,16 +115,6 @@ function getHighlightStyle(status: DashboardEntryStatus) {
   }
 }
 
-function normalizePhoneLink(phone: string) {
-  const digits = phone.replace(/\D/g, '')
-
-  if (!digits) {
-    return null
-  }
-
-  return `tel:${digits}`
-}
-
 function getAssignmentCreateHref(entry: DashboardSaturdayEntryView) {
   const params = new URLSearchParams({
     evento: entry.event.id,
@@ -125,10 +125,11 @@ function getAssignmentCreateHref(entry: DashboardSaturdayEntryView) {
 }
 
 const cardClass =
-  'rounded-xl border-gray-200 shadow-sm'
+  'overflow-hidden rounded-xl border-gray-200 shadow-sm'
 
 const quickActionClass =
   'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-card dark:text-foreground'
+const emailDeliveryConfigured = isEmailDeliveryConfigured()
 
 const dashboardShortcutClass =
   'flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-card dark:text-foreground'
@@ -138,6 +139,10 @@ export function DashboardPage() {
   today.setHours(0, 0, 0, 0)
 
   const appSettingsQuery = useAppSettingsQuery()
+  const { user } = useAuth()
+  const toast = useToast()
+  const requestManualEmailMutation =
+    useRequestManualAssignmentConfirmationEmailMutation()
   const congregationsQuery = useCongregationsQuery()
   const dashboardSnapshotQuery = useDashboardSnapshotQuery(today)
 
@@ -152,8 +157,17 @@ export function DashboardPage() {
     10,
   )
   const nextSaturdayEntry = upcomingSaturdayEntries[0] ?? null
+  const nextAssignment = nextSaturdayEntry?.assignment ?? null
   const remainingSaturdayEntries = upcomingSaturdayEntries.slice(1)
-  const nextSpeakerQuery = useSpeakerByIdQuery(nextSaturdayEntry?.assignment?.speakerId)
+  const nextSpeakerQuery = useSpeakerByIdQuery(nextAssignment?.speakerId)
+  const automaticConfirmationNotificationQuery = useNotificationByIdQuery(
+    nextAssignment ? `${nextAssignment.id}__confirmation` : '',
+    Boolean(nextAssignment),
+  )
+  const manualConfirmationNotificationQuery = useNotificationByIdQuery(
+    nextAssignment ? `${nextAssignment.id}__manual` : '',
+    Boolean(nextAssignment),
+  )
   const nextSpeaker = nextSpeakerQuery.data
   const combinedError =
     appSettingsQuery.error ??
@@ -170,8 +184,70 @@ export function DashboardPage() {
   const highlightStyle = getHighlightStyle(nextSaturdayStatus)
   const HighlightIcon = highlightStyle.Icon
   const nextSpeakerEmail = nextSpeaker?.email.trim() ?? ''
-  const nextSpeakerPhone = nextSpeaker?.phone.trim() ?? ''
-  const nextSpeakerPhoneLink = normalizePhoneLink(nextSpeakerPhone)
+  const nextDestinationCongregation = nextAssignment
+    ? congregationsQuery.data?.find(
+        (congregation) => congregation.id === nextAssignment.localCongregationId,
+      ) ?? null
+    : null
+  const nextSpeakerWhatsAppLink =
+    nextAssignment && nextSpeaker
+      ? buildAssignmentWhatsAppConfirmationUrl({
+          assignment: nextAssignment,
+          destinationCongregation: nextDestinationCongregation,
+          speaker: nextSpeaker,
+        })
+      : null
+  const automaticConfirmationNotification =
+    automaticConfirmationNotificationQuery.data ?? null
+  const manualConfirmationNotification =
+    manualConfirmationNotificationQuery.data ?? null
+  const automaticConfirmationStatus =
+    automaticConfirmationNotification?.status ?? null
+  const manualConfirmationStatus =
+    manualConfirmationNotification?.status ?? null
+  const automaticEmailAlreadySent = automaticConfirmationStatus === 'sent'
+  const automaticEmailQueued = automaticConfirmationStatus === 'pending'
+  const automaticEmailFailed = automaticConfirmationStatus === 'failed'
+  const manualEmailFailed = manualConfirmationStatus === 'failed'
+  const manualEmailAlreadyRequested = Boolean(
+    nextAssignment?.manualConfirmationEmailRequestedAt,
+  )
+  const manualEmailAlreadyQueuedOrSent =
+    manualConfirmationStatus === 'pending' ||
+    manualConfirmationStatus === 'sent' ||
+    manualConfirmationStatus === 'failed'
+  const emailActionResolved =
+    automaticEmailAlreadySent ||
+    manualEmailAlreadyRequested ||
+    manualEmailAlreadyQueuedOrSent
+  const emailActionDisabled =
+    requestManualEmailMutation.isPending ||
+    !emailDeliveryConfigured ||
+    automaticEmailQueued ||
+    emailActionResolved
+  const EmailActionIcon =
+    automaticEmailFailed || manualEmailFailed
+      ? MailWarning
+      : automaticEmailAlreadySent ||
+          manualEmailAlreadyRequested ||
+          manualConfirmationStatus === 'sent'
+      ? CheckCircle2
+      : MailCheck
+  const emailActionLabel = !emailDeliveryConfigured
+    ? 'E-mail indisponível'
+    : automaticEmailFailed || manualEmailFailed
+      ? 'Erro no e-mail'
+      : automaticEmailAlreadySent
+        ? 'E-mail enviado'
+        : manualEmailAlreadyRequested || manualConfirmationStatus === 'sent'
+          ? 'E-mail solicitado'
+          : automaticEmailQueued
+            ? 'E-mail na fila'
+            : 'E-mail'
+  const emailErrorMessage =
+    manualConfirmationNotification?.errorMessage?.trim() ||
+    automaticConfirmationNotification?.errorMessage?.trim() ||
+    ''
   const dashboardShortcuts = [
     {
       href: '/designacoes',
@@ -211,6 +287,41 @@ export function DashboardPage() {
   const nextSaturdayTheme = nextSaturdayEntry?.assignment
     ? `${nextSaturdayEntry.assignment.themeNumber} - ${nextSaturdayEntry.assignment.themeTitle}`
     : 'Ainda não definido'
+
+  async function handleRequestManualConfirmationEmail() {
+    if (!nextAssignment) {
+      return
+    }
+
+    if (!emailDeliveryConfigured) {
+      toast.error(emailDeliveryUnavailableMessage)
+      return
+    }
+
+    if (!user) {
+      toast.error('Sua sessão expirou. Entre novamente para continuar.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Enviar agora o e-mail de confirmação para ${nextAssignment.speakerName}? Esta ação só pode ser feita uma vez para esta designação.`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await requestManualEmailMutation.mutateAsync({
+        id: nextAssignment.id,
+        actorUid: user.uid,
+        actorName: user.displayName ?? user.email ?? null,
+      })
+      toast.success('E-mail de confirmação solicitado com sucesso.')
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    }
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-3">
@@ -324,26 +435,46 @@ export function DashboardPage() {
                       </p>
                       <div className="mt-2.5 flex flex-wrap gap-2">
                         {nextSpeakerEmail ? (
+                          <button
+                            type="button"
+                            className={cn(
+                              quickActionClass,
+                              emailActionDisabled &&
+                                'cursor-not-allowed opacity-70 hover:border-gray-200 hover:bg-white hover:text-slate-700 dark:hover:bg-card dark:hover:text-foreground',
+                            )}
+                            onClick={() => void handleRequestManualConfirmationEmail()}
+                            disabled={emailActionDisabled}
+                          >
+                            <EmailActionIcon className="size-3.5" />
+                            {emailActionLabel}
+                          </button>
+                        ) : null}
+                        {nextSpeakerWhatsAppLink ? (
                           <a
                             className={quickActionClass}
-                            href={`mailto:${nextSpeakerEmail}`}
+                            href={nextSpeakerWhatsAppLink}
+                            rel="noreferrer"
+                            target="_blank"
                           >
-                            <Mail className="size-3.5" />
-                            E-mail
+                            <MessageCircle className="size-3.5" />
+                            WhatsApp
                           </a>
                         ) : null}
-                        {nextSpeakerPhoneLink ? (
-                          <a className={quickActionClass} href={nextSpeakerPhoneLink}>
-                            <Phone className="size-3.5" />
-                            Telefone
-                          </a>
-                        ) : null}
-                        {!nextSpeakerEmail && !nextSpeakerPhoneLink ? (
+                        {!nextSpeakerEmail && !nextSpeakerWhatsAppLink ? (
                           <p className="text-sm text-muted-foreground">
                             Sem contato rápido disponível.
                           </p>
                         ) : null}
                       </div>
+                      {emailErrorMessage ? (
+                        <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium leading-5 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
+                          {emailErrorMessage}
+                        </p>
+                      ) : nextSpeakerEmail && !emailDeliveryConfigured ? (
+                        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium leading-5 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200">
+                          {emailDeliveryUnavailableMessage}
+                        </p>
+                      ) : null}
                       {nextSpeakerQuery.isLoading ? (
                         <p className="mt-2 text-xs text-muted-foreground">
                           Carregando contato do orador...

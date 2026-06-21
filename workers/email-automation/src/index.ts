@@ -88,7 +88,12 @@ type AssignmentStatus =
 type SpeakerType = 'local' | 'visitor'
 
 type NotificationStatus = 'pending' | 'sent' | 'failed' | 'cancelled'
-type NotificationType = 'confirmation' | 'reminder7d' | 'reminder1d' | 'manual'
+type NotificationType =
+  | 'confirmation'
+  | 'reminder4d'
+  | 'reminder7d'
+  | 'reminder1d'
+  | 'manual'
 type GoogleCalendarSyncStatus = 'pending' | 'synced' | 'error'
 type CalendarSyncRunStatus = 'idle' | 'running' | 'success' | 'error'
 
@@ -253,7 +258,8 @@ const maxRetryCount = 3
 const processingLeaseMinutes = 5
 const retryDelayMinutes = 30
 const notificationTypeLabels: Record<NotificationType, string> = {
-  confirmation: 'Confirmacao',
+  confirmation: 'Confirmação',
+  reminder4d: 'Lembrete de 4 dias',
   reminder7d: 'Lembrete de 7 dias',
   reminder1d: 'Lembrete de 1 dia',
   manual: 'Envio manual',
@@ -263,10 +269,10 @@ const assignmentStatusLabels: Record<AssignmentStatus, string> = {
   confirmed: 'Confirmado',
   declined: 'Recusado',
   cancelled: 'Cancelado',
-  replaced: 'Substituido',
+  replaced: 'Substituído',
 }
 const eventTypeLabels: Record<string, string> = {
-  publicTalk: 'Discurso publico',
+  publicTalk: 'Discurso público',
   congress: 'Congresso',
   assembly: 'Assembleia',
   visit: 'Visita',
@@ -300,7 +306,7 @@ export default {
         return jsonResponse(
           {
             error: 'unauthorized',
-            message: 'Token interno ausente ou invalido.',
+            message: 'Token interno ausente ou inválido.',
           },
           401,
         )
@@ -341,7 +347,7 @@ export default {
         return jsonResponse(
           {
             error: 'unauthorized',
-            message: 'Token interno ausente ou invalido.',
+            message: 'Token interno ausente ou inválido.',
           },
           401,
         )
@@ -366,7 +372,7 @@ export default {
     return jsonResponse(
       {
         error: 'not_found',
-        message: 'Rota nao encontrada.',
+        message: 'Rota não encontrada.',
       },
       404,
     )
@@ -386,7 +392,7 @@ async function handlePublicAssignmentPreview(requestUrl: URL, env: Env) {
     return jsonResponse(
       buildPublicConfirmationResponse({
         assignment: null,
-        message: 'Este link de confirmacao esta incompleto.',
+        message: 'Este link de confirmação está incompleto.',
         state: 'invalid',
       }),
       400,
@@ -411,7 +417,7 @@ async function handlePublicAssignmentConfirmation(request: Request, env: Env) {
     return jsonResponse(
       buildPublicConfirmationResponse({
         assignment: null,
-        message: 'Este link de confirmacao esta incompleto.',
+        message: 'Este link de confirmação está incompleto.',
         state: 'invalid',
       }),
       400,
@@ -433,7 +439,7 @@ async function handlePublicAssignmentConfirmation(request: Request, env: Env) {
     return jsonResponse(
       buildPublicConfirmationResponse({
         assignment: null,
-        message: 'Este link nao corresponde mais a uma designacao ativa.',
+        message: 'Este link não corresponde mais a uma designação ativa.',
         state: 'invalid',
       }),
       400,
@@ -446,7 +452,7 @@ async function handlePublicAssignmentConfirmation(request: Request, env: Env) {
     return jsonResponse(
       buildPublicConfirmationResponse({
         assignment: null,
-        message: 'Este link nao corresponde mais a uma designacao ativa.',
+        message: 'Este link não corresponde mais a uma designação ativa.',
         state: 'invalid',
       }),
       400,
@@ -463,7 +469,7 @@ async function handlePublicAssignmentConfirmation(request: Request, env: Env) {
     return jsonResponse(
       buildPublicConfirmationResponse({
         assignment: mapAssignmentSummary(assignment),
-        message: 'Este slot ja foi ocupado por outra designacao operacional.',
+        message: 'Este horário já foi ocupado por outra designação operacional.',
         state: 'conflict',
       }),
       409,
@@ -566,7 +572,7 @@ async function handlePublicAssignmentConfirmation(request: Request, env: Env) {
         ...mapAssignmentSummary(assignment),
         status: 'confirmed',
       },
-      message: 'Designacao confirmada com sucesso.',
+      message: 'Designação confirmada com sucesso.',
       state: 'confirmed',
     }),
   )
@@ -582,7 +588,7 @@ async function buildAssignmentPreview(
   if (!assignment || !assignment.confirmationToken || assignment.confirmationToken !== token) {
     return buildPublicConfirmationResponse({
       assignment: null,
-      message: 'Este link nao e mais valido para confirmacao.',
+      message: 'Este link não é mais válido para confirmação.',
       state: 'invalid',
     })
   }
@@ -590,7 +596,7 @@ async function buildAssignmentPreview(
   if (assignment.status === 'confirmed') {
     return buildPublicConfirmationResponse({
       assignment: mapAssignmentSummary(assignment),
-      message: 'Esta designacao ja havia sido confirmada anteriormente.',
+      message: 'Esta designação já havia sido confirmada anteriormente.',
       state: 'confirmed',
     })
   }
@@ -598,7 +604,7 @@ async function buildAssignmentPreview(
   if (!isOperationalAssignmentStatus(assignment.status)) {
     return buildPublicConfirmationResponse({
       assignment: mapAssignmentSummary(assignment),
-      message: 'Esta designacao nao esta mais ativa para confirmacao.',
+      message: 'Esta designação não está mais ativa para confirmação.',
       state: 'inactive',
     })
   }
@@ -612,14 +618,14 @@ async function buildAssignmentPreview(
   if (conflictingAssignment) {
     return buildPublicConfirmationResponse({
       assignment: mapAssignmentSummary(assignment),
-      message: 'Este slot ja foi remanejado para outra designacao.',
+      message: 'Este horário já foi remanejado para outra designação.',
       state: 'conflict',
     })
   }
 
   return buildPublicConfirmationResponse({
     assignment: mapAssignmentSummary(assignment),
-    message: 'Tudo certo. Voce pode confirmar esta designacao agora.',
+    message: 'Tudo certo. Você pode confirmar esta designação agora.',
     state: 'pending',
   })
 }
@@ -970,7 +976,7 @@ async function processSingleNotification(
   }
 
   if (!notification.assignmentId) {
-    await markNotificationCancelled(env, notification, 'Notificacao sem assignmentId ativo.')
+    await markNotificationCancelled(env, notification, 'Notificação sem assignmentId ativo.')
     return 'cancelled'
   }
 
@@ -980,7 +986,7 @@ async function processSingleNotification(
     await markNotificationFailed(
       env,
       notification,
-      'A designacao vinculada a esta notificacao nao foi encontrada.',
+      'A designação vinculada a esta notificação não foi encontrada.',
     )
     return 'failed'
   }
@@ -989,7 +995,7 @@ async function processSingleNotification(
     await markNotificationCancelled(
       env,
       notification,
-      'Confirmacao automatica cancelada porque a designacao nao esta mais pendente.',
+      'Confirmação automática cancelada porque a designação não está mais pendente.',
     )
     return 'cancelled'
   }
@@ -998,7 +1004,7 @@ async function processSingleNotification(
     await markNotificationCancelled(
       env,
       notification,
-      'Lembrete cancelado porque a designacao nao esta mais operacional.',
+      'Lembrete cancelado porque a designação não está mais operacional.',
     )
     return 'cancelled'
   }
@@ -1010,9 +1016,16 @@ async function processSingleNotification(
     await markNotificationCancelled(
       env,
       notification,
-      'Lembrete cancelado porque a data do evento ja passou.',
+      'Lembrete cancelado porque a data do evento já passou.',
     )
     return 'cancelled'
+  }
+
+  const emailJsConfigurationError = getEmailJsConfigurationError(env)
+
+  if (emailJsConfigurationError) {
+    await markNotificationFailed(env, notification, emailJsConfigurationError)
+    return 'failed'
   }
 
   const emailResponse = await sendEmail(env, notification, assignment)
@@ -1224,25 +1237,25 @@ function buildGoogleCalendarDescription(
     calendarEvent.congregationName?.trim() ||
     organizationName
   const lines = [
-    `Congregacao local: ${organizationName}`,
+    `Congregação local: ${organizationName}`,
     `Tipo: ${getCalendarSyncKindLabel(syncEntry.kind)}`,
     `Local: ${locationName}`,
-    `Hora da reuniao: ${meetingTime}`,
+    `Hora da reunião: ${meetingTime}`,
   ]
 
   if (syncEntry.congregation) {
-    lines.push(`Endereco: ${buildGoogleCalendarLocation(syncEntry.congregation)}`)
+    lines.push(`Endereço: ${buildGoogleCalendarLocation(syncEntry.congregation)}`)
   }
 
   if (syncEntry.assignment) {
     lines.push(`Status: ${assignmentStatusLabels[syncEntry.assignment.status]}`)
     lines.push(`Orador: ${syncEntry.assignment.speakerName}`)
     lines.push(`Tema: ${syncEntry.assignment.themeNumber} - ${syncEntry.assignment.themeTitle}`)
-    lines.push(`Congregacao de origem: ${syncEntry.assignment.originCongregationName}`)
-    lines.push(`Congregacao de destino: ${syncEntry.assignment.localCongregationName}`)
+    lines.push(`Congregação de origem: ${syncEntry.assignment.originCongregationName}`)
+    lines.push(`Congregação de destino: ${syncEntry.assignment.localCongregationName}`)
 
     if (syncEntry.assignment.notes.trim()) {
-      lines.push(`Observacoes: ${syncEntry.assignment.notes.trim()}`)
+      lines.push(`Observações: ${syncEntry.assignment.notes.trim()}`)
     }
   }
 
@@ -1275,7 +1288,7 @@ function resolveOrganizationName(
     return calendarCongregationName
   }
 
-  return 'Congregacao local'
+  return 'Congregação local'
 }
 
 function buildGoogleCalendarLocation(
@@ -1323,7 +1336,7 @@ function buildCalendarDateRange(
     minutes < 0 ||
     minutes > 59
   ) {
-    throw new Error('Horario padrao invalido em settings/calendar.')
+    throw new Error('Horário padrão inválido em settings/calendar.')
   }
 
   const totalStartMinutes = hours * 60 + minutes
@@ -1391,7 +1404,7 @@ async function createGoogleCalendarEvent(
   const responsePayload = (await response.json()) as Partial<{ id: string }>
 
   if (!responsePayload.id) {
-    throw new Error('Google Calendar nao retornou o id do evento criado.')
+    throw new Error('Google Calendar não retornou o id do evento criado.')
   }
 
   return responsePayload.id
@@ -1453,8 +1466,17 @@ async function deleteGoogleCalendarEvent(
 }
 
 async function sendEmail(env: Env, notification: NotificationRecord, assignment: AssignmentRecord) {
+  const emailJsConfigurationError = getEmailJsConfigurationError(env)
+
+  if (emailJsConfigurationError) {
+    return {
+      errorMessage: emailJsConfigurationError,
+      ok: false as const,
+    }
+  }
+
   const confirmationUrl = buildConfirmationUrl(env, assignment)
-  const organizationName = assignment.localCongregationName.trim() || 'Congregacao local'
+  const organizationName = assignment.localCongregationName.trim() || 'Congregação local'
   const response = await fetch(emailJsSendUrl, {
     method: 'POST',
     headers: {
@@ -1564,6 +1586,23 @@ async function listDueNotifications(env: Env) {
     .map((row) => row.document)
     .filter((document): document is FirestoreDocument => Boolean(document))
     .map(parseNotificationDocument)
+}
+
+function getEmailJsConfigurationError(env: Env) {
+  const missingCredentials = [
+    ['EMAILJS_PRIVATE_KEY', env.EMAILJS_PRIVATE_KEY],
+    ['EMAILJS_PUBLIC_KEY', env.EMAILJS_PUBLIC_KEY],
+    ['EMAILJS_SERVICE_ID', env.EMAILJS_SERVICE_ID],
+    ['EMAILJS_TEMPLATE_ID', env.EMAILJS_TEMPLATE_ID],
+  ]
+    .filter(([, value]) => !value?.trim())
+    .map(([name]) => name)
+
+  if (missingCredentials.length === 0) {
+    return null
+  }
+
+  return `Credenciais do EmailJS não configuradas: ${missingCredentials.join(', ')}.`
 }
 
 async function listPendingCalendarEvents(env: Env) {
@@ -2296,7 +2335,7 @@ async function handleAdminAccessReconcile(request: Request, env: Env) {
     return jsonResponse(
       {
         authorized: false,
-        message: 'Este e-mail nao possui acesso administrativo.',
+        message: 'Este e-mail não possui acesso administrativo.',
       },
       403,
     )
@@ -2383,7 +2422,7 @@ async function handleRemoveAdminUser(request: Request, env: Env) {
     return jsonResponse(
       {
         error: 'self_removal_not_allowed',
-        message: 'Voce nao pode remover o proprio acesso administrativo.',
+        message: 'Você não pode remover o próprio acesso administrativo.',
       },
       400,
     )
@@ -3286,5 +3325,5 @@ function getErrorMessage(error: unknown) {
     return error.message
   }
 
-  return 'Falha desconhecida na integracao com Google Calendar.'
+  return 'Falha desconhecida na integração com Google Calendar.'
 }
