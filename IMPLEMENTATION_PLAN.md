@@ -65,6 +65,7 @@
 * Identidade visual administrativa alinhada ao mockup de referência
 * Navegação mobile com atalhos principais no rodapé e prioridade real para toque
 * Frontend padronizado para deploy em Firebase Hosting
+* PWA instalável com nome, ícones próprios e suporte ao shell offline
 
 ### Autenticação
 
@@ -354,6 +355,7 @@ Implementar:
 * Topbar
 * Tema claro/escuro
 * Estrutura responsiva com boa usabilidade em desktop e mobile
+* PWA instalável com identidade visual própria
 
 Critérios de aceite:
 
