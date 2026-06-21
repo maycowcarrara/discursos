@@ -114,7 +114,8 @@ Próxima etapa obrigatória:
 * formulário validado com React Hook Form + Zod
 * múltiplos temas por orador com seleção administrativa
 * filtros locais por congregação, status e tipo
-* período de indisponibilidade com datas inicial e final
+* status simplificado em ativo, indisponível e inativo
+* período de indisponibilidade com datas inicial e final para bloqueios temporários
 * exclusão lógica com preservação do cadastro para histórico
 * auditoria de create, update e delete em `auditLogs`
 

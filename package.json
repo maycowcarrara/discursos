@@ -18,6 +18,7 @@
     "admin:grant": "node scripts/set-firebase-admin-claim.mjs",
     "admin:bootstrap": "node scripts/bootstrap-admin-access.mjs",
     "congregations:remove-zip-code": "node scripts/remove-congregation-zip-code.mjs",
+    "speakers:normalize-statuses": "node scripts/normalize-speaker-statuses.mjs",
     "preview": "vite preview",
     "deploy:worker": "npm run typecheck:worker && npm run test:calendar-sync && npx wrangler deploy --config workers/email-automation/wrangler.jsonc",
     "worker:deploy": "npm run deploy:worker",

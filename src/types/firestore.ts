@@ -29,13 +29,7 @@ const managedDocumentSchema = baseDocumentSchema
   .merge(activatableDocumentSchema)
 
 export const speakerTypeSchema = z.enum(['local', 'visitor'])
-export const speakerStatusSchema = z.enum([
-  'active',
-  'vacation',
-  'unavailable',
-  'transferred',
-  'inactive',
-])
+export const speakerStatusSchema = z.enum(['active', 'unavailable', 'inactive'])
 export const themeCategorySchema = z.enum(themeCategoryValues)
 
 export const calendarEventTypeSchema = z.enum([

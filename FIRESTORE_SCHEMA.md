@@ -235,7 +235,7 @@ Campos:
   congregationName?: string
   type: "local" | "visitor"
   themeIds: string[]
-  status: "active" | "vacation" | "unavailable" | "transferred" | "inactive"
+  status: "active" | "unavailable" | "inactive"
   unavailableStart?: Timestamp | null
   unavailableEnd?: Timestamp | null
   notes: string
@@ -252,6 +252,12 @@ Observações:
 * usar `themeIds`, nunca `themes` com objetos embutidos
 * `type` define a origem do orador
 * `status` é obrigatório e controlado por enum
+* `active` indica orador disponível para novas designações
+* `unavailable` indica bloqueio temporário por período informado em `unavailableStart` e `unavailableEnd`
+* `inactive` indica orador fora da operação atual, preservado apenas para histórico e auditoria
+* valores legados `vacation` devem ser migrados para `unavailable`
+* valores legados `transferred` devem ser migrados para `inactive`
+* a normalização operacional dos valores legados deve usar `npm run speakers:normalize-statuses -- --dry-run` antes da execução sem `--dry-run`
 
 ### 4. `themes`
 

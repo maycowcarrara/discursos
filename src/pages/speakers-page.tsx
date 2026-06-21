@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   AlertTriangle,
-  ArrowRightLeft,
   Ban,
   CheckCircle2,
   Clock3,
@@ -10,7 +9,6 @@ import {
   MapPin,
   Mic2,
   PencilLine,
-  Plane,
   Phone,
   Plus,
   Search,
@@ -66,9 +64,7 @@ const speakerTypeLabels: Record<SpeakerType, string> = {
 const speakerStatusLabels: Record<SpeakerStatus, string> = {
   active: 'Ativo',
   inactive: 'Inativo',
-  transferred: 'Transferido',
   unavailable: 'Indisponível',
-  vacation: 'Férias',
 }
 
 const speakerTypeOptions: Array<{
@@ -104,22 +100,10 @@ const speakerStatusOptions: Array<{
     icon: CheckCircle2,
   },
   {
-    value: 'vacation',
-    title: 'Férias',
-    description: 'Informe o período.',
-    icon: Plane,
-  },
-  {
     value: 'unavailable',
     title: 'Indisponível',
-    description: 'Intervalo bloqueado.',
+    description: 'Bloqueio temporário com período informado.',
     icon: Clock3,
-  },
-  {
-    value: 'transferred',
-    title: 'Transferido',
-    description: 'Preservado no histórico.',
-    icon: ArrowRightLeft,
   },
   {
     value: 'inactive',
@@ -135,9 +119,7 @@ const speakerFilterOptions: Array<{
 }> = [
   { value: 'all', label: 'Todos os status' },
   { value: 'active', label: 'Ativos' },
-  { value: 'vacation', label: 'Férias' },
   { value: 'unavailable', label: 'Indisponíveis' },
-  { value: 'transferred', label: 'Transferidos' },
   { value: 'inactive', label: 'Inativos' },
 ]
 
@@ -167,14 +149,13 @@ const speakerFormSchema = z
     themeIds: z
       .array(z.string().trim().min(1))
       .min(1, 'Selecione pelo menos um tema.'),
-    status: z.enum(['active', 'vacation', 'unavailable', 'transferred', 'inactive']),
+    status: z.enum(['active', 'unavailable', 'inactive']),
     unavailableStart: z.string().trim(),
     unavailableEnd: z.string().trim(),
     notes: z.string().trim(),
   })
   .superRefine((values, context) => {
-    const needsUnavailableWindow =
-      values.status === 'vacation' || values.status === 'unavailable'
+    const needsUnavailableWindow = values.status === 'unavailable'
     const hasStart = values.unavailableStart.length > 0
     const hasEnd = values.unavailableEnd.length > 0
 
@@ -197,7 +178,7 @@ const speakerFormSchema = z
     if (!needsUnavailableWindow && (hasStart || hasEnd)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Datas de indisponibilidade só valem para férias ou indisponível.',
+        message: 'Datas de indisponibilidade só valem para status indisponível.',
         path: ['unavailableStart'],
       })
     }
@@ -239,15 +220,50 @@ function getStatusBadgeClassName(status: SpeakerStatus) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200'
   }
 
-  if (status === 'vacation') {
-    return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200'
-  }
-
   if (status === 'unavailable') {
     return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200'
   }
 
   return 'border-border bg-muted text-muted-foreground'
+}
+
+function getStatusOptionClassName(status: SpeakerStatus, isSelected: boolean) {
+  const baseClassName =
+    'flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition sm:text-sm'
+
+  if (status === 'active') {
+    return `${baseClassName} ${
+      isSelected
+        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-500/20 dark:border-emerald-400/70 dark:bg-emerald-500/15 dark:text-emerald-100'
+        : 'border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15'
+    }`
+  }
+
+  if (status === 'unavailable') {
+    return `${baseClassName} ${
+      isSelected
+        ? 'border-amber-500 bg-amber-50 text-amber-800 shadow-sm ring-1 ring-amber-500/20 dark:border-amber-400/70 dark:bg-amber-500/15 dark:text-amber-100'
+        : 'border-amber-200 bg-amber-50/60 text-amber-700 hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/15'
+    }`
+  }
+
+  return `${baseClassName} ${
+    isSelected
+      ? 'border-slate-500 bg-slate-100 text-slate-800 shadow-sm ring-1 ring-slate-500/20 dark:border-slate-400/70 dark:bg-slate-500/20 dark:text-slate-100'
+      : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-500/20 dark:bg-slate-500/10 dark:text-slate-300 dark:hover:bg-slate-500/15'
+  }`
+}
+
+function getStatusOptionIconClassName(status: SpeakerStatus, isSelected: boolean) {
+  if (status === 'active') {
+    return isSelected ? 'text-emerald-600 dark:text-emerald-200' : 'text-emerald-600'
+  }
+
+  if (status === 'unavailable') {
+    return isSelected ? 'text-amber-600 dark:text-amber-200' : 'text-amber-600'
+  }
+
+  return isSelected ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500'
 }
 
 function formatUpdatedAt(value: Date) {
@@ -385,6 +401,13 @@ export function SpeakersPage() {
     .map((themeId) => themesById.get(themeId) ?? null)
     .filter((theme): theme is NonNullable<typeof theme> => theme !== null)
     .sort((firstTheme, secondTheme) => firstTheme.number - secondTheme.number)
+  const isThemeNumberListSearch = formThemeSearchNumbers.length > 0
+  const formThemeListSearchIds = isThemeNumberListSearch
+    ? filteredFormThemes.map((theme) => theme.id)
+    : []
+  const hasUnselectedThemeListSearchResults = formThemeListSearchIds.some(
+    (themeId) => !selectedThemeIds.includes(themeId),
+  )
   const inactiveSelectedThemes = selectedThemeIds
     .map((themeId) => themesById.get(themeId) ?? null)
     .filter(
@@ -417,9 +440,7 @@ export function SpeakersPage() {
   const operationalSpeakersCount =
     speakersQuery.data?.filter((item) => item.isActive).length ?? 0
   const temporarilyUnavailableCount =
-    speakersQuery.data?.filter(
-      (item) => item.status === 'vacation' || item.status === 'unavailable',
-    ).length ?? 0
+    speakersQuery.data?.filter((item) => item.status === 'unavailable').length ?? 0
   const visitorsCount =
     speakersQuery.data?.filter((item) => item.type === 'visitor').length ?? 0
   const hasCongregationOptions = availableCongregationOptions.length > 0
@@ -430,8 +451,7 @@ export function SpeakersPage() {
     deleteSpeakerMutation.isPending
   const formModeLabel = editingSpeaker ? 'Editar orador' : 'Novo orador'
   const actorName = user?.displayName ?? user?.email ?? null
-  const needsUnavailableWindow =
-    selectedStatus === 'vacation' || selectedStatus === 'unavailable'
+  const needsUnavailableWindow = selectedStatus === 'unavailable'
   const selectedTypeOption =
     speakerTypeOptions.find((option) => option.value === selectedType) ?? null
   const selectedStatusOption =
@@ -496,21 +516,32 @@ export function SpeakersPage() {
   })
 
   useEffect(() => {
-    if (selectedCongregationId.length === 0) {
-      return
-    }
-
     const selectedCongregationStillAllowed = availableCongregationOptions.some(
       (congregation) => congregation.id === selectedCongregationId,
     )
+    const defaultLocalCongregationId =
+      selectedType === 'local' ? availableCongregationOptions[0]?.id ?? '' : ''
 
-    if (!selectedCongregationStillAllowed) {
+    if (
+      selectedType === 'local' &&
+      defaultLocalCongregationId &&
+      selectedCongregationId !== defaultLocalCongregationId &&
+      (selectedCongregationId.length === 0 || !selectedCongregationStillAllowed)
+    ) {
+      setValue('congregationId', defaultLocalCongregationId, {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      return
+    }
+
+    if (selectedCongregationId.length > 0 && !selectedCongregationStillAllowed) {
       setValue('congregationId', '', {
         shouldDirty: true,
         shouldValidate: true,
       })
     }
-  }, [availableCongregationOptions, selectedCongregationId, setValue])
+  }, [availableCongregationOptions, selectedCongregationId, selectedType, setValue])
 
   function handleToggleTheme(themeId: string) {
     const nextThemeIds = selectedThemeIds.includes(themeId)
@@ -532,6 +563,17 @@ export function SpeakersPage() {
         shouldValidate: true,
       },
     )
+  }
+
+  function handleSelectThemeListSearchResults() {
+    const nextThemeIds = Array.from(
+      new Set([...selectedThemeIds, ...formThemeListSearchIds]),
+    )
+
+    setValue('themeIds', nextThemeIds, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
   }
 
   async function handleDelete(id: string, name: string) {
@@ -708,30 +750,6 @@ export function SpeakersPage() {
                   </label>
                 </div>
 
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-foreground">
-                    Congregação
-                  </span>
-                  <select className={selectClassName} {...register('congregationId')}>
-                    <option value="">Selecione a congregação</option>
-                    {availableCongregationOptions.map((congregation) => (
-                      <option key={congregation.id} value={congregation.id}>
-                        {congregation.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    {selectedType === 'local'
-                      ? 'Oradores locais só podem ser vinculados a congregações locais.'
-                      : 'Oradores visitantes só podem ser vinculados a congregações parceiras ou externas.'}
-                  </p>
-                  {errors.congregationId ? (
-                    <p className="text-sm text-rose-600 dark:text-rose-300">
-                      {errors.congregationId.message}
-                    </p>
-                  ) : null}
-                </label>
-
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">
                     Tipo de orador
@@ -769,31 +787,49 @@ export function SpeakersPage() {
                   ) : null}
                 </div>
 
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Congregação
+                  </span>
+                  <select className={selectClassName} {...register('congregationId')}>
+                    <option value="">Selecione a congregação</option>
+                    {availableCongregationOptions.map((congregation) => (
+                      <option key={congregation.id} value={congregation.id}>
+                        {congregation.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {selectedType === 'local'
+                      ? 'Oradores locais só podem ser vinculados a congregações locais.'
+                      : 'Oradores visitantes só podem ser vinculados a congregações parceiras ou externas.'}
+                  </p>
+                  {errors.congregationId ? (
+                    <p className="text-sm text-rose-600 dark:text-rose-300">
+                      {errors.congregationId.message}
+                    </p>
+                  ) : null}
+                </label>
+
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Status</span>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  <div className="grid grid-cols-3 gap-2">
                     {speakerStatusOptions.map((option) => {
                       const OptionIcon = option.icon
+                      const isSelected = selectedStatus === option.value
 
                       return (
                       <button
                         key={option.value}
                         type="button"
-                        className={`flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition sm:text-sm ${
-                          selectedStatus === option.value
-                            ? 'border-primary bg-primary/10 text-foreground shadow-sm'
-                            : 'border-border bg-background text-muted-foreground hover:bg-accent'
-                        }`}
+                        className={getStatusOptionClassName(option.value, isSelected)}
                         onClick={() => {
                           setValue('status', option.value, {
                             shouldDirty: true,
                             shouldValidate: true,
                           })
 
-                          if (
-                            option.value !== 'vacation' &&
-                            option.value !== 'unavailable'
-                          ) {
+                          if (option.value !== 'unavailable') {
                             setValue('unavailableStart', '', {
                               shouldDirty: true,
                               shouldValidate: true,
@@ -806,11 +842,10 @@ export function SpeakersPage() {
                         }}
                       >
                         <OptionIcon
-                          className={`size-4 shrink-0 ${
-                            selectedStatus === option.value
-                              ? 'text-primary'
-                              : 'text-muted-foreground'
-                          }`}
+                          className={`size-4 shrink-0 ${getStatusOptionIconClassName(
+                            option.value,
+                            isSelected,
+                          )}`}
                         />
                         <span className="min-w-0 truncate font-medium">{option.title}</span>
                       </button>
@@ -852,7 +887,7 @@ export function SpeakersPage() {
                   </div>
                 ) : null}
 
-                <div className="space-y-3">
+                <div className="min-w-0 space-y-3 overflow-hidden">
                   <div className="flex flex-col gap-2 min-[440px]:flex-row min-[440px]:items-center min-[440px]:justify-between">
                     <span className="text-sm font-medium text-foreground">Temas vinculados ({selectedThemeIds.length} selecionados)</span>
                     <span className="text-xs text-muted-foreground">
@@ -860,31 +895,49 @@ export function SpeakersPage() {
                     </span>
                   </div>
 
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      className="pl-9 h-10 text-sm"
-                      placeholder="Buscar por número, título ou lista: 40,55,70"
-                      value={formThemeSearch}
-                      onChange={(e) => setFormThemeSearch(e.target.value)}
-                    />
+                  <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="relative min-w-0">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        className="h-10 min-w-0 pl-9 text-sm"
+                        placeholder="Buscar por número, título ou lista: 40,55,70"
+                        value={formThemeSearch}
+                        onChange={(e) => setFormThemeSearch(e.target.value)}
+                      />
+                    </div>
+                    {isThemeNumberListSearch && filteredFormThemes.length > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-10 w-full shrink-0 sm:w-auto"
+                        disabled={!hasUnselectedThemeListSearchResults}
+                        onClick={handleSelectThemeListSearchResults}
+                      >
+                        {hasUnselectedThemeListSearchResults
+                          ? 'Selecionar todos'
+                          : 'Todos selecionados'}
+                      </Button>
+                    ) : null}
                   </div>
 
                   {selectedFormThemes.length > 0 ? (
-                    <div className="flex gap-1.5 overflow-x-auto pb-1">
-                      {selectedFormThemes.map((theme) => (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 text-xs font-medium text-primary transition hover:bg-primary/15"
-                          title={`Remover tema ${theme.number}: ${theme.title}`}
-                          onClick={() => handleRemoveTheme(theme.id)}
-                        >
-                          Tema {theme.number}
-                          <X className="size-3" />
-                        </button>
-                      ))}
+                    <div className="min-w-0 max-w-full overflow-hidden">
+                      <div className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
+                        {selectedFormThemes.map((theme) => (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 text-xs font-medium text-primary transition hover:bg-primary/15"
+                            title={`Remover tema ${theme.number}: ${theme.title}`}
+                            onClick={() => handleRemoveTheme(theme.id)}
+                          >
+                            Tema {theme.number}
+                            <X className="size-3" />
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
 

@@ -519,7 +519,7 @@ async function assertSpeakerExists(id: string) {
     throw new Error('O orador selecionado nao foi encontrado.')
   }
 
-  if (!speaker.isActive || speaker.status === 'inactive' || speaker.status === 'transferred') {
+  if (!speaker.isActive || speaker.status === 'inactive') {
     throw new Error('O orador selecionado nao esta disponivel para novas designacoes.')
   }
 
@@ -571,7 +571,7 @@ function assertSpeakerAvailability(
   speaker: FirestoreRecord<SpeakerDocument>,
   eventDate: Timestamp,
 ) {
-  if (speaker.status !== 'vacation' && speaker.status !== 'unavailable') {
+  if (speaker.status !== 'unavailable') {
     return
   }
 

@@ -47,6 +47,7 @@
 * saneamento completo de PT-BR com correção de acentuação, consistência editorial e mensagens mais claras
 * redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
 * reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
+* simplificação dos status de oradores para `ativo`, `indisponível` e `inativo`, consolidando férias como indisponibilidade temporária e transferidos como inativos preservados no histórico
 * validação visual em larguras desktop e mobile antes do aceite final do lançamento
 
 ## Entregas já realizadas
@@ -536,9 +537,7 @@ Campos:
 Status:
 
 * ativo
-* férias
 * indisponível
-* transferido
 * inativo
 
 Critérios:
@@ -551,8 +550,8 @@ Entregas realizadas:
 
 * formulário completo com validação estrita
 * vinculação de múltiplos temas por orador
-* controle administrativo de status ativo, férias, indisponível, transferido e inativo
-* período de indisponibilidade com datas inicial e final
+* controle administrativo simplificado de status ativo, indisponível e inativo
+* período de indisponibilidade com datas inicial e final para bloqueios temporários
 * listagem administrativa real com filtros locais por tipo, congregação e status
 * exclusão lógica com `status = inactive` e `isActive = false`
 * auditoria para create, update e delete

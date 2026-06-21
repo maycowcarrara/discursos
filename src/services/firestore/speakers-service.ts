@@ -121,7 +121,7 @@ function normalizeThemeIds(themeIds: string[]) {
 }
 
 function resolveSpeakerActivity(status: SpeakerStatus) {
-  return status !== 'inactive' && status !== 'transferred'
+  return status !== 'inactive'
 }
 
 function assertSpeakerTypeMatchesCongregation(
@@ -149,8 +149,7 @@ function buildSpeakerPayload(
   'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'
 > {
   const normalizedThemeIds = normalizeThemeIds(values.themeIds)
-  const hasUnavailableWindow =
-    values.status === 'vacation' || values.status === 'unavailable'
+  const hasUnavailableWindow = values.status === 'unavailable'
 
   return {
     name: values.name.trim(),
