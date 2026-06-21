@@ -905,6 +905,8 @@ export async function createAssignment({
         now,
       })
 
+      await syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
+
       if (isAssignmentCoveringCalendarSlot(values.status)) {
         operationalAssignments.forEach((assignment) => {
           const replacedAssignment = {
@@ -936,7 +938,6 @@ export async function createAssignment({
       }
 
       transaction.set(assignmentRef, assignmentDocument)
-      await syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
       transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
         entityType: 'assignment',
         entityId: assignmentRef.id,
@@ -1049,8 +1050,8 @@ export async function updateAssignment({
             now,
           })
 
-          transaction.set(assignmentRef, updatedAssignment)
           await syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
+          transaction.set(assignmentRef, updatedAssignment)
           transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
             entityType: 'assignment',
             entityId: id,
@@ -1164,8 +1165,8 @@ export async function updateAssignment({
             now,
           })
 
-          transaction.set(assignmentRef, updatedAssignment)
           await syncNotificationDocumentsInTransaction(transaction, notificationDocuments)
+          transaction.set(assignmentRef, updatedAssignment)
           transaction.set(doc(collection(firebaseDb, 'auditLogs')), {
             entityType: 'assignment',
             entityId: id,
