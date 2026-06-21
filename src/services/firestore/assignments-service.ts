@@ -1446,36 +1446,8 @@ export async function requestManualAssignmentConfirmationEmail({
       throw new Error('Envie e-mail apenas para designações pendentes ou confirmadas.')
     }
 
-    const automaticConfirmationRef = getAssignmentNotificationRef(id, 'confirmation')
     const manualNotificationRef = getAssignmentNotificationRef(id, 'manual')
-    const [automaticConfirmationSnapshot, manualNotificationSnapshot] =
-      await Promise.all([
-        transaction.get(automaticConfirmationRef),
-        transaction.get(manualNotificationRef),
-      ])
-
-    if (automaticConfirmationSnapshot.exists()) {
-      const automaticConfirmation = notificationSchema.parse(
-        automaticConfirmationSnapshot.data(),
-      )
-      const isCurrentAutomaticConfirmation =
-        isTimestampInCurrentAssignmentRevision(
-          automaticConfirmation.updatedAt,
-          assignment.updatedAt,
-        )
-
-      if (
-        isCurrentAutomaticConfirmation &&
-        (automaticConfirmation.status === 'sent' ||
-          automaticConfirmation.status === 'pending')
-      ) {
-        throw new Error(
-          automaticConfirmation.status === 'sent'
-            ? 'O e-mail de confirmação já foi enviado automaticamente.'
-            : 'O e-mail de confirmação já está na fila automática.',
-        )
-      }
-    }
+    const manualNotificationSnapshot = await transaction.get(manualNotificationRef)
 
     if (manualNotificationSnapshot.exists()) {
       const manualNotification = notificationSchema.parse(

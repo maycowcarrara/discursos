@@ -352,6 +352,13 @@ export default {
       return handleProcessManualNotification(request, env)
     }
 
+    if (
+      requestUrl.pathname === '/api/admin/process-calendar-sync' &&
+      request.method === 'POST'
+    ) {
+      return handleProcessManualCalendarSync(request, env)
+    }
+
     if (requestUrl.pathname === '/api/internal/process-calendar-sync') {
       if (!isInternalRequestAuthorized(request, env)) {
         return jsonResponse(
@@ -389,8 +396,7 @@ export default {
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(processDueNotifications(env))
-    ctx.waitUntil(processPendingCalendarSync(env))
+    ctx.waitUntil(processDueNotifications(env, 'reminder4d'))
   },
 }
 
@@ -640,8 +646,11 @@ async function buildAssignmentPreview(
   })
 }
 
-async function processDueNotifications(env: Env) {
-  const dueNotifications = await listDueNotifications(env)
+async function processDueNotifications(
+  env: Env,
+  type?: NotificationType,
+) {
+  const dueNotifications = await listDueNotifications(env, type)
   const summary = {
     cancelled: 0,
     failed: 0,
@@ -780,6 +789,9 @@ async function processSingleCalendarEventSync(
   calendarEvent: CalendarEventRecord,
   congregationCache: Map<string, CongregationRecord | null>,
   speakerCache: Map<string, SpeakerRecord | null>,
+  options: {
+    allowRetry?: boolean
+  } = {},
 ): Promise<CalendarSyncProcessResult> {
   try {
     const assignments = await listAssignmentsForCalendarEvent(
@@ -969,7 +981,12 @@ async function processSingleCalendarEventSync(
 
     return 'created'
   } catch (error) {
-    await markCalendarEventSyncFailure(env, calendarEvent, getErrorMessage(error))
+    await markCalendarEventSyncFailure(
+      env,
+      calendarEvent,
+      getErrorMessage(error),
+      options.allowRetry ?? true,
+    )
 
     return 'failed'
   }
@@ -978,6 +995,9 @@ async function processSingleCalendarEventSync(
 async function processSingleNotification(
   env: Env,
   notification: NotificationRecord,
+  options: {
+    allowRetry?: boolean
+  } = {},
 ): Promise<NotificationProcessResult> {
   const wasClaimed = await claimNotificationForProcessing(env, notification)
 
@@ -1053,7 +1073,7 @@ async function processSingleNotification(
     return 'sent'
   }
 
-  if (notification.retryCount + 1 >= maxRetryCount) {
+  if (!(options.allowRetry ?? true) || notification.retryCount + 1 >= maxRetryCount) {
     await markNotificationFailed(env, notification, emailResponse.errorMessage)
     return 'failed'
   }
@@ -1574,8 +1594,17 @@ async function claimNotificationForProcessing(env: Env, notification: Notificati
   }
 }
 
-async function listDueNotifications(env: Env) {
+async function listDueNotifications(env: Env, type?: NotificationType) {
   const nowIso = new Date().toISOString()
+  const filters = [
+    buildFieldFilter('status', 'EQUAL', toStringValue('pending')),
+    buildFieldFilter('scheduledFor', 'LESS_THAN_OR_EQUAL', toTimestampValue(new Date(nowIso))),
+  ]
+
+  if (type) {
+    filters.push(buildFieldFilter('type', 'EQUAL', toStringValue(type)))
+  }
+
   const rows = await runQuery(env, {
     from: [
       {
@@ -1593,10 +1622,7 @@ async function listDueNotifications(env: Env) {
     ],
     where: {
       compositeFilter: {
-        filters: [
-          buildFieldFilter('status', 'EQUAL', toStringValue('pending')),
-          buildFieldFilter('scheduledFor', 'LESS_THAN_OR_EQUAL', toTimestampValue(new Date(nowIso))),
-        ],
+        filters,
         op: 'AND',
       },
     },
@@ -1992,12 +2018,16 @@ async function markCalendarEventSyncFailure(
   env: Env,
   calendarEvent: CalendarEventRecord,
   reason: string,
+  allowRetry = true,
 ) {
   const now = new Date()
-  const retryDecision = resolveCalendarRetryDecision(
-    calendarEvent.googleCalendarRetryCount,
-    now,
-  )
+  const retryDecision = allowRetry
+    ? resolveCalendarRetryDecision(calendarEvent.googleCalendarRetryCount, now)
+    : {
+        nextRetryCount: calendarEvent.googleCalendarRetryCount + 1,
+        scheduledFor: null,
+        status: 'error' as const,
+      }
 
   try {
     await commitWrites(env, [
@@ -2441,7 +2471,9 @@ async function handleProcessManualNotification(request: Request, env: Env) {
     )
   }
 
-  const result = await processSingleNotification(env, notification)
+  const result = await processSingleNotification(env, notification, {
+    allowRetry: false,
+  })
 
   if (result === 'sent') {
     return jsonResponse({ result })
@@ -2475,6 +2507,110 @@ async function handleProcessManualNotification(request: Request, env: Env) {
     },
     result === 'failed' ? 422 : 409,
   )
+}
+
+async function handleProcessManualCalendarSync(request: Request, env: Env) {
+  const caller = await getAuthorizedAdminCaller(request, env)
+
+  if (!caller) {
+    return buildUnauthorizedAdminResponse()
+  }
+
+  const calendarEventId = await readCalendarEventIdFromRequest(request)
+
+  if (!calendarEventId) {
+    return jsonResponse(
+      {
+        error: 'invalid_calendar_event',
+        message: 'O evento informado para sincronização é inválido.',
+      },
+      400,
+    )
+  }
+
+  const calendarEventDocument = await getDocument(
+    env,
+    `calendarEvents/${calendarEventId}`,
+  )
+
+  if (!calendarEventDocument) {
+    return jsonResponse(
+      {
+        error: 'calendar_event_not_found',
+        message: 'O evento informado não foi encontrado.',
+      },
+      404,
+    )
+  }
+
+  const calendarEvent = parseCalendarEventDocument(calendarEventDocument)
+  const calendarSettings = await getCalendarSettingsRecord(env)
+  const configurationError = !calendarSettings.exists || !calendarSettings.enabled
+    ? 'Ative a integração com Google Calendar nas configurações antes de sincronizar.'
+    : !calendarSettings.calendarId
+      ? 'Calendar ID ausente. Revise as configurações antes de sincronizar.'
+      : null
+
+  if (configurationError) {
+    await markCalendarEventSyncFailure(
+      env,
+      calendarEvent,
+      configurationError,
+      false,
+    )
+
+    return jsonResponse(
+      {
+        error: 'calendar_configuration_error',
+        message: configurationError,
+      },
+      422,
+    )
+  }
+
+  const claimedCalendarEvent = await claimCalendarEventForProcessing(
+    env,
+    calendarEvent,
+  )
+
+  if (!claimedCalendarEvent) {
+    return jsonResponse(
+      {
+        error: 'calendar_sync_in_progress',
+        message: 'Este evento já está sendo sincronizado. Aguarde a conclusão.',
+      },
+      409,
+    )
+  }
+
+  const result = await processSingleCalendarEventSync(
+    env,
+    calendarSettings,
+    claimedCalendarEvent,
+    new Map<string, CongregationRecord | null>(),
+    new Map<string, SpeakerRecord | null>(),
+    { allowRetry: false },
+  )
+
+  if (result === 'failed') {
+    const updatedDocument = await getDocument(
+      env,
+      `calendarEvents/${calendarEventId}`,
+    )
+    const errorMessage = updatedDocument
+      ? getNullableStringField(updatedDocument, 'googleCalendarSyncError')
+      : null
+
+    return jsonResponse(
+      {
+        error: 'calendar_sync_failed',
+        message: errorMessage ?? 'Não foi possível sincronizar a agenda.',
+      },
+      422,
+    )
+  }
+
+  return jsonResponse({ result })
 }
 
 async function handleAddAdminUser(request: Request, env: Env) {
@@ -2670,6 +2806,23 @@ async function readNotificationIdFromRequest(request: Request) {
   const notificationId = payload.notificationId.trim()
 
   return /^[A-Za-z0-9_-]+__manual$/.test(notificationId) ? notificationId : null
+}
+
+async function readCalendarEventIdFromRequest(request: Request) {
+  const payload = (await request.json().catch(() => null)) as unknown
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('calendarEventId' in payload) ||
+    typeof payload.calendarEventId !== 'string'
+  ) {
+    return null
+  }
+
+  const calendarEventId = payload.calendarEventId.trim()
+
+  return /^[A-Za-z0-9_-]+$/.test(calendarEventId) ? calendarEventId : null
 }
 
 async function getAdminAccessSettingsRecord(

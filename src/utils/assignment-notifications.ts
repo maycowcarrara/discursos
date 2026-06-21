@@ -80,9 +80,8 @@ export function buildAssignmentNotificationPlan(
       : input.now
     const shouldStayPending =
       canOperateNotifications &&
-      (isConfirmation
-        ? input.status === 'pending' || input.isAssignmentUpdate === true
-        : canScheduleReminder)
+      !isConfirmation &&
+      canScheduleReminder
 
     return {
       documentId: getAssignmentNotificationDocumentId(input.assignmentId, type),

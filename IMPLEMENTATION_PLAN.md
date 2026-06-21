@@ -182,15 +182,15 @@
 
 ### EmailJS — fechamento da Fase 11
 
-* fila automática de `notifications` sincronizada junto com create, update, confirmação e substituição de `assignments`
+* fila automática de `notifications` restrita ao lembrete de 4 dias; confirmações usam ação imediata
 * criação de designação passa a deixar notificações automáticas por e-mail desligadas por padrão, com ativação explícita no cadastro
-* envio manual de e-mail de confirmação pode ser concluído uma única vez por revisão da designação operacional, usando a fila `notifications`; uma edição libera um novo envio com os dados atualizados
+* envio manual de e-mail de confirmação é processado imediatamente pelo worker, uma única vez por revisão da designação; uma edição libera novo envio com os dados atualizados
 * falhas definitivas no envio manual não consomem a ação única; o painel permite tentar novamente até ocorrer envio ou existir uma solicitação pendente
 * ações de e-mail ficam bloqueadas no painel quando as chaves públicas do EmailJS não estão configuradas no frontend
 * botão de confirmação por WhatsApp disponível quando o orador possui WhatsApp, reutilizando a mesma mensagem completa no dashboard e na lista de designações
 * lembrete único de 4 dias programado por utilitário tipado e coberto por teste dedicado
 * confirmação pública por link em rota do frontend, com fluxo validado para desktop e mobile
-* worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
+* worker Cloudflare com cron exclusivo para `reminder4d` e endpoints administrativos imediatos para os botões de e-mail e agenda
 * confirmação pública grava `confirmedAt`, `responseAt` e auditoria no Firestore após validação do token
 * confirmação pública protegida com precondition do Firestore para não reativar designação já substituída em paralelo
 * autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
@@ -715,23 +715,23 @@ Utilizar:
 Entregas realizadas:
 
 * sincronização automática da fila `notifications` a partir das mudanças em `assignments`
-* confirmação automática imediata opt-in e lembrete único de 4 dias com agendamento oficial
+* lembrete automático único de 4 dias com agendamento oficial; confirmação somente por ação imediata do botão
 * confirmação pública por link com validação no worker e escrita segura no Firestore
-* trigger manual e cron no worker para processar envios EmailJS
+* endpoint administrativo imediato para confirmação manual e cron exclusivo para `reminder4d`
 * segredos mantidos fora do frontend, via variáveis do worker e service account do Firebase
 * template único do EmailJS alimentado por `email_subject`, `to_email`, `reply_to`, `notification_type_label`, `organization_name`, `speaker_name`, `event_date`, `event_type_label`, `local_congregation_name`, `origin_congregation_name`, `theme_number`, `theme_title`, `status_label`, `notes` e `confirmation_url`
 
 Fluxo operacional oficial da Fase 11:
 
-* `pending`: gera `confirmation` e `reminder4d` em `notifications` quando a designação continua operacional, o evento ainda não passou, existe e-mail válido e as notificações automáticas foram ativadas
-* notificações automáticas só entram como `pending` quando `assignments.emailNotificationsEnabled = true`; quando desligadas, os documentos determinísticos permanecem cancelados
+* `pending`: gera `reminder4d` quando a designação continua operacional, o evento ainda não passou, existe e-mail válido e o lembrete automático foi ativado
+* somente `reminder4d` entra automaticamente como `pending` quando `assignments.emailNotificationsEnabled = true`; confirmações automáticas permanecem canceladas
 * o disparo manual de confirmação usa notificação `manual` com agendamento imediato e grava `manualConfirmationEmailRequestedAt`; na mesma revisão, nova solicitação só é permitida após falha definitiva, nunca enquanto estiver pendente ou depois de enviada
-* toda edição operacional inicia uma nova revisão para o controle de e-mail: notificações e solicitações anteriores permanecem no histórico, mas deixam de bloquear um novo envio manual; se a automação estiver ativa, a confirmação atualizada entra na fila e continua bloqueando duplicidade nessa nova revisão
-* o botão manual fica bloqueado quando a confirmação automática já foi enviada ou já está na fila, evitando duplicidade de e-mail
-* `confirmed`: mantém lembretes futuros ativos e encerra a automação de confirmação
+* toda edição operacional inicia uma nova revisão para o controle de e-mail: solicitações anteriores permanecem no histórico, mas deixam de bloquear um novo envio manual
+* o botão de e-mail executa a tentativa imediatamente e só fica bloqueado após envio bem-sucedido na revisão atual
+* `confirmed`: mantém lembretes futuros ativos
 * `declined`, `cancelled` e `replaced`: encerram as automações pendentes da designação, preservando o histórico
 * sincronizações de status sem edição preservam notificações já processadas, sem usar `scheduledFor` como identidade de entrega
-* edição operacional com automação ativa reinicia explicitamente a confirmação automática e prefixa o assunto com `ATUALIZAÇÃO`
+* edição operacional libera novo envio manual de confirmação com os dados atuais
 * lembrete de 4 dias não é enviado quando seu horário oficial já passou
 * o worker faz `claim` temporário da notificação antes de enviar para reduzir duplicidade em concorrência
 * retentativas usam novo `scheduledFor`; após o limite, a notificação passa para `failed`
@@ -751,16 +751,14 @@ Status atual:
 
 Entregue:
 
-* publicação manual por botão `Sincronizar com agenda`
-* atualização manual com processamento por fila do worker
-* remoção manual com processamento por fila do worker
-* sincronização segura via cron e trigger interno
+* publicação, atualização e remoção imediatas pelo botão `Sincronizar Agenda`
+* sincronização segura por endpoint administrativo autenticado, sem depender do cron
 
 Entregas desta fase:
 
 * `settings/calendar` com persistência real para `enabled`, `calendarId`, horário padrão e duração padrão
 * estado de sincronização do Google Calendar registrado diretamente em `calendarEvents`
-* publicação manual de qualquer designação operacional — `orador visitante`, `designação local` ou `discurso fora` — por botão `Sincronizar com agenda`, sem envio automático ao Google Calendar logo após salvar
+* publicação manual de qualquer designação operacional — `orador visitante`, `designação local` ou `discurso fora` — concluída imediatamente pelo botão `Sincronizar Agenda`
 * aprovação manual persistida no próprio `calendarEvents`, impedindo republicação operacional sem novo pedido
 * alinhamento entre UI e worker para usar a designação operacional vigente como referência da ação manual
 * worker preparado para criar, atualizar e excluir eventos no Google Calendar por cron e trigger interno

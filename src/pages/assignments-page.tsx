@@ -459,7 +459,7 @@ function buildAssignmentSaveFeedbackMessage(baseMessage: string, movementType: M
     return baseMessage
   }
 
-  return `${baseMessage} Use "Sincronizar com agenda" quando quiser refletir isso no Google Calendar.`
+  return `${baseMessage} Use "Sincronizar Agenda" quando quiser refletir isso no Google Calendar.`
 }
 
 function GoogleCalendarButtonMark() {
@@ -547,8 +547,8 @@ function getAssignmentGoogleCalendarSyncState(options: {
     return {
       canRequestSync: false,
       canShowAction: true,
-      description: 'Este item já entrou na fila manual e será processado em breve.',
-      label: 'Na fila de sincronização',
+      description: 'A sincronização deste item está em andamento.',
+      label: 'Sincronizando agenda',
       tone: 'warning',
     }
   }
@@ -1725,14 +1725,16 @@ export function AssignmentsPage() {
     setFeedback(null)
 
     try {
-      await requestManualGoogleCalendarSyncMutation.mutateAsync({
+      const result = await requestManualGoogleCalendarSyncMutation.mutateAsync({
         actorUid: user.uid,
         actorName,
         calendarEventId: assignment.calendarEventId,
       })
 
       const message =
-        'Solicitação enviada para sincronização com Google Calendar. Ela será processada no próximo ciclo.'
+        result === 'deleted'
+          ? 'Evento removido da agenda com sucesso.'
+          : 'Agenda sincronizada com sucesso.'
       setFeedback({
         tone: 'success',
         message,
@@ -2294,10 +2296,10 @@ export function AssignmentsPage() {
                   />
                   <span className="min-w-0">
                     <span className="block text-sm font-medium text-foreground">
-                      Ativar notificações automáticas por e-mail
+                      Ativar lembrete automático por e-mail
                     </span>
                     <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                      Quando ligado, o sistema agenda a confirmação automática e um lembrete 4 dias antes da reunião. Por padrão fica desligado.
+                      Quando ligado, o sistema envia um lembrete 4 dias antes da reunião. A confirmação é enviada somente pelo botão de e-mail. Por padrão fica desligado.
                     </span>
                     {!isAssignmentCoveringCalendarSlot(watchedStatus) ? (
                       <span className="mt-1 block text-xs text-amber-700 dark:text-amber-200">
@@ -2305,7 +2307,7 @@ export function AssignmentsPage() {
                       </span>
                     ) : selectedSpeakerMissingEmail ? (
                       <span className="mt-1 block text-xs text-amber-700 dark:text-amber-200">
-                        Cadastre o e-mail do orador para ativar notificações automáticas.
+                        Cadastre o e-mail do orador para ativar o lembrete automático.
                       </span>
                     ) : !emailDeliveryConfigured ? (
                       <span className="mt-1 block text-xs text-amber-700 dark:text-amber-200">
@@ -2616,7 +2618,7 @@ export function AssignmentsPage() {
                             manualConfirmationStatus === 'sent'
                           ? 'E-mail solicitado'
                           : automaticEmailQueued
-                            ? 'E-mail na fila'
+                            ? 'Enviando e-mail'
                             : 'E-mail agora'
                   const emailErrorMessage =
                     currentManualConfirmationNotification?.errorMessage?.trim() ||
@@ -2770,7 +2772,7 @@ export function AssignmentsPage() {
                               disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
                             >
                               <GoogleCalendarButtonMark />
-                              Enviar ao Google Calendar
+                              Sincronizar Agenda
                             </Button>
                           ) : null}
                           {canRequestManualEmail && emailDeliveryConfigured ? (

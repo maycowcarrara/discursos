@@ -166,9 +166,9 @@ Próxima etapa obrigatória:
 * confirmação por WhatsApp abre mensagem completa com data, discurso, origem, destino, endereço, dia e horário da reunião
 * lembrete único de 4 dias com agendamento tipado e cobertura por teste
 * edição operacional com automação ativa reenvia a confirmação com `ATUALIZAÇÃO` no assunto, sem duplicar envios em sincronizações de status
-* o botão manual aciona processamento imediato no worker e as telas acompanham o resultado da fila em tempo real
+* o botão manual de e-mail aciona processamento imediato no worker e mostra o resultado na mesma ação
 * confirmação pública por link em rota dedicada do frontend, com boa leitura em desktop e mobile
-* worker Cloudflare com cron e trigger manual para processar a fila via EmailJS sem expor segredos no frontend
+* worker Cloudflare com cron exclusivo para o lembrete de 4 dias, sem expor segredos no frontend
 * confirmação por link validada no worker antes de gravar `confirmedAt`, `responseAt` e auditoria
 * confirmação pública protegida com precondition do Firestore para não reativar designação já alterada em paralelo
 * autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
@@ -180,7 +180,7 @@ Próxima etapa obrigatória:
 
 * `settings/calendar` passa a ser documento real do Firestore para ativação da integração, `calendarId`, horário padrão e duração padrão
 * `calendarEvents` passa a guardar o vínculo remoto do Google Calendar e o estado oficial de sincronização
-* alterações em `calendarEvents` seguem controlando a fila técnica, enquanto designações operacionais passam a usar o botão `Sincronizar com agenda`
+* o botão `Sincronizar Agenda` publica, atualiza ou remove o evento imediatamente pelo worker
 * a aprovação manual passa a ficar persistida em `calendarEvents.googleCalendarManualSyncRequestedAt`, evitando republicação operacional sem novo clique
 * `settings/calendar.configurationUpdatedAt` passa a separar mudança real de configuração dos ciclos rotineiros do worker
 * o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account da Fase 11
@@ -308,10 +308,10 @@ Parâmetros atuais do template único do EmailJS:
 
 Fluxo operacional atual da fila:
 
-* `pending`: agenda `confirmation` e `reminder4d` quando a designação cobre o slot, a data ainda não passou, o orador tem e-mail válido e as notificações automáticas estão ativadas na designação
-* `manual`: agenda envio imediato pelo botão de e-mail, grava a solicitação na designação e bloqueia novo disparo manual
-* quando a confirmação automática já foi enviada ou está na fila, o botão manual fica bloqueado para evitar duplicidade
-* `confirmed`: cancela a automação de confirmação e mantém os lembretes futuros ativos
+* `pending`: agenda somente `reminder4d` quando a designação cobre o slot, a data ainda não passou, o orador tem e-mail válido e o lembrete automático está ativado
+* `manual`: processa o envio imediatamente pelo botão de e-mail e registra o resultado na designação
+* após envio manual bem-sucedido, o botão fica bloqueado até a próxima edição da designação
+* `confirmed`: mantém os lembretes futuros ativos
 * `declined`, `cancelled` e `replaced`: cancelam as automações da designação, preservando o histórico do documento
 * mudanças administrativas que não alteram a identidade de entrega preservam `sentAt`, `retryCount`, `errorMessage` e o status já processado da notificação
 * mudanças que alteram a entrega de fato, como destinatário, assunto, orador vinculado ou horário agendado, reabrem a notificação com novo ciclo
@@ -319,10 +319,10 @@ Fluxo operacional atual da fila:
 
 Fluxo operacional do worker:
 
-* o worker busca notificações `pending` vencidas por `scheduledFor`
+* o cron busca exclusivamente notificações `reminder4d` pendentes e vencidas por `scheduledFor`
 * antes do envio, ele faz um `claim` temporário no documento para reduzir duplicidade em execuções concorrentes
 * se o EmailJS responder com sucesso, a notificação vira `sent`
-* se houver falha transitória, a notificação volta para `pending` com retentativa em 30 minutos
+* se houver falha transitória no lembrete automático, a notificação volta para `pending` com retentativa em 30 minutos; ações de botão falham imediatamente
 * se atingir o limite de tentativas, a notificação vira `failed`
 * se a designação deixar de ser operacional ou a data do evento já tiver passado, a notificação vira `cancelled`
 
@@ -337,12 +337,12 @@ Antes de publicar o acesso administrativo:
 
 Fluxo operacional do Google Calendar:
 
-* `calendarEvents` continua sendo a fila oficial, sem coleção paralela
-* designações operacionais pendentes ou confirmadas, inclusive locais, entram na fila apenas após o clique em `Sincronizar com agenda`
+* `calendarEvents` mantém o estado técnico da integração, sem coleção paralela
+* designações operacionais pendentes ou confirmadas, inclusive locais, são processadas imediatamente ao clicar em `Sincronizar Agenda`
 * edições, cancelamentos e substituições exigem novo clique para atualizar ou remover o evento remoto
-* eventos especiais entram automaticamente na fila técnica
+* o cron não processa Google Calendar; ele fica exclusivo para lembretes de 4 dias
 * o worker faz `claim` temporário antes de processar cada item
-* falhas transitórias voltam para `pending` com novo horário; após o limite, ficam em `error`
+* falhas acionadas pelo botão ficam em `error` imediatamente e podem ser tentadas novamente pelo usuário
 * o ID remoto determinístico impede duplicidade se o Google Calendar responder antes de uma falha no Firestore
 * a integração com Google Calendar permite retomar manualmente eventos não operacionais que terminaram em erro
 

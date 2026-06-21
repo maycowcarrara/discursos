@@ -4,6 +4,7 @@ import {
   requestManualGoogleCalendarSync,
   type RequestManualGoogleCalendarSyncInput,
 } from '@/services/firestore/google-calendar-sync-service'
+import { processGoogleCalendarSyncImmediately } from '@/services/calendar/google-calendar-delivery-service'
 import {
   createCalendarEvent,
   deleteCalendarEvent,
@@ -94,9 +95,12 @@ export function useRequestManualGoogleCalendarSyncMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (input: RequestManualGoogleCalendarSyncInput) =>
-      requestManualGoogleCalendarSync(input),
-    onSuccess: async () => {
+    mutationFn: async (input: RequestManualGoogleCalendarSyncInput) => {
+      await requestManualGoogleCalendarSync(input)
+
+      return processGoogleCalendarSyncImmediately(input.calendarEventId)
+    },
+    onSettled: async () => {
       await invalidateCalendarQueries(queryClient)
     },
   })

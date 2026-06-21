@@ -370,7 +370,7 @@ Observações:
 * o vínculo remoto do Google Calendar deve ficar neste documento, nunca em coleção paralela
 * `googleCalendarEventId` identifica o evento remoto atual
 * `googleCalendarCalendarId` registra em qual calendário remoto o vínculo foi criado, permitindo migração segura de `calendarId`
-* `googleCalendarSyncStatus` controla a fila leve da Fase 12 sem criar nova coleção, inclusive quando a solicitação parte do botão manual `Sincronizar com agenda`
+* `googleCalendarSyncStatus` registra o estado técnico da integração; o botão manual `Sincronizar Agenda` chama o worker e conclui a tentativa na mesma ação, sem depender do cron
 * `googleCalendarManualSyncRequestedAt` registra a última aprovação manual para publicar, atualizar ou remover o item operacional no Google Calendar
 * `googleCalendarClaimId` e `googleCalendarClaimedAt` implementam lease temporário para impedir processamento concorrente do mesmo item
 * `googleCalendarRetryCount` e `googleCalendarSyncScheduledFor` controlam retentativas sem perder a pendência após falha transitória
@@ -423,7 +423,7 @@ Observações:
 * esta coleção concentra o histórico operacional dos discursos
 * salvar snapshots mínimos como `speakerName`, `themeTitle` e `originCongregationName` é permitido para preservar histórico
 * nunca depender apenas do documento relacionado para reconstruir histórico antigo
-* `emailNotificationsEnabled` controla se a designação entra automaticamente na fila de confirmação e lembretes por e-mail; o padrão operacional é `false`
+* `emailNotificationsEnabled` controla somente o lembrete automático de 4 dias; confirmações são enviadas imediatamente pelo botão de e-mail e o padrão operacional continua `false`
 * `manualConfirmationEmailRequestedAt` registra a solicitação manual mais recente; na revisão atual da designação, notificação manual `pending` ou `sent` impede novo disparo, enquanto `failed` permite nova tentativa
 * `confirmationToken` só deve ser resolvido por fluxo público mediado por worker, nunca por escrita pública direta no frontend
 
@@ -455,11 +455,11 @@ Campos:
 
 Observações:
 
-* Workers e cron devem operar sobre esta coleção
+* o cron deve operar somente sobre notificações `reminder4d`; confirmações manuais são processadas imediatamente pelo worker
 * não expor segredos ou payloads sensíveis no frontend
 * a fila ativa deve usar IDs determinísticos por designação e tipo para evitar duplicidade de lembretes dentro da mesma operação
 * envios manuais de e-mail de confirmação também usam esta coleção, com ID determinístico por designação para impedir disparos repetidos pelo painel
-* uma edição operacional pode reabrir explicitamente a notificação automática de confirmação; o assunto deve identificar o reenvio com `ATUALIZAÇÃO`
+* uma edição operacional pode liberar um novo envio manual de confirmação; não existe confirmação automática pelo cron
 * `assignments.updatedAt` delimita a revisão operacional atual: uma notificação anterior a esse horário não bloqueia novo envio manual após edição; notificações criadas na mesma revisão continuam impedindo duplicidade
 * `scheduledFor` controla execução e retentativa, mas não deve ser usado isoladamente como identidade de entrega
 * lembretes cujo horário de quatro dias já passou devem permanecer cancelados
@@ -582,6 +582,7 @@ Os índices abaixo devem ser tratados como base inicial da V1.
 ### `notifications`
 
 * `status ASC, scheduledFor ASC`
+* `type ASC, status ASC, scheduledFor ASC`
 * `assignmentId ASC, scheduledFor DESC`
 * `speakerId ASC, scheduledFor DESC`
 

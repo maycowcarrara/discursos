@@ -265,7 +265,7 @@ export function DashboardPage() {
         : manualEmailAlreadyRequested || manualConfirmationStatus === 'sent'
           ? 'E-mail solicitado'
           : automaticEmailQueued
-            ? 'E-mail na fila'
+            ? 'Enviando e-mail'
             : 'E-mail'
   const emailErrorMessage =
     currentManualConfirmationNotification?.errorMessage?.trim() ||
