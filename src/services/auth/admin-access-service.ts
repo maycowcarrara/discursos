@@ -74,6 +74,32 @@ function getWorkerErrorMessage(payload: unknown) {
   return 'Não foi possível concluir a operação administrativa.'
 }
 
+function waitForAdminClaimRetry(delayMs: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, delayMs)
+  })
+}
+
+async function refreshUntilAdminClaimIsAvailable(user: User) {
+  const retryDelaysMs = [0, 300, 900, 1800] as const
+
+  for (const retryDelayMs of retryDelaysMs) {
+    if (retryDelayMs > 0) {
+      await waitForAdminClaimRetry(retryDelayMs)
+    }
+
+    const tokenResult = await user.getIdTokenResult(true)
+
+    if (tokenResult.claims.admin === true) {
+      return
+    }
+  }
+
+  throw new AdminAccessRequiredError(
+    'A conta foi aprovada, mas a claim administrativa ainda não ficou disponível. Tente entrar novamente.',
+  )
+}
+
 async function requestAdminUsers(
   init?: RequestInit,
 ): Promise<AdminUsersResponse> {
@@ -105,12 +131,14 @@ async function requestAdminUsers(
 }
 
 export async function reconcileAdminAccess(user: User) {
+  const currentTokenResult = await user.getIdTokenResult()
+  const hadAdminClaim = currentTokenResult.claims.admin === true
   const response = await fetch(
     buildWorkerUrl('/api/public/admin-access/reconcile'),
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${await user.getIdToken()}`,
+        Authorization: `Bearer ${currentTokenResult.token}`,
         'Content-Type': 'application/json',
       },
     },
@@ -127,7 +155,12 @@ export async function reconcileAdminAccess(user: User) {
     'tokenRefreshRequired' in payload &&
     payload.tokenRefreshRequired === true
   ) {
-    await user.getIdToken(true)
+    await refreshUntilAdminClaimIsAvailable(user)
+    return
+  }
+
+  if (!hadAdminClaim) {
+    await refreshUntilAdminClaimIsAvailable(user)
   }
 }
 
