@@ -207,6 +207,7 @@ export function DashboardPage() {
       : null
   const manualConfirmationStatus =
     currentManualConfirmationNotification?.status ?? null
+  const isNextAssignmentConfirmed = nextAssignment?.status === 'confirmed'
   const manualEmailFailed = manualConfirmationStatus === 'failed'
   const manualEmailAlreadyRequested = Boolean(
     nextAssignment &&
@@ -220,6 +221,7 @@ export function DashboardPage() {
     manualConfirmationStatus === 'pending' ||
     manualConfirmationStatus === 'sent'
   const emailActionResolved =
+    isNextAssignmentConfirmed ||
     manualEmailAlreadyRequested ||
     manualEmailAlreadyQueuedOrSent
   const emailActionDisabled =
@@ -227,15 +229,19 @@ export function DashboardPage() {
     !emailDeliveryConfigured ||
     emailActionResolved
   const EmailActionIcon =
-    manualEmailFailed
+    isNextAssignmentConfirmed
+      ? CheckCircle2
+      : manualEmailFailed
       ? MailWarning
       : manualEmailAlreadyRequested ||
           manualConfirmationStatus === 'sent'
       ? CheckCircle2
       : MailCheck
-  const emailActionLabel = !emailDeliveryConfigured
-    ? 'E-mail indisponível'
-    : manualEmailFailed
+  const emailActionLabel = isNextAssignmentConfirmed
+    ? 'Confirmado'
+    : !emailDeliveryConfigured
+      ? 'E-mail indisponível'
+      : manualEmailFailed
       ? 'Tentar novamente'
       : manualEmailAlreadyRequested || manualConfirmationStatus === 'sent'
         ? 'E-mail solicitado'
@@ -286,6 +292,10 @@ export function DashboardPage() {
 
   async function handleRequestManualConfirmationEmail() {
     if (!nextAssignment) {
+      return
+    }
+
+    if (nextAssignment.status === 'confirmed') {
       return
     }
 

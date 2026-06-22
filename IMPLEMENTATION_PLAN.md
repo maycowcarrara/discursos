@@ -47,6 +47,7 @@
 * saneamento completo de PT-BR com correção de acentuação, consistência editorial e mensagens mais claras
 * redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
 * reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
+* plano técnico de reorganização dos cards, listas, filtros e formulários documentado em `docs/ui-reorganization-plan.md`
 * simplificação dos status de oradores para `ativo`, `indisponível` e `inativo`, consolidando férias como indisponibilidade temporária e transferidos como inativos preservados no histórico
 * controle explícito de e-mails por revisão da designação, mantendo notificações automáticas desligadas por padrão, um único lembrete automático 4 dias antes e envio manual de confirmação como ação única até a próxima edição
 * confirmação por WhatsApp com mensagem completa de data, discurso, origem, destino, endereço, dia e horário da reunião

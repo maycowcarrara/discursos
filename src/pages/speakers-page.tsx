@@ -11,6 +11,7 @@ import {
   PencilLine,
   Phone,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   X,
@@ -21,10 +22,15 @@ import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { AvatarBadge } from '@/components/app/avatar-badge'
+import { ActionMenu } from '@/components/app/action-menu'
+import { CompactEntityCard } from '@/components/app/compact-entity-card'
 import { EmptyState } from '@/components/app/empty-state'
+import { EntityPageShell } from '@/components/app/entity-page-shell'
+import { EntityToolbar } from '@/components/app/entity-toolbar'
 import { MetadataChip } from '@/components/app/metadata-chip'
+import { MetricStrip } from '@/components/app/metric-strip'
 import { PageHeader } from '@/components/app/page-header'
-import { PageHeaderStat } from '@/components/app/page-header-stat'
+import { ResponsiveFormPanel } from '@/components/app/responsive-form-panel'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -328,6 +334,7 @@ export function SpeakersPage() {
   const [congregationFilter, setCongregationFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState<'all' | SpeakerStatus>('all')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isFormPanelOpen, setIsFormPanelOpen] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [formThemeSearch, setFormThemeSearch] = useState('')
 
@@ -503,6 +510,7 @@ export function SpeakersPage() {
       }
 
       setEditingId(null)
+      setIsFormPanelOpen(false)
       setFormThemeSearch('')
       reset(defaultSpeakerFormValues)
     } catch (error) {
@@ -606,6 +614,7 @@ export function SpeakersPage() {
 
       if (editingId === id) {
         setEditingId(null)
+        setIsFormPanelOpen(false)
         setFormThemeSearch('')
         reset(defaultSpeakerFormValues)
       }
@@ -631,6 +640,7 @@ export function SpeakersPage() {
     setFeedback(null)
     setFormThemeSearch('')
     reset(defaultSpeakerFormValues)
+    setIsFormPanelOpen(true)
   }
 
   function handleStartEdit(id: string) {
@@ -643,66 +653,183 @@ export function SpeakersPage() {
     if (speaker) {
       reset(toSpeakerFormValues(speaker))
     }
+
+    setIsFormPanelOpen(true)
+  }
+
+  function handleFormPanelOpenChange(open: boolean) {
+    setIsFormPanelOpen(open)
+
+    if (!open) {
+      setEditingId(null)
+      setFormThemeSearch('')
+      reset(defaultSpeakerFormValues)
+    }
+  }
+
+  async function handleReactivate(id: string, name: string) {
+    if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    const speaker = speakersQuery.data?.find((item) => item.id === id)
+
+    if (!speaker) {
+      const message = 'O orador selecionado não foi encontrado.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Reativar ${name} na base operacional de oradores?`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setFeedback(null)
+
+    try {
+      await updateSpeakerMutation.mutateAsync({
+        ...toSpeakerFormValues(speaker),
+        status: 'active',
+        unavailableStart: '',
+        unavailableEnd: '',
+        id,
+        actorUid: user.uid,
+        actorName,
+      })
+
+      const message = 'Orador reativado com sucesso.'
+      setFeedback({
+        tone: 'success',
+        message,
+      })
+      toast.success(message)
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+    }
   }
 
   return (
-    <div className="space-y-5">
+    <EntityPageShell>
       <PageHeader
         eyebrow="Cadastro"
         title="Oradores"
         description="Mantenha a base de oradores organizada, com filtros simples e destaque para o que mais importa no uso diário."
-        meta={
-          <>
-            <PageHeaderStat
-              label="Cadastrados"
-              value={String(totalSpeakers)}
-              icon={Mic2}
-              tone="blue"
-            />
-            <PageHeaderStat
-              label="Operacionais"
-              value={String(operationalSpeakersCount)}
-              icon={Plus}
-              tone="green"
-            />
-            <PageHeaderStat
-              label="Indisponíveis"
-              value={String(temporarilyUnavailableCount)}
-              icon={Phone}
-              tone="amber"
-            />
-            <PageHeaderStat
-              label="Visitantes"
-              value={String(visitorsCount)}
-              icon={Mail}
-              tone="slate"
-            />
-          </>
+        actions={
+          <Button onClick={handleStartCreate}>
+            <Plus className="size-4" />
+            Novo orador
+          </Button>
         }
       />
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <Card className="min-w-0">
-          <CardHeader className="gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-2xl">{formModeLabel}</CardTitle>
-                <CardDescription>
-                  {editingSpeaker
-                    ? 'Atualize dados, status e temas sem sair desta tela.'
-                    : 'Cadastre um orador com congregação, temas e status bem definidos.'}
-                </CardDescription>
-              </div>
-              {editingSpeaker ? (
-                <Button variant="outline" onClick={handleStartCreate} disabled={isSubmitting}>
-                  Cancelar edição
-                </Button>
-              ) : null}
-            </div>
-          </CardHeader>
+      <MetricStrip
+        items={[
+          {
+            label: 'Cadastrados',
+            value: String(totalSpeakers),
+            icon: Mic2,
+            tone: 'blue',
+          },
+          {
+            label: 'Operacionais',
+            value: String(operationalSpeakersCount),
+            icon: Plus,
+            tone: 'green',
+          },
+          {
+            label: 'Indisponíveis',
+            value: String(temporarilyUnavailableCount),
+            icon: Phone,
+            tone: 'amber',
+          },
+          {
+            label: 'Visitantes',
+            value: String(visitorsCount),
+            icon: Mail,
+            tone: 'slate',
+          },
+        ]}
+      />
 
-          <CardContent>
-            <form className="space-y-5" onSubmit={submitHandler}>
+      {feedback && !isFormPanelOpen ? (
+        <div className={getFeedbackContainerClassName(feedback.tone)}>
+          {feedback.message}
+        </div>
+      ) : null}
+
+      <section className="space-y-4">
+        <ResponsiveFormPanel
+          open={isFormPanelOpen}
+          onOpenChange={handleFormPanelOpenChange}
+          title={formModeLabel}
+          description={
+            editingSpeaker
+              ? 'Atualize dados, status e temas do orador selecionado.'
+              : 'Cadastre um orador com congregação, temas e status bem definidos.'
+          }
+          footer={
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-muted-foreground">
+                {editingSpeaker
+                  ? `Última atualização em ${formatUpdatedAt(
+                      editingSpeaker.updatedAt.toDate(),
+                    )}.`
+                  : 'O cadastro permanece no histórico mesmo quando sai da base ativa.'}
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  variant="outline"
+                  type="button"
+                  disabled={isSubmitting || !isDirty}
+                  onClick={() => reset(toSpeakerFormValues(editingSpeaker))}
+                >
+                  Restaurar
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleFormPanelOpenChange(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  form="speaker-form"
+                  disabled={
+                    isSubmitting ||
+                    !hasCongregationOptions ||
+                    !hasThemeOptions ||
+                    hasInvalidSelectedThemes
+                  }
+                >
+                  <Plus className="size-4" />
+                  {editingSpeaker ? 'Salvar alterações' : 'Salvar orador'}
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <form id="speaker-form" className="space-y-5" onSubmit={submitHandler}>
               <div className="grid gap-4">
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Nome</span>
@@ -1080,114 +1207,82 @@ export function SpeakersPage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {editingSpeaker
-                    ? `Última atualização em ${formatUpdatedAt(
-                        editingSpeaker.updatedAt.toDate(),
-                      )}.`
-                    : 'O cadastro permanece no histórico mesmo quando sai da base ativa.'}
-                </p>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    type="button"
-                    disabled={isSubmitting || !isDirty}
-                    onClick={() => reset(toSpeakerFormValues(editingSpeaker))}
-                  >
-                    Restaurar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={
-                      isSubmitting ||
-                      !hasCongregationOptions ||
-                      !hasThemeOptions ||
-                      hasInvalidSelectedThemes
-                    }
-                  >
-                    <Plus className="size-4" />
-                    {editingSpeaker ? 'Salvar alterações' : 'Salvar orador'}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+          </form>
+        </ResponsiveFormPanel>
 
         <Card className="min-w-0">
-          <CardHeader className="gap-4">
+          <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <CardTitle className="text-2xl">Base de oradores</CardTitle>
                 <CardDescription>
-                  Veja rapidamente quem está ativo, quem está indisponível e quem já precisa de atualização.
+                  Lista principal para localizar, revisar e atualizar cadastros.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                <span>Resultados</span>
-                <span className="font-medium text-foreground">
-                  {filteredSpeakers.length}/{totalSpeakers}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2 min-[1500px]:grid-cols-[minmax(0,1fr)_180px_210px_220px]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-11"
-                  placeholder="Buscar por nome, e-mail, WhatsApp..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                />
-              </div>
-              <select
-                className={selectClassName}
-                value={typeFilter}
-                onChange={(event) =>
-                  setTypeFilter(event.target.value as 'all' | SpeakerType)
-                }
-              >
-                <option value="all">Todos os tipos</option>
-                <option value="local">Locais</option>
-                <option value="visitor">Visitantes</option>
-              </select>
-              <select
-                className={selectClassName}
-                value={congregationFilter}
-                onChange={(event) => setCongregationFilter(event.target.value)}
-              >
-                <option value="all">Todas as congregações</option>
-                {(congregationsQuery.data ?? []).map((congregation) => (
-                  <option key={congregation.id} value={congregation.id}>
-                    {congregation.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={selectClassName}
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as 'all' | SpeakerStatus)
-                }
-              >
-                {speakerFilterOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-4">
+            <EntityToolbar
+              searchValue={searchTerm}
+              searchPlaceholder="Buscar por nome, e-mail, WhatsApp..."
+              onSearchChange={setSearchTerm}
+              summary={
+                <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                  <span>Resultados</span>
+                  <span className="font-medium text-foreground">
+                    {filteredSpeakers.length}/{totalSpeakers}
+                  </span>
+                </div>
+              }
+              filters={
+                <>
+                  <select
+                    className={selectClassName}
+                    value={typeFilter}
+                    onChange={(event) =>
+                      setTypeFilter(event.target.value as 'all' | SpeakerType)
+                    }
+                  >
+                    <option value="all">Todos os tipos</option>
+                    <option value="local">Locais</option>
+                    <option value="visitor">Visitantes</option>
+                  </select>
+                  <select
+                    className={selectClassName}
+                    value={congregationFilter}
+                    onChange={(event) => setCongregationFilter(event.target.value)}
+                  >
+                    <option value="all">Todas as congregações</option>
+                    {(congregationsQuery.data ?? []).map((congregation) => (
+                      <option key={congregation.id} value={congregation.id}>
+                        {congregation.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className={selectClassName}
+                    value={statusFilter}
+                    onChange={(event) =>
+                      setStatusFilter(event.target.value as 'all' | SpeakerStatus)
+                    }
+                  >
+                    {speakerFilterOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              }
+            />
+
             {speakersQuery.isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-48 animate-pulse rounded-xl border border-border bg-background"
+                    className="h-28 animate-pulse rounded-lg border border-border bg-background"
                   />
                 ))}
               </div>
@@ -1244,109 +1339,109 @@ export function SpeakersPage() {
                   )
 
                   return (
-                    <div
+                    <CompactEntityCard
                       key={speaker.id}
-                      className="min-w-0 rounded-xl border border-border bg-background p-3 sm:p-4"
-                    >
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <AvatarBadge name={speaker.name} size="sm" />
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-lg font-semibold text-foreground">
-                                {speaker.name}
-                              </h3>
-                              <Badge variant="outline">
-                                {speakerTypeLabels[speaker.type]}
-                              </Badge>
-                              <Badge className={getStatusBadgeClassName(speaker.status)}>
-                                {speakerStatusLabels[speaker.status]}
-                              </Badge>
+                      leading={<AvatarBadge name={speaker.name} size="sm" />}
+                      title={speaker.name}
+                      subtitle={congregationName}
+                      badges={
+                        <>
+                          <Badge variant="outline">
+                            {speakerTypeLabels[speaker.type]}
+                          </Badge>
+                          <Badge className={getStatusBadgeClassName(speaker.status)}>
+                            {speakerStatusLabels[speaker.status]}
+                          </Badge>
+                        </>
+                      }
+                      primaryAction={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full sm:w-auto"
+                          onClick={() => handleStartEdit(speaker.id)}
+                          disabled={isSubmitting}
+                        >
+                          <PencilLine className="size-4" />
+                          Editar
+                        </Button>
+                      }
+                      secondaryActions={
+                        <ActionMenu
+                          items={[
+                            {
+                              label: 'Reativar',
+                              icon: RotateCcw,
+                              disabled: isSubmitting || speaker.isActive,
+                              onSelect: () => handleReactivate(speaker.id, speaker.name),
+                            },
+                            {
+                              label: 'Remover da base ativa',
+                              icon: Trash2,
+                              disabled: isSubmitting || !speaker.isActive,
+                              tone: 'danger',
+                              onSelect: () => handleDelete(speaker.id, speaker.name),
+                            },
+                          ]}
+                        />
+                      }
+                      metadata={
+                        <>
+                          <MetadataChip
+                            label="Temas"
+                            value={`${speaker.themeIds.length} vinculado(s)`}
+                          />
+                          <MetadataChip
+                            label="E-mail"
+                            value={speaker.email.trim() || 'Sem e-mail'}
+                            tone={speaker.email.trim() ? 'default' : 'warning'}
+                          />
+                          <MetadataChip
+                            label="WhatsApp"
+                            value={speaker.phone.trim() || 'Sem WhatsApp'}
+                            tone={speaker.phone.trim() ? 'default' : 'warning'}
+                          />
+                        </>
+                      }
+                      alert={
+                        <>
+                          {missingContactLabels.length > 0 ? (
+                            <div className="flex w-full items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                              <p>
+                                Cadastro sem{' '}
+                                {formatMissingContactLabels(missingContactLabels)}.
+                              </p>
                             </div>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {congregationName}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-2 sm:flex-row lg:shrink-0">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full sm:w-auto"
-                            onClick={() => handleStartEdit(speaker.id)}
-                            disabled={isSubmitting}
-                          >
-                            <PencilLine className="size-4" />
-                            Editar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full sm:w-auto"
-                            onClick={() => handleDelete(speaker.id, speaker.name)}
-                            disabled={isSubmitting || !speaker.isActive}
-                          >
-                            <Trash2 className="size-4" />
-                            Remover da base ativa
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 border-t border-border/70 pt-2.5">
-                        <MetadataChip
-                          label="E-mail"
-                          value={speaker.email.trim() || 'Sem e-mail'}
-                          tone={speaker.email.trim() ? 'default' : 'warning'}
-                        />
-                        <MetadataChip
-                          label="WhatsApp"
-                          value={speaker.phone.trim() || 'Sem WhatsApp'}
-                          tone={speaker.phone.trim() ? 'default' : 'warning'}
-                        />
-                      </div>
-
-                      <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                        {missingContactLabels.length > 0 ? (
-                          <div className="flex w-full items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                            <p>
-                              Cadastro sem{' '}
-                              {formatMissingContactLabels(missingContactLabels)}.
-                              Complete quando quiser liberar contato rápido,
-                              lembretes por e-mail e convites da agenda.
-                            </p>
-                          </div>
-                        ) : null}
-
-                        <div className="flex min-w-0 items-start gap-2">
-                          <Mic2 className="mt-0.5 size-4 shrink-0 text-primary" />
-                          <div className="min-w-0">
-                            <p className="text-foreground">Temas vinculados</p>
-                            <p>
-                              {themeLabels.length > 0
-                                ? themeLabels.join(', ')
-                                : `${speaker.themeIds.length} tema(s) vinculado(s)`}
-                            </p>
-                          </div>
-                        </div>
-
-                        {hasUnavailableWindow ? (
-                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-                            Período informado:{' '}
-                            {formatDateRange(
-                              unavailableStart.toDate(),
-                              unavailableEnd.toDate(),
-                            )}
-                          </div>
-                        ) : null}
-
-                        <p>{speaker.notes || 'Sem observações cadastradas.'}</p>
-                        <p className="text-xs">
-                          Atualizado em {formatUpdatedAt(speaker.updatedAt.toDate())}
-                        </p>
-                      </div>
-                    </div>
+                          ) : null}
+                          {hasUnavailableWindow ? (
+                            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                              Indisponível:{' '}
+                              {formatDateRange(
+                                unavailableStart.toDate(),
+                                unavailableEnd.toDate(),
+                              )}
+                            </div>
+                          ) : null}
+                        </>
+                      }
+                      footer={
+                        <>
+                          <p className="line-clamp-1">
+                            Temas:{' '}
+                            {themeLabels.length > 0
+                              ? themeLabels.join(', ')
+                              : `${speaker.themeIds.length} tema(s) vinculado(s)`}
+                          </p>
+                          {speaker.notes ? (
+                            <p className="mt-1 line-clamp-1">Obs.: {speaker.notes}</p>
+                          ) : null}
+                          <p className="mt-1">
+                            Atualizado em {formatUpdatedAt(speaker.updatedAt.toDate())}
+                          </p>
+                        </>
+                      }
+                    />
                   )
                 })}
               </div>
@@ -1355,6 +1450,6 @@ export function SpeakersPage() {
         </Card>
       </section>
 
-    </div>
+    </EntityPageShell>
   )
 }
