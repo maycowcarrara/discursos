@@ -7,7 +7,6 @@ import {
   PencilLine,
   Plus,
   Save,
-  Search,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -15,10 +14,15 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
+import { ActionMenu } from '@/components/app/action-menu'
+import { CompactEntityCard } from '@/components/app/compact-entity-card'
 import { EmptyState } from '@/components/app/empty-state'
+import { EntityPageShell } from '@/components/app/entity-page-shell'
+import { EntityToolbar } from '@/components/app/entity-toolbar'
 import { MetadataChip } from '@/components/app/metadata-chip'
+import { MetricStrip } from '@/components/app/metric-strip'
 import { PageHeader } from '@/components/app/page-header'
-import { PageHeaderStat } from '@/components/app/page-header-stat'
+import { ResponsiveFormPanel } from '@/components/app/responsive-form-panel'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -219,6 +223,7 @@ export function CongregationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [editingExternalId, setEditingExternalId] = useState<string | null>(null)
+  const [isExternalFormPanelOpen, setIsExternalFormPanelOpen] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [isLocalCardExpanded, setIsLocalCardExpanded] = useState(true)
   const [hasInitializedLocalCard, setHasInitializedLocalCard] = useState(false)
@@ -409,6 +414,7 @@ export function CongregationsPage() {
       }
 
       setEditingExternalId(null)
+      setIsExternalFormPanelOpen(false)
       resetExternalForm(defaultExternalCongregationFormValues)
       setCurrentPage(1)
     } catch (error) {
@@ -451,6 +457,7 @@ export function CongregationsPage() {
 
       if (editingExternalId === id) {
         setEditingExternalId(null)
+        setIsExternalFormPanelOpen(false)
         resetExternalForm(defaultExternalCongregationFormValues)
       }
 
@@ -474,6 +481,7 @@ export function CongregationsPage() {
     setEditingExternalId(null)
     setFeedback(null)
     resetExternalForm(defaultExternalCongregationFormValues)
+    setIsExternalFormPanelOpen(true)
   }
 
   function handleStartEditExternal(id: string) {
@@ -485,30 +493,56 @@ export function CongregationsPage() {
     if (congregation) {
       resetExternalForm(toExternalCongregationFormValues(congregation))
     }
+
+    setIsExternalFormPanelOpen(true)
+  }
+
+  function handleExternalFormPanelOpenChange(open: boolean) {
+    setIsExternalFormPanelOpen(open)
+
+    if (!open) {
+      setEditingExternalId(null)
+      resetExternalForm(defaultExternalCongregationFormValues)
+    }
   }
 
   return (
-    <div className="space-y-5">
+    <EntityPageShell>
       <PageHeader
         eyebrow="Cadastro"
         title="Congregações"
         description="Mantenha a base local fixa e cadastre separadamente as congregações externas usadas na operação."
-        meta={
-          <>
-            <PageHeaderStat
-              label="Externas"
-              value={String(totalExternalCongregations)}
-              icon={Users}
-              tone="blue"
-            />
-            <PageHeaderStat
-              label="Ativas"
-              value={String(totalCongregations)}
-              icon={MapPinned}
-              tone="slate"
-            />
-          </>
+        actions={
+          <Button onClick={handleStartCreateExternal} disabled={isSubmitting}>
+            <Plus className="size-4" />
+            Nova externa
+          </Button>
         }
+      />
+
+      <MetricStrip
+        items={[
+          {
+            label: 'Externas',
+            value: String(totalExternalCongregations),
+            icon: Users,
+            tone: 'blue',
+          },
+          {
+            label: 'Ativas',
+            value: String(totalCongregations),
+            icon: MapPinned,
+            tone: 'slate',
+          },
+          {
+            label: 'Base local',
+            value: localCongregation ? '1' : '0',
+            detail: localCongregation ? localCongregation.name : 'Cadastro necessário',
+            icon: MapPinned,
+            tone: localCongregation ? 'green' : 'amber',
+          },
+        ]}
+        className="lg:grid-cols-3"
       />
 
       {feedback ? (
@@ -523,36 +557,62 @@ export function CongregationsPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-        <Card>
-          <CardHeader className="gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-2xl">
-                  {editingExternalCongregation
-                    ? 'Editar congregação externa'
-                    : 'Nova congregação externa'}
-                </CardTitle>
-                <CardDescription>
-                  {editingExternalCongregation
-                    ? 'Atualize os dados da congregação externa sem mudar o tipo.'
-                    : 'Cadastre apenas congregações parceiras ou externas usadas em visitantes e saídas.'}
-                </CardDescription>
-              </div>
-              {editingExternalCongregation ? (
-                <Button
-                  variant="outline"
-                  onClick={handleStartCreateExternal}
-                  disabled={isSubmitting}
-                >
-                  Cancelar edição
-                </Button>
-              ) : null}
+      <ResponsiveFormPanel
+        open={isExternalFormPanelOpen}
+        onOpenChange={handleExternalFormPanelOpenChange}
+        title={
+          editingExternalCongregation
+            ? 'Editar congregação externa'
+            : 'Nova congregação externa'
+        }
+        description={
+          editingExternalCongregation
+            ? 'Atualize os dados da congregação externa sem mudar o tipo.'
+            : 'Cadastre apenas congregações parceiras ou externas usadas em visitantes e saídas.'
+        }
+        footer={
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {editingExternalCongregation
+                ? `Última atualização em ${formatUpdatedAt(
+                    editingExternalCongregation.updatedAt.toDate(),
+                  )}.`
+                : 'O cadastro será salvo automaticamente como congregação externa.'}
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                variant="outline"
+                type="button"
+                disabled={isSubmitting || !isExternalFormDirty}
+                onClick={() =>
+                  resetExternalForm(
+                    toExternalCongregationFormValues(editingExternalCongregation),
+                  )
+                }
+              >
+                Restaurar
+              </Button>
+              <Button
+                variant="outline"
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleExternalFormPanelOpenChange(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" form="external-congregation-form" disabled={isSubmitting}>
+                <Plus className="size-4" />
+                {editingExternalCongregation ? 'Salvar alterações' : 'Salvar externa'}
+              </Button>
             </div>
-          </CardHeader>
-
-          <CardContent>
-            <form className="space-y-5" onSubmit={submitExternalHandler}>
+          </div>
+        }
+      >
+        <form
+          id="external-congregation-form"
+          className="space-y-5"
+          onSubmit={submitExternalHandler}
+        >
               <div className="grid gap-4">
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Nome</span>
@@ -743,41 +803,12 @@ export function CongregationsPage() {
                 </label>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {editingExternalCongregation
-                    ? `Última atualização em ${formatUpdatedAt(
-                        editingExternalCongregation.updatedAt.toDate(),
-                      )}.`
-                    : 'O cadastro será salvo automaticamente como congregação externa.'}
-                </p>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    type="button"
-                    disabled={isSubmitting || !isExternalFormDirty}
-                    onClick={() =>
-                      resetExternalForm(
-                        toExternalCongregationFormValues(editingExternalCongregation),
-                      )
-                    }
-                  >
-                    Restaurar
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    <Plus className="size-4" />
-                    {editingExternalCongregation
-                      ? 'Salvar alterações'
-                      : 'Salvar externa'}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        </form>
+      </ResponsiveFormPanel>
 
+      <section className="space-y-4">
         <Card>
-          <CardHeader className="gap-4">
+          <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <CardTitle className="text-2xl">Congregações externas</CardTitle>
@@ -792,36 +823,32 @@ export function CongregationsPage() {
                 </span>
               </div>
             </div>
-
-            <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-11"
-                  placeholder="Buscar por nome, cidade, UF ou dia..."
-                  value={searchTerm}
-                  onChange={(event) => {
-                    setSearchTerm(event.target.value)
-                    setCurrentPage(1)
-                  }}
-                />
-              </div>
-              <div className={selectClassName}>
-                <span>
-                  {filteredExternalCongregations.length} resultado(s) de{' '}
-                  {totalExternalCongregations}
-                </span>
-              </div>
-            </div>
           </CardHeader>
 
           <CardContent className="space-y-4">
+            <EntityToolbar
+              searchValue={searchTerm}
+              searchPlaceholder="Buscar por nome, cidade, UF ou dia..."
+              onSearchChange={(value) => {
+                setSearchTerm(value)
+                setCurrentPage(1)
+              }}
+              summary={
+                <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                  <span>Resultados</span>
+                  <span className="font-medium text-foreground">
+                    {filteredExternalCongregations.length}/{totalExternalCongregations}
+                  </span>
+                </div>
+              }
+            />
+
             {congregationsQuery.isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-44 animate-pulse rounded-xl border border-border bg-background"
+                    className="h-28 animate-pulse rounded-lg border border-border bg-background"
                   />
                 ))}
               </div>
@@ -856,78 +883,63 @@ export function CongregationsPage() {
                     item.publicTalkCoordinatorEmail
 
                   return (
-                    <div
+                    <CompactEntityCard
                       key={item.id}
-                      className="rounded-xl border border-border bg-background p-4"
-                    >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="flex min-w-0 gap-4">
-                        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      leading={
+                        <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
                           <MapPinned className="size-5" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-xl font-semibold text-foreground">
-                              {item.name}
-                            </h3>
-                            <Badge>Externa</Badge>
-                          </div>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {item.city}/{item.state}
-                          </p>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {item.meetingDay} • {item.meetingTime}
-                          </p>
-                          <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                            {item.address}
-                          </p>
+                      }
+                      title={item.name}
+                      subtitle={`${item.city}/${item.state}`}
+                      badges={<Badge>Externa</Badge>}
+                      primaryAction={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full sm:w-auto"
+                          onClick={() => handleStartEditExternal(item.id)}
+                          disabled={isSubmitting}
+                        >
+                          <PencilLine className="size-4" />
+                          Editar
+                        </Button>
+                      }
+                      secondaryActions={
+                        <ActionMenu
+                          items={[
+                            {
+                              label: 'Excluir',
+                              icon: Trash2,
+                              disabled: isSubmitting,
+                              tone: 'danger',
+                              onSelect: () => handleDeleteExternal(item.id, item.name),
+                            },
+                          ]}
+                        />
+                      }
+                      metadata={
+                        <>
+                          <MetadataChip
+                            label="Reunião"
+                            value={`${item.meetingDay}, ${item.meetingTime}`}
+                          />
+                          <MetadataChip label="Endereço" value={item.address} />
                           {hasCoordinatorContact ? (
-                            <div className="mt-4 rounded-xl border border-border/70 bg-muted/10 px-4 py-3">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Arranjo de discursos
-                              </p>
-                              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-                                <MetadataChip
-                                  label="Responsável"
-                                  value={getOptionalMetadataValue(
-                                    coordinatorName,
-                                    'Sem nome',
-                                  )}
-                                  tone={coordinatorName ? 'default' : 'pending'}
-                                />
-                                <MetadataChip
-                                  label="WhatsApp"
-                                  value={getOptionalMetadataValue(
-                                    item.publicTalkCoordinatorPhone,
-                                    'Sem WhatsApp',
-                                  )}
-                                  tone={
-                                    item.publicTalkCoordinatorPhone
-                                      ? 'default'
-                                      : 'pending'
-                                  }
-                                />
-                                <MetadataChip
-                                  label="E-mail"
-                                  value={getOptionalMetadataValue(
-                                    item.publicTalkCoordinatorEmail,
-                                    'Sem e-mail',
-                                  )}
-                                  tone={
-                                    item.publicTalkCoordinatorEmail
-                                      ? 'default'
-                                      : 'pending'
-                                  }
-                                />
-                              </div>
-                            </div>
+                            <MetadataChip
+                              label="Responsável"
+                              value={getOptionalMetadataValue(
+                                coordinatorName,
+                                'Sem nome',
+                              )}
+                              tone={coordinatorName ? 'default' : 'pending'}
+                            />
                           ) : null}
-                          {item.notes ? (
-                            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                              {item.notes}
-                            </p>
-                          ) : null}
-                          <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        </>
+                      }
+                      footer={
+                        <>
+                          <div className="flex flex-wrap gap-3">
                             <a
                               href={item.mapsUrl}
                               target="_blank"
@@ -940,29 +952,12 @@ export function CongregationsPage() {
                               Atualizado em {formatUpdatedAt(item.updatedAt.toDate())}
                             </span>
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleStartEditExternal(item.id)}
-                          disabled={isSubmitting}
-                        >
-                          <PencilLine className="size-4" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleDeleteExternal(item.id, item.name)}
-                          disabled={isSubmitting}
-                        >
-                          <Trash2 className="size-4" />
-                          Excluir
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                          {item.notes ? (
+                            <p className="mt-1 line-clamp-1">Obs.: {item.notes}</p>
+                          ) : null}
+                        </>
+                      }
+                    />
                   )
                 })}
               </div>
@@ -1287,6 +1282,6 @@ export function CongregationsPage() {
           </CardContent>
         ) : null}
       </Card>
-    </div>
+    </EntityPageShell>
   )
 }

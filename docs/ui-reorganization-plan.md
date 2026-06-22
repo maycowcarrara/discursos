@@ -12,7 +12,12 @@
 
 * UI-0 iniciada com componentes compartilhados para shell de tela, faixa de metricas, toolbar, card compacto, painel responsivo de formulario e menu de acoes.
 * UI-1 aplicada primeiro em Oradores: lista principal antes do formulario, formulario sob demanda, filtros compactos, cards mais densos e acoes secundarias agrupadas.
-* Proxima etapa obrigatoria: validar Oradores em desktop e mobile antes de propagar o padrao para Temas.
+* UI-2 aplicada em Temas: catalogo como lista principal, formulario sob demanda, importacao de PDF preservada no cabecalho, filtros compactos por categoria/status e cards densos por numero/titulo.
+* UI-3 aplicada em Congregacoes: lista de externas como conteudo principal, formulario de externa sob demanda, cards compactos com Maps e acoes secundarias em menu, preservando o card protegido da congregacao local.
+* UI-4 iniciada em Designacoes: lista anual passa a ser o centro da tela, nova/editar/substituir abre em painel responsivo sob demanda, metricas e filtros foram compactados, cards ficaram mais densos e acoes de gerenciamento secundarias foram agrupadas.
+* UI-5 iniciada em Historico e Dashboard: filtros do Historico passam a ser colapsaveis, timeline ficou mais compacta, Dashboard recebeu cabecalho/metrica compacta e cards menores preservando o atalho para Designacoes com data pre-selecionada.
+* UI-6 iniciada em Configuracoes: cabecalho e metricas foram padronizados, cards administrativos ficaram mais consistentes e filas/atividade recente passaram a usar cards compactos.
+* Proxima etapa obrigatoria: validar Oradores, Temas, Congregacoes, Designacoes, Historico, Dashboard e Configuracoes em desktop, mobile, tema claro e tema escuro antes do checklist operacional de lancamento V1.
 
 ## Objetivo
 

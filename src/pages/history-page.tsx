@@ -10,9 +10,10 @@ import {
 import { useMemo, useState } from 'react'
 
 import { EmptyState } from '@/components/app/empty-state'
+import { EntityPageShell } from '@/components/app/entity-page-shell'
 import { MetadataChip } from '@/components/app/metadata-chip'
+import { MetricStrip } from '@/components/app/metric-strip'
 import { PageHeader } from '@/components/app/page-header'
-import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -193,6 +194,7 @@ export function HistoryPage() {
   const [speakerFilter, setSpeakerFilter] = useState('all')
   const [themeFilter, setThemeFilter] = useState('all')
   const [congregationFilter, setCongregationFilter] = useState('all')
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [periodFeedback, setPeriodFeedback] = useState<string | null>(null)
 
   const historyQuery = useAssignmentHistoryInfiniteQuery(
@@ -297,35 +299,11 @@ export function HistoryPage() {
     }
   }, [filteredAssignments])
 
-  const visibleHeaderStats = [
-    metrics.confirmed > 0 ? (
-      <PageHeaderStat
-        key="confirmed"
-        label="Confirmados"
-        value={String(metrics.confirmed)}
-        icon={UsersRound}
-        tone="green"
-      />
-    ) : null,
-    metrics.pending > 0 ? (
-      <PageHeaderStat
-        key="pending"
-        label="Pendentes"
-        value={String(metrics.pending)}
-        icon={CalendarDays}
-        tone="amber"
-      />
-    ) : null,
-    metrics.congregations > 0 && metrics.total > 0 ? (
-      <PageHeaderStat
-        key="congregations"
-        label="Congregações"
-        value={String(metrics.congregations)}
-        icon={Church}
-        tone="slate"
-      />
-    ) : null,
-  ]
+  const shouldShowFilterPanel =
+    isFiltersOpen ||
+    historyQuery.isError ||
+    Boolean(filterOptionsError) ||
+    Boolean(periodFeedback)
 
   function handleApplyPeriod() {
     if (
@@ -367,7 +345,7 @@ export function HistoryPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <EntityPageShell>
       <PageHeader
         eyebrow="Histórico"
         title="Histórico de designações"
@@ -380,152 +358,218 @@ export function HistoryPage() {
             <Badge variant="outline">
               {buildResultSummary(loadedAssignments.length, metrics.total)}
             </Badge>
-            {visibleHeaderStats}
           </>
         }
       />
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Filter className="size-5 text-primary" />
-            <CardTitle className="text-2xl">Filtros</CardTitle>
-          </div>
-          <CardDescription>
-            Escolha o período principal e depois refine por orador, tema ou congregação.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {historyQuery.isError ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-              {getErrorMessage(historyQuery.error)}
+      <MetricStrip
+        items={[
+          {
+            label: 'Registros',
+            value: String(metrics.total),
+            detail: buildResultSummary(loadedAssignments.length, metrics.total),
+            icon: History,
+            tone: 'blue',
+          },
+          {
+            label: 'Confirmados',
+            value: String(metrics.confirmed),
+            detail: 'No filtro atual',
+            icon: UsersRound,
+            tone: 'green',
+          },
+          {
+            label: 'Pendentes',
+            value: String(metrics.pending),
+            detail: 'Aguardando retorno',
+            icon: CalendarDays,
+            tone: 'amber',
+          },
+          {
+            label: 'Congregações',
+            value: String(metrics.congregations),
+            detail: 'Origem ou destino',
+            icon: Church,
+            tone: 'slate',
+          },
+        ]}
+      />
+
+      <Card className="overflow-hidden rounded-lg">
+        <CardHeader className="gap-3 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Filter className="size-5 text-primary" />
+                <CardTitle className="text-xl">Filtros</CardTitle>
+              </div>
+              <CardDescription className="mt-1">
+                Escolha o período principal e refine por orador, tema ou congregação.
+              </CardDescription>
             </div>
-          ) : null}
-
-          {filterOptionsError ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-              {getErrorMessage(filterOptionsError)}
-            </div>
-          ) : null}
-
-          {periodFeedback ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
-              {periodFeedback}
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 xl:grid-cols-5">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Orador</span>
-              <select
-                className={selectClassName}
-                value={speakerFilter}
-                onChange={(event) => setSpeakerFilter(event.target.value)}
-                disabled={speakersQuery.isLoading}
-              >
-                <option value="all">Todos os oradores</option>
-                {speakerOptions.map((speaker) => (
-                  <option key={speaker.value} value={speaker.value}>
-                    {speaker.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Tema</span>
-              <select
-                className={selectClassName}
-                value={themeFilter}
-                onChange={(event) => setThemeFilter(event.target.value)}
-                disabled={themesQuery.isLoading}
-              >
-                <option value="all">Todos os temas</option>
-                {themeOptions.map((theme) => (
-                  <option key={theme.value} value={theme.value}>
-                    {theme.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Congregação</span>
-              <select
-                className={selectClassName}
-                value={congregationFilter}
-                onChange={(event) => setCongregationFilter(event.target.value)}
-                disabled={congregationsQuery.isLoading}
-              >
-                <option value="all">Origem ou destino</option>
-                {congregationOptions.map((congregation) => (
-                  <option key={congregation.value} value={congregation.value}>
-                    {congregation.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Período inicial</span>
-              <Input
-                type="date"
-                value={draftPeriod.periodStart}
-                onChange={(event) =>
-                  setDraftPeriod((currentValue) => ({
-                    ...currentValue,
-                    periodStart: event.target.value,
-                  }))
-                }
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFiltersOpen((currentValue) => !currentValue)}
+            >
+              <ChevronDown
+                className={`size-4 transition-transform ${shouldShowFilterPanel ? 'rotate-180' : ''}`}
               />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Período final</span>
-              <Input
-                type="date"
-                value={draftPeriod.periodEnd}
-                onChange={(event) =>
-                  setDraftPeriod((currentValue) => ({
-                    ...currentValue,
-                    periodEnd: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleCurrentYearShortcut}>
-                <CalendarDays className="size-4" />
-                Ano atual
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleAllHistoryShortcut}>
-                <History className="size-4" />
-                Todo histórico
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleResetLocalFilters}>
-                <RotateCcw className="size-4" />
-                Limpar filtros locais
-              </Button>
-            </div>
-
-            <Button size="lg" onClick={handleApplyPeriod}>
-              Aplicar período
+              {shouldShowFilterPanel ? 'Ocultar filtros' : 'Mostrar filtros'}
             </Button>
           </div>
-        </CardContent>
+          {!shouldShowFilterPanel ? (
+            <div className="flex flex-wrap gap-2">
+              <MetadataChip
+                label="Período"
+                value={buildPeriodSummary(
+                  appliedPeriod.periodStart,
+                  appliedPeriod.periodEnd,
+                )}
+              />
+              <MetadataChip label="Orador" value={speakerFilter === 'all' ? 'Todos' : 'Filtrado'} />
+              <MetadataChip label="Tema" value={themeFilter === 'all' ? 'Todos' : 'Filtrado'} />
+              <MetadataChip
+                label="Congregação"
+                value={congregationFilter === 'all' ? 'Todas' : 'Filtrada'}
+              />
+            </div>
+          ) : null}
+        </CardHeader>
+        {shouldShowFilterPanel ? (
+          <CardContent className="space-y-5 p-4 pt-0">
+            {historyQuery.isError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {getErrorMessage(historyQuery.error)}
+              </div>
+            ) : null}
+
+            {filterOptionsError ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                {getErrorMessage(filterOptionsError)}
+              </div>
+            ) : null}
+
+            {periodFeedback ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                {periodFeedback}
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 xl:grid-cols-5">
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">Orador</span>
+                <select
+                  className={selectClassName}
+                  value={speakerFilter}
+                  onChange={(event) => setSpeakerFilter(event.target.value)}
+                  disabled={speakersQuery.isLoading}
+                >
+                  <option value="all">Todos os oradores</option>
+                  {speakerOptions.map((speaker) => (
+                    <option key={speaker.value} value={speaker.value}>
+                      {speaker.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">Tema</span>
+                <select
+                  className={selectClassName}
+                  value={themeFilter}
+                  onChange={(event) => setThemeFilter(event.target.value)}
+                  disabled={themesQuery.isLoading}
+                >
+                  <option value="all">Todos os temas</option>
+                  {themeOptions.map((theme) => (
+                    <option key={theme.value} value={theme.value}>
+                      {theme.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">Congregação</span>
+                <select
+                  className={selectClassName}
+                  value={congregationFilter}
+                  onChange={(event) => setCongregationFilter(event.target.value)}
+                  disabled={congregationsQuery.isLoading}
+                >
+                  <option value="all">Origem ou destino</option>
+                  {congregationOptions.map((congregation) => (
+                    <option key={congregation.value} value={congregation.value}>
+                      {congregation.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">Período inicial</span>
+                <Input
+                  type="date"
+                  value={draftPeriod.periodStart}
+                  onChange={(event) =>
+                    setDraftPeriod((currentValue) => ({
+                      ...currentValue,
+                      periodStart: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-foreground">Período final</span>
+                <Input
+                  type="date"
+                  value={draftPeriod.periodEnd}
+                  onChange={(event) =>
+                    setDraftPeriod((currentValue) => ({
+                      ...currentValue,
+                      periodEnd: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={handleCurrentYearShortcut}>
+                  <CalendarDays className="size-4" />
+                  Ano atual
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleAllHistoryShortcut}>
+                  <History className="size-4" />
+                  Todo histórico
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleResetLocalFilters}>
+                  <RotateCcw className="size-4" />
+                  Limpar filtros locais
+                </Button>
+              </div>
+
+              <Button size="lg" onClick={handleApplyPeriod}>
+                Aplicar período
+              </Button>
+            </div>
+          </CardContent>
+        ) : null}
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Linha do tempo</CardTitle>
+      <Card className="overflow-hidden rounded-lg">
+        <CardHeader className="p-4">
+          <CardTitle className="text-xl">Linha do tempo</CardTitle>
           <CardDescription>
             A consulta atual cobre {buildPeriodSummary(appliedPeriod.periodStart, appliedPeriod.periodEnd)} com carregamento progressivo.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-4 p-4 pt-0">
           {historyQuery.isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }, (_, index) => (
@@ -577,10 +621,10 @@ export function HistoryPage() {
                       return (
                         <article
                           key={assignment.id}
-                          className="rounded-xl border border-border bg-background px-5 py-4"
+                          className="rounded-lg border border-border bg-background px-3 py-3"
                         >
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="space-y-3">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0 space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <Badge className={getStatusClassName(assignment.status)}>
                                   {assignmentStatusLabels[assignment.status]}
@@ -594,7 +638,7 @@ export function HistoryPage() {
                               </div>
 
                               <div>
-                                <p className="text-lg font-semibold text-foreground">
+                                <p className="text-base font-semibold leading-tight text-foreground">
                                   {assignment.themeNumber} - {assignment.themeTitle}
                                 </p>
                                 <p className="mt-1 text-sm text-muted-foreground">
@@ -603,7 +647,7 @@ export function HistoryPage() {
                               </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-x-5 gap-y-2 lg:max-w-[420px] lg:justify-end">
+                            <div className="flex flex-wrap gap-x-3 gap-y-1.5 lg:max-w-[420px] lg:justify-end">
                               <MetadataChip
                                 label="Destino"
                                 value={assignment.localCongregationName}
@@ -620,7 +664,7 @@ export function HistoryPage() {
                           </div>
 
                           {assignment.notes ? (
-                            <div className="mt-4 border-l-2 border-border py-0.5 pl-3 text-sm leading-6 text-muted-foreground">
+                            <div className="mt-3 border-l-2 border-border py-0.5 pl-3 text-sm leading-6 text-muted-foreground">
                               {assignment.notes}
                             </div>
                           ) : null}
@@ -654,6 +698,6 @@ export function HistoryPage() {
           ) : null}
         </CardContent>
       </Card>
-    </div>
+    </EntityPageShell>
   )
 }

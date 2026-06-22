@@ -37,5 +37,14 @@ export async function refreshApp(): Promise<void> {
     await registration?.update()
   }
 
+  if ('caches' in window) {
+    const cacheNames = await caches.keys()
+    await Promise.all(
+      cacheNames
+        .filter((cacheName) => cacheName.startsWith('gestao-discursos-'))
+        .map((cacheName) => caches.delete(cacheName)),
+    )
+  }
+
   window.location.reload()
 }

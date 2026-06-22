@@ -18,7 +18,6 @@ import {
   Plus,
   Search,
   Speech,
-  Undo2,
   XCircle,
   type LucideIcon,
 } from 'lucide-react'
@@ -27,20 +26,18 @@ import { useForm, useWatch } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 
+import { ActionMenu } from '@/components/app/action-menu'
 import { EmptyState } from '@/components/app/empty-state'
+import { EntityPageShell } from '@/components/app/entity-page-shell'
+import { EntityToolbar } from '@/components/app/entity-toolbar'
 import { MetadataChip } from '@/components/app/metadata-chip'
+import { MetricStrip } from '@/components/app/metric-strip'
 import { PageHeader } from '@/components/app/page-header'
-import { PageHeaderStat } from '@/components/app/page-header-stat'
+import { ResponsiveFormPanel } from '@/components/app/responsive-form-panel'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
@@ -105,6 +102,7 @@ type ThemeCategoryFilter = 'all' | ThemeCategory
 const selectClassName =
   'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70'
 const emailDeliveryConfigured = isEmailDeliveryConfigured()
+const assignmentFormId = 'assignment-form'
 
 const assignmentFormSchema = z.object({
   calendarEventId: z.string().trim().min(1, 'Selecione o sábado da designação.'),
@@ -616,6 +614,7 @@ export function AssignmentsPage() {
   const [visitorCongregationFilterId, setVisitorCongregationFilterId] = useState('')
   const [meetingDateDraft, setMeetingDateDraft] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isFormPanelOpen, setIsFormPanelOpen] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [dateFieldFeedback, setDateFieldFeedback] = useState<string | null>(null)
   const [movementTypeOverride, setMovementTypeOverride] = useState<MovementType | null>(
@@ -731,8 +730,20 @@ export function AssignmentsPage() {
     [congregationsQuery.data],
   )
   const calendarEventsById = useMemo(
-    () => new Map((calendarEventsQuery.data ?? []).map((item) => [item.id, item])),
-    [calendarEventsQuery.data],
+    () =>
+      new Map(
+        [
+          ...(calendarEventsQuery.data ?? []),
+          ...(shouldLoadRequestedCalendarEventYear
+            ? requestedYearCalendarEventsQuery.data ?? []
+            : []),
+        ].map((item) => [item.id, item]),
+      ),
+    [
+      calendarEventsQuery.data,
+      requestedYearCalendarEventsQuery.data,
+      shouldLoadRequestedCalendarEventYear,
+    ],
   )
   const speakersById = useMemo(
     () => new Map((speakersQuery.data ?? []).map((item) => [item.id, item])),
@@ -803,13 +814,6 @@ export function AssignmentsPage() {
       meetingDayEligibleEvents.length > 0 ? meetingDayEligibleEvents : eligibleEvents,
     [eligibleEvents, meetingDayEligibleEvents],
   )
-  const quickSelectableEvents = useMemo(() => {
-    const futureEvents = selectableEvents.filter(
-      (event) => getLocalDateKey(event.date.toDate()) >= todayDateKey,
-    )
-
-    return (futureEvents.length > 0 ? futureEvents : selectableEvents).slice(0, 6)
-  }, [selectableEvents, todayDateKey])
   const selectableEventsByDateInputValue = useMemo(
     () =>
       new Map(
@@ -858,7 +862,7 @@ export function AssignmentsPage() {
 
   const {
     control,
-    formState: { errors, isDirty },
+    formState: { errors },
     handleSubmit,
     register,
     reset,
@@ -963,6 +967,22 @@ export function AssignmentsPage() {
 
   const selectedEvent =
     eligibleEvents.find((event) => event.id === watchedCalendarEventId) ?? null
+  const quickSelectableEvents = useMemo(() => {
+    const futureEvents = selectableEvents.filter(
+      (event) => getLocalDateKey(event.date.toDate()) >= todayDateKey,
+    )
+    const baseQuickEvents = (futureEvents.length > 0 ? futureEvents : selectableEvents)
+      .slice(0, 6)
+
+    if (
+      selectedEvent &&
+      !baseQuickEvents.some((event) => event.id === selectedEvent.id)
+    ) {
+      return [selectedEvent, ...baseQuickEvents].slice(0, 6)
+    }
+
+    return baseQuickEvents
+  }, [selectableEvents, selectedEvent, todayDateKey])
   const meetingDateValue =
     meetingDateDraft ?? (selectedEvent ? getLocalDateKey(selectedEvent.date.toDate()) : '')
   const requestedCalendarEvent =
@@ -1123,6 +1143,11 @@ export function AssignmentsPage() {
     speakersQuery.error,
     themesQuery.error,
   ].filter(Boolean)
+  const isDashboardHandoffPanelOpen = Boolean(
+    requestedCalendarEventId.length > 0 && requestedCalendarEvent,
+  )
+  const isAssignmentFormPanelOpen =
+    isFormPanelOpen || isDashboardHandoffPanelOpen
 
   useEffect(() => {
     if (
@@ -1310,6 +1335,7 @@ export function AssignmentsPage() {
     setVisitorCongregationFilterId('')
     setMeetingDateDraft(null)
     setDateFieldFeedback(null)
+    setIsFormPanelOpen(true)
     reset(
       buildCreateFormValues(
         nextMovementType,
@@ -1337,6 +1363,7 @@ export function AssignmentsPage() {
     setMeetingDateDraft(null)
     setDateFieldFeedback(null)
     setMovementTypeOverride(nextMovementType)
+    setIsFormPanelOpen(true)
     reset(toAssignmentFormValues(assignment))
   }
 
@@ -1357,12 +1384,34 @@ export function AssignmentsPage() {
     )
     setMeetingDateDraft(null)
     setDateFieldFeedback(null)
+    setIsFormPanelOpen(true)
     reset({
       ...buildCreateFormValues(nextMovementType, assignment.localCongregationId),
       calendarEventId: assignment.calendarEventId,
       localCongregationId: assignment.localCongregationId,
       status: 'pending',
     })
+  }
+
+  function handleCloseAssignmentForm() {
+    const nextMovementType = preferredMovementType
+
+    setSearchParams({}, { replace: true })
+    setEditingId(null)
+    setFeedback(null)
+    setMovementTypeOverride(null)
+    setThemeCategoryFilter('all')
+    setThemeSearchTerm('')
+    setVisitorCongregationFilterId('')
+    setMeetingDateDraft(null)
+    setDateFieldFeedback(null)
+    setIsFormPanelOpen(false)
+    reset(
+      buildCreateFormValues(
+        nextMovementType,
+        getDefaultDestinationId(nextMovementType),
+      ),
+    )
   }
 
   function handleVisitorCongregationFilterChange(nextCongregationId: string) {
@@ -1495,6 +1544,7 @@ export function AssignmentsPage() {
       setThemeSearchTerm('')
       setVisitorCongregationFilterId('')
       setMeetingDateDraft(null)
+      setIsFormPanelOpen(false)
       reset(
         buildCreateFormValues(
           movementType,
@@ -1743,102 +1793,222 @@ export function AssignmentsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <EntityPageShell>
       <PageHeader
         eyebrow="Operação"
         title="Designações"
         description="Defina orador e tema para cada sábado de reunião, com visitantes, locais e confirmações no mesmo fluxo."
-        actions={<Badge className="bg-primary/10 text-primary">{activeYear}</Badge>}
-        meta={
-          <>
-            <PageHeaderStat
-              label="Cadastradas"
-              value={String(assignments.length)}
-              icon={Speech}
-              tone="blue"
-            />
-            <PageHeaderStat
-              label="Pendentes"
-              value={String(pendingAssignmentsCount)}
-              icon={Clock3}
-              tone="amber"
-            />
-            <PageHeaderStat
-              label="Confirmadas"
-              value={String(confirmedAssignmentsCount)}
-              icon={CheckCircle2}
-              tone="green"
-            />
-            <PageHeaderStat
-              label="Encerradas"
-              value={String(closedAssignmentsCount)}
-              icon={XCircle}
-              tone="slate"
-            />
-          </>
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-primary/10 text-primary">{activeYear}</Badge>
+            <Button onClick={handleStartCreate} disabled={isSubmitting}>
+              <Plus className="size-4" />
+              Nova designação
+            </Button>
+          </div>
         }
       />
 
-      <section className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card>
-          <CardHeader className="gap-4 pb-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-2xl">
-                  {editingAssignment ? 'Editar designação' : 'Nova designação'}
-                </CardTitle>
-                <CardDescription>
-                  {editingAssignment
-                    ? 'Atualize status, observações, destino e tema sem perder o histórico da data.'
-                    : 'Escolha o sábado, o orador e o tema do discurso público.'}
-                </CardDescription>
-              </div>
-              {editingAssignment ? (
+      <MetricStrip
+        items={[
+          {
+            label: 'Cadastradas',
+            value: String(assignments.length),
+            icon: Speech,
+            tone: 'blue',
+          },
+          {
+            label: 'Pendentes',
+            value: String(pendingAssignmentsCount),
+            icon: Clock3,
+            tone: 'amber',
+          },
+          {
+            label: 'Confirmadas',
+            value: String(confirmedAssignmentsCount),
+            icon: CheckCircle2,
+            tone: 'green',
+          },
+          {
+            label: 'Encerradas',
+            value: String(closedAssignmentsCount),
+            icon: XCircle,
+            tone: 'slate',
+          },
+        ]}
+      />
+
+      <EntityToolbar
+        searchValue={searchTerm}
+        searchPlaceholder="Buscar por orador, tema ou congregação..."
+        onSearchChange={setSearchTerm}
+        filters={
+          <>
+            <select
+              className={selectClassName}
+              value={movementFilter}
+              onChange={(event) =>
+                setMovementFilter(event.target.value as 'all' | MovementType)
+              }
+            >
+              <option value="all">Todos os movimentos</option>
+              <option value="incoming">Oradores visitantes</option>
+              <option value="local">Designações locais</option>
+              <option value="outgoing">Discursos fora</option>
+            </select>
+            <select
+              className={selectClassName}
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as 'all' | AssignmentStatus)
+              }
+            >
+              <option value="all">Todos os status</option>
+              {editableStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.title}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+        summary={
+          <div className="flex h-10 items-center gap-2 rounded-full border border-border bg-background px-3 text-xs text-muted-foreground">
+            <span>Resultados</span>
+            <span className="font-medium text-foreground">
+              {filteredAssignments.length}/{assignments.length}
+            </span>
+          </div>
+        }
+      />
+
+      <section className="space-y-4">
+        <ResponsiveFormPanel
+          open={isAssignmentFormPanelOpen}
+          onOpenChange={(open) => {
+            if (open) {
+              setIsFormPanelOpen(true)
+              return
+            }
+
+            handleCloseAssignmentForm()
+          }}
+          title={editingAssignment ? 'Editar designação' : 'Nova designação'}
+          description={
+            editingAssignment
+              ? 'Atualize status, observações, destino e tema sem perder o histórico da data.'
+              : 'Escolha o sábado, o orador e o tema do discurso público.'
+          }
+          className="max-w-5xl"
+          bodyClassName="pt-0 sm:pt-0"
+          footer={
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-muted-foreground">
+                {editingAssignment
+                  ? `Última atualização em ${formatUpdatedAt(
+                      editingAssignment.updatedAt.toDate(),
+                    )}.`
+                  : 'As validações de tema, disponibilidade e bloqueio de datas continuam ativas ao salvar.'}
+              </p>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <Button
                   variant="outline"
-                  onClick={handleStartCreate}
+                  type="button"
+                  onClick={handleCloseAssignmentForm}
                   disabled={isSubmitting}
                 >
-                  Cancelar edição
+                  Cancelar
                 </Button>
-              ) : null}
+                <Button
+                  type="submit"
+                  form={assignmentFormId}
+                  disabled={isSubmitting || !canSubmit}
+                >
+                  <Plus className="size-4" />
+                  {editingAssignment ? 'Salvar alterações' : 'Salvar designação'}
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="sticky top-0 z-20 -mx-4 border-b border-border/80 bg-card/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                <span className="shrink-0 font-semibold text-foreground">
+                  Resumo
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex max-w-[9rem] shrink-0 items-center gap-1 rounded-full border px-2 py-1',
+                    selectedEvent
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
+                      : 'border-border bg-background text-muted-foreground',
+                  )}
+                >
+                  <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Data
+                  </span>
+                  <span className="truncate font-medium">
+                    {selectedEvent
+                      ? formatTimestampDate(selectedEvent.date)
+                      : 'Escolha'}
+                  </span>
+                </span>
+                <span className="inline-flex max-w-[10rem] shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-muted-foreground">
+                  <span className="text-[10px] font-semibold uppercase">Tipo</span>
+                  <span className="truncate font-medium text-foreground">
+                    {selectedMovementOption?.title ?? 'Designação'}
+                  </span>
+                </span>
+                <span className="inline-flex max-w-[11rem] shrink-0 items-center gap-1 rounded-full border border-border bg-background px-2 py-1 text-muted-foreground">
+                  <span className="text-[10px] font-semibold uppercase">Destino</span>
+                  <span className="truncate font-medium text-foreground">
+                    {destinationSummaryLabel}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex max-w-[11rem] shrink-0 items-center gap-1 rounded-full border px-2 py-1',
+                    selectedSpeaker
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
+                      : 'border-border bg-background text-muted-foreground',
+                  )}
+                >
+                  <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Orador
+                  </span>
+                  <span className="truncate font-medium">{speakerSummaryLabel}</span>
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex max-w-[9rem] shrink-0 items-center gap-1 rounded-full border px-2 py-1',
+                    selectedTheme
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100'
+                      : 'border-border bg-background text-muted-foreground',
+                  )}
+                >
+                  <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Tema
+                  </span>
+                  <span className="truncate font-medium">{themeSummaryLabel}</span>
+                </span>
+                <span className="inline-flex max-w-[9rem] shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+                  <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                    Status
+                  </span>
+                  <span className="truncate font-medium">
+                    {selectedStatusOption?.title ?? assignmentStatusLabels[watchedStatus]}
+                  </span>
+                </span>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <MetadataChip
-                label="Tipo"
-                value={selectedMovementOption?.title ?? 'Designação'}
-              />
-              <MetadataChip
-                label="Data"
-                tone={selectedEvent ? 'success' : 'pending'}
-                value={
-                  selectedEvent
-                    ? formatTimestampDate(selectedEvent.date)
-                    : 'Escolha data'
-                }
-              />
-              <MetadataChip label="Destino" value={destinationSummaryLabel} />
-              <MetadataChip
-                label="Orador"
-                tone={selectedSpeaker ? 'success' : 'pending'}
-                value={speakerSummaryLabel}
-              />
-              <MetadataChip
-                label="Tema"
-                tone={selectedTheme ? 'success' : 'pending'}
-                value={themeSummaryLabel}
-              />
-              <MetadataChip
-                label="Status"
-                tone={watchedStatus === 'confirmed' ? 'success' : 'warning'}
-                value={selectedStatusOption?.title ?? assignmentStatusLabels[watchedStatus]}
-              />
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            <form className="space-y-4" onSubmit={submitHandler}>
+            <form
+              id={assignmentFormId}
+              className="space-y-4"
+              onSubmit={submitHandler}
+            >
               <div className="grid gap-4">
                 <div className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Tipo de designação</span>
@@ -2401,101 +2571,12 @@ export function AssignmentsPage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {editingAssignment
-                    ? `Última atualização em ${formatUpdatedAt(
-                        editingAssignment.updatedAt.toDate(),
-                      )}.`
-                    : 'As validações de tema, disponibilidade e bloqueio de datas continuam ativas ao salvar.'}
-                </p>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    type="button"
-                    disabled={isSubmitting || !isDirty}
-                    onClick={() =>
-                      reset(
-                        editingAssignment
-                          ? toAssignmentFormValues(editingAssignment)
-                          : buildCreateFormValues(
-                              movementType,
-                              getDefaultDestinationId(movementType),
-                            ),
-                      )
-                    }
-                  >
-                    <Undo2 className="size-4" />
-                    Restaurar
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting || !canSubmit}>
-                    <Plus className="size-4" />
-                    {editingAssignment ? 'Salvar alterações' : 'Salvar designação'}
-                  </Button>
-                </div>
-              </div>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </ResponsiveFormPanel>
 
         <Card>
-          <CardHeader className="gap-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <CardTitle className="text-2xl">Designações do ano</CardTitle>
-                <CardDescription>
-                  Localize, confirme, substitua ou cancele uma designação sem sair da mesma tela.
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2 self-start rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                <span>Resultados</span>
-                <span className="font-medium text-foreground">
-                  {filteredAssignments.length}/{assignments.length}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-[1.15fr_220px_220px]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-11"
-                  placeholder="Buscar por orador, tema ou congregação..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                />
-              </div>
-              <select
-                className={selectClassName}
-                value={movementFilter}
-                onChange={(event) =>
-                  setMovementFilter(event.target.value as 'all' | MovementType)
-                }
-              >
-                <option value="all">Todos os movimentos</option>
-                <option value="incoming">Oradores visitantes</option>
-                <option value="local">Designações locais</option>
-                <option value="outgoing">Discursos fora</option>
-              </select>
-              <select
-                className={selectClassName}
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as 'all' | AssignmentStatus)
-                }
-              >
-                <option value="all">Todos os status</option>
-                {editableStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-3 sm:p-4">
             {assignmentsQuery.isLoading || calendarEventsQuery.isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }, (_, index) => (
@@ -2625,9 +2706,9 @@ export function AssignmentsPage() {
                   return (
                     <div
                       key={assignment.id}
-                      className="rounded-xl border border-border bg-background p-3.5 sm:p-4"
+                      className="rounded-lg border border-border bg-card p-3 shadow-sm"
                     >
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant="outline">{movementLabel}</Badge>
@@ -2639,49 +2720,24 @@ export function AssignmentsPage() {
                             </span>
                           </div>
 
-                          <h3 className="mt-3 text-xl font-semibold text-foreground">
+                          <h3 className="mt-2 text-lg font-semibold leading-tight text-foreground">
                             {assignment.speakerName}
                           </h3>
 
-                          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
-                            <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-                              <div className="flex items-start gap-3">
-                                <CalendarDays className="mt-0.5 size-4 text-primary" />
-                                <div>
-                                  <p className="text-sm font-medium text-foreground">
-                                    Sábado
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {calendarEventTypeLabels[assignment.eventType]}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {assignment.localCongregationName}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="rounded-lg bg-muted/40 px-3 py-2.5">
-                              <div className="flex items-start gap-3">
-                                <MapPinned className="mt-0.5 size-4 text-primary" />
-                                <div>
-                                  <p className="text-sm font-medium text-foreground">
-                                    Origem
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {assignment.originCongregationName}
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {assignment.speakerType === 'visitor'
-                                      ? 'Visitante'
-                                      : 'Local'}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
+                          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5">
+                              <CalendarDays className="size-4 text-primary" />
+                              {calendarEventTypeLabels[assignment.eventType]} em{' '}
+                              {assignment.localCongregationName}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <MapPinned className="size-4 text-primary" />
+                              {assignment.originCongregationName} ·{' '}
+                              {assignment.speakerType === 'visitor' ? 'Visitante' : 'Local'}
+                            </span>
                           </div>
 
-                          <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+                          <div className="mt-2 space-y-2 text-sm text-muted-foreground">
                             <div className="flex items-start gap-3">
                               <Mic2 className="mt-0.5 size-4 text-primary" />
                               <div>
@@ -2716,17 +2772,17 @@ export function AssignmentsPage() {
 
                             {googleCalendarSyncState ? (
                               <div
-                                className={`rounded-xl border px-4 py-3.5 ${getGoogleCalendarSyncBadgeClassName(
+                                className={`rounded-lg border px-3 py-2 ${getGoogleCalendarSyncBadgeClassName(
                                   googleCalendarSyncState.tone,
                                 )}`}
                               >
                                 <div className="flex items-start gap-3">
                                   <GoogleCalendarButtonMark />
                                   <div>
-                                    <p className="text-sm font-medium">
+                                    <p className="text-xs font-semibold">
                                       {googleCalendarSyncState.label}
                                     </p>
-                                    <p className="mt-1 text-sm leading-6">
+                                    <p className="mt-1 text-xs leading-5">
                                       {googleCalendarSyncState.description}
                                     </p>
                                   </div>
@@ -2736,12 +2792,9 @@ export function AssignmentsPage() {
                           </div>
                         </div>
 
-                        <div className="grid gap-3 border-t border-border pt-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                        <div className="grid gap-3 border-t border-border pt-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                           {hasCommunicationActions ? (
-                            <div className="min-w-0 space-y-2">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Comunicação
-                              </p>
+                            <div className="min-w-0">
                               <div
                                 className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap"
                                 role="group"
@@ -2803,61 +2856,59 @@ export function AssignmentsPage() {
                             </div>
                           ) : null}
 
-                          <div className="space-y-2 lg:justify-self-end">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:text-right">
-                              Gerenciar
-                            </p>
-                            <div
-                              className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end"
-                              role="group"
-                              aria-label="Ações da designação"
+                          <div
+                            className="flex items-center justify-end gap-2"
+                            role="group"
+                            aria-label="Ações da designação"
+                          >
+                            <Button
+                              className="w-full sm:w-auto"
+                              size="sm"
+                              onClick={() => handleStartEdit(assignment.id)}
+                              disabled={isSubmitting}
                             >
-                              {hasQuickConfirm ? (
-                                <Button
-                                  className="w-full lg:w-auto"
-                                  size="sm"
-                                  onClick={() => handleQuickConfirm(assignment.id)}
-                                  disabled={isSubmitting}
-                                >
-                                  <CheckCircle2 className="size-4" />
-                                  Confirmar
-                                </Button>
-                              ) : null}
-                              {canQuickCancel ? (
-                                <Button
-                                  className="w-full lg:w-auto"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleQuickCancel(assignment)}
-                                  disabled={isSubmitting}
-                                >
-                                  <XCircle className="size-4" />
-                                  Cancelar
-                                </Button>
-                              ) : null}
-                              {isAssignmentCoveringCalendarSlot(assignment.status) ? (
-                                <Button
-                                  className="w-full lg:w-auto"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleStartReplacement(assignment)}
-                                  disabled={isSubmitting}
-                                >
-                                  <ArrowRightLeft className="size-4" />
-                                  Substituir
-                                </Button>
-                              ) : null}
-                              <Button
-                                className="w-full lg:w-auto"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleStartEdit(assignment.id)}
-                                disabled={isSubmitting}
-                              >
-                                <PencilLine className="size-4" />
-                                Editar
-                              </Button>
-                            </div>
+                              <PencilLine className="size-4" />
+                              Editar
+                            </Button>
+                            {hasQuickConfirm ||
+                            canQuickCancel ||
+                            isAssignmentCoveringCalendarSlot(assignment.status) ? (
+                              <ActionMenu
+                                items={[
+                                  ...(hasQuickConfirm
+                                    ? [
+                                        {
+                                          label: 'Confirmar',
+                                          icon: CheckCircle2,
+                                          disabled: isSubmitting,
+                                          onSelect: () => handleQuickConfirm(assignment.id),
+                                        },
+                                      ]
+                                    : []),
+                                  ...(isAssignmentCoveringCalendarSlot(assignment.status)
+                                    ? [
+                                        {
+                                          label: 'Substituir',
+                                          icon: ArrowRightLeft,
+                                          disabled: isSubmitting,
+                                          onSelect: () => handleStartReplacement(assignment),
+                                        },
+                                      ]
+                                    : []),
+                                  ...(canQuickCancel
+                                    ? [
+                                        {
+                                          label: 'Cancelar',
+                                          icon: XCircle,
+                                          disabled: isSubmitting,
+                                          tone: 'danger' as const,
+                                          onSelect: () => handleQuickCancel(assignment),
+                                        },
+                                      ]
+                                    : []),
+                                ]}
+                              />
+                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -2869,6 +2920,6 @@ export function AssignmentsPage() {
           </CardContent>
         </Card>
       </section>
-    </div>
+    </EntityPageShell>
   )
 }

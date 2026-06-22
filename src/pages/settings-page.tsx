@@ -11,10 +11,12 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 
+import { CompactEntityCard } from '@/components/app/compact-entity-card'
+import { EntityPageShell } from '@/components/app/entity-page-shell'
 import { EmptyState } from '@/components/app/empty-state'
 import { MetadataChip } from '@/components/app/metadata-chip'
+import { MetricStrip } from '@/components/app/metric-strip'
 import { PageHeader } from '@/components/app/page-header'
-import { PageHeaderStat } from '@/components/app/page-header-stat'
 import { AdminUsersCard } from '@/components/settings/admin-users-card'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
@@ -228,59 +230,68 @@ export function SettingsPage() {
   const isCalendarSaving = saveCalendarSettingsMutation.isPending
 
   return (
-    <div className="space-y-5">
+    <EntityPageShell>
       <PageHeader
         eyebrow="Ajustes do sistema"
         title="Configurações"
         description="Defina a base do painel, mantenha a integração da agenda alinhada e acompanhe os últimos envios e movimentos administrativos."
-        meta={
-          <>
-            <PageHeaderStat
-              label="Painel"
-              value={persistedSettings ? 'Configurado' : 'Pendente'}
-              icon={Settings2}
-              tone={persistedSettings ? 'green' : 'amber'}
-            />
-            <PageHeaderStat
-              label="Agenda"
-              value={persistedCalendarSettings?.enabled ? 'Ativa' : 'Desligada'}
-              icon={CalendarDays}
-              tone={persistedCalendarSettings?.enabled ? 'green' : 'slate'}
-            />
-            <PageHeaderStat
-              label="Último ciclo"
-              value={getCalendarRunStatusLabel(persistedCalendarSettings?.lastSyncStatus)}
-              icon={Clock3}
-              tone={
-                persistedCalendarSettings?.lastSyncStatus === 'error'
-                  ? 'amber'
-                  : persistedCalendarSettings?.lastSyncStatus === 'success'
-                    ? 'green'
-                    : 'blue'
-              }
-            />
-            <PageHeaderStat
-              label="Pendentes"
-              value={String(pendingNotifications.length)}
-              icon={BellRing}
-              tone={pendingNotifications.length > 0 ? 'amber' : 'green'}
-            />
-            <PageHeaderStat
-              label="Falhas"
-              value={String(failedNotifications.length)}
-              icon={ShieldCheck}
-              tone={failedNotifications.length > 0 ? 'amber' : 'green'}
-            />
-          </>
-        }
+      />
+
+      <MetricStrip
+        items={[
+          {
+            label: 'Painel',
+            value: persistedSettings ? 'Configurado' : 'Pendente',
+            detail: persistedSettings
+              ? `Ano ${persistedSettings.defaultYear}`
+              : 'Configuração inicial',
+            icon: Settings2,
+            tone: persistedSettings ? 'green' : 'amber',
+          },
+          {
+            label: 'Agenda',
+            value: persistedCalendarSettings?.enabled ? 'Ativa' : 'Desligada',
+            detail: persistedCalendarSettings?.calendarId
+              ? persistedCalendarSettings.calendarId
+              : 'Sem calendário remoto',
+            icon: CalendarDays,
+            tone: persistedCalendarSettings?.enabled ? 'green' : 'slate',
+          },
+          {
+            label: 'Último ciclo',
+            value: getCalendarRunStatusLabel(
+              persistedCalendarSettings?.lastSyncStatus,
+            ),
+            detail:
+              persistedCalendarSettings?.lastSyncMessage ??
+              'Aguardando retorno da automação',
+            icon: Clock3,
+            tone:
+              persistedCalendarSettings?.lastSyncStatus === 'error'
+                ? 'amber'
+                : persistedCalendarSettings?.lastSyncStatus === 'success'
+                  ? 'green'
+                  : 'blue',
+          },
+          {
+            label: 'Fila',
+            value: `${pendingNotifications.length}/${failedNotifications.length}`,
+            detail: 'Pendentes / falhas',
+            icon: BellRing,
+            tone:
+              pendingNotifications.length > 0 || failedNotifications.length > 0
+                ? 'amber'
+                : 'green',
+          },
+        ]}
       />
 
       <section className="grid gap-5 xl:grid-cols-[1.06fr_0.94fr]">
         <div className="space-y-5">
-          <Card>
-            <CardHeader>
+          <Card className="rounded-lg shadow-sm">
+            <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Settings2 className="size-5" />
                 </div>
                 <div>
@@ -293,7 +304,7 @@ export function SettingsPage() {
             </CardHeader>
 
             <CardContent>
-              <form className="space-y-5" onSubmit={submitAppHandler}>
+              <form className="space-y-4" onSubmit={submitAppHandler}>
                 <div className="grid gap-4 md:max-w-[18rem]">
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-foreground">
@@ -372,11 +383,11 @@ export function SettingsPage() {
 
           <AdminUsersCard />
 
-          <Card>
-            <CardHeader>
+          <Card className="rounded-lg shadow-sm">
+            <CardHeader className="pb-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <CalendarDays className="size-5" />
                   </div>
                   <div>
@@ -400,9 +411,9 @@ export function SettingsPage() {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-5">
-              <form className="space-y-5" onSubmit={submitCalendarHandler}>
-                <label className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3.5">
+            <CardContent className="space-y-4">
+              <form className="space-y-4" onSubmit={submitCalendarHandler}>
+                <label className="flex items-start gap-3 rounded-lg border border-border bg-background px-4 py-3">
                   <input
                     type="checkbox"
                     className="mt-1 size-4 rounded border-border text-primary"
@@ -552,8 +563,8 @@ export function SettingsPage() {
         </div>
 
         <div className="space-y-5">
-          <Card>
-            <CardHeader>
+          <Card className="rounded-lg shadow-sm">
+            <CardHeader className="pb-3">
               <CardTitle>Fila de notificações</CardTitle>
               <CardDescription>
                 Acompanhe o que ainda será enviado e o que precisa de nova tentativa.
@@ -594,27 +605,25 @@ export function SettingsPage() {
               (pendingNotifications.length > 0 || failedNotifications.length > 0) ? (
                 <div className="space-y-3">
                   {[...pendingNotifications, ...failedNotifications].map((notification) => (
-                    <div
+                    <CompactEntityCard
                       key={notification.id}
-                      className="rounded-xl border border-border bg-background px-4 py-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {notificationTypeLabels[notification.type]}
-                          </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {notification.recipientEmail}
-                          </p>
+                      className="bg-background"
+                      leading={
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <BellRing className="size-4" />
                         </div>
+                      }
+                      title={notificationTypeLabels[notification.type]}
+                      subtitle={notification.recipientEmail}
+                      badges={
                         <Badge
                           className={getNotificationStatusClassName(notification.status)}
                         >
                           {notificationStatusLabels[notification.status]}
                         </Badge>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
+                      }
+                      metadata={
+                        <>
                         <MetadataChip
                           label="Agendado"
                           value={formatTimestampDate(notification.scheduledFor)}
@@ -627,22 +636,24 @@ export function SettingsPage() {
                           label="Tentativas"
                           value={String(notification.retryCount)}
                         />
-                      </div>
-
-                      {notification.errorMessage ? (
-                        <p className="mt-3 text-sm leading-6 text-rose-700 dark:text-rose-200">
-                          {notification.errorMessage}
-                        </p>
-                      ) : null}
-                    </div>
+                        </>
+                      }
+                      alert={
+                        notification.errorMessage ? (
+                          <p className="text-sm leading-5 text-rose-700 dark:text-rose-200">
+                            {notification.errorMessage}
+                          </p>
+                        ) : null
+                      }
+                    />
                   ))}
                 </div>
               ) : null}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="rounded-lg shadow-sm">
+            <CardHeader className="pb-3">
               <CardTitle>Atividade recente</CardTitle>
               <CardDescription>
                 Últimos movimentos administrativos registrados no sistema.
@@ -680,31 +691,31 @@ export function SettingsPage() {
               recentAuditLogs.length > 0 ? (
                 <div className="space-y-3">
                   {recentAuditLogs.map((auditLog) => (
-                    <div
+                    <CompactEntityCard
                       key={auditLog.id}
-                      className="rounded-xl border border-border bg-background px-4 py-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {auditEntityTypeLabels[auditLog.entityType]}
-                          </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {auditLog.actorName ?? 'Administrador'}
-                          </p>
+                      className="bg-background"
+                      leading={
+                        <div className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                          <ShieldCheck className="size-4" />
                         </div>
+                      }
+                      title={auditEntityTypeLabels[auditLog.entityType]}
+                      subtitle={auditLog.actorName ?? 'Administrador'}
+                      badges={
                         <Badge className={getAuditActionClassName(auditLog.action)}>
                           {auditActionLabels[auditLog.action]}
                         </Badge>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-3">
+                      }
+                      metadata={
+                        <>
                         <MetadataChip
                           label="Em"
                           value={formatTimestampDate(auditLog.createdAt)}
                         />
                         <MetadataChip label="Registro" value={auditLog.entityId} />
-                      </div>
-                    </div>
+                        </>
+                      }
+                    />
                   ))}
                 </div>
               ) : null}
@@ -712,6 +723,6 @@ export function SettingsPage() {
           </Card>
         </div>
       </section>
-    </div>
+    </EntityPageShell>
   )
 }

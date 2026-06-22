@@ -1,6 +1,7 @@
 import { Suspense, type ReactNode } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 
+import { AppRouteErrorBoundary } from '@/components/app/app-route-error-boundary'
 import { RouteLoadingScreen } from '@/components/app/route-loading-screen'
 import { GuestRoute } from '@/components/auth/guest-route'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -25,10 +26,12 @@ export const appRouter = createBrowserRouter([
   {
     path: '/confirmacao/designacao',
     element: withRouteLoadingFallback(<PublicAssignmentConfirmationPage />),
+    errorElement: <AppRouteErrorBoundary />,
   },
   {
     path: '/login',
     element: <GuestRoute />,
+    errorElement: <AppRouteErrorBoundary />,
     children: [
       {
         index: true,
@@ -39,9 +42,11 @@ export const appRouter = createBrowserRouter([
   {
     path: '/',
     element: <ProtectedRoute />,
+    errorElement: <AppRouteErrorBoundary />,
     children: [
       {
         element: withRouteLoadingFallback(<AppShell />),
+        errorElement: <AppRouteErrorBoundary />,
         children: [
           {
             index: true,

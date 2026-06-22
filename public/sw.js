@@ -1,4 +1,6 @@
-const CACHE_NAME = 'gestao-discursos-v1'
+const swUrl = new URL(self.location.href)
+const appVersion = swUrl.searchParams.get('v') || 'dev'
+const CACHE_NAME = `gestao-discursos-${appVersion}`
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -11,7 +13,11 @@ const APP_SHELL = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
+    caches.open(CACHE_NAME).then((cache) =>
+      cache.addAll(
+        APP_SHELL.map((url) => new Request(url, { cache: 'reload' })),
+      ),
+    ),
   )
   self.skipWaiting()
 })
@@ -41,10 +47,15 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(new Request(request, { cache: 'reload' }))
         .then((response) => {
-          const responseCopy = response.clone()
-          void caches.open(CACHE_NAME).then((cache) => cache.put('/', responseCopy))
+          const contentType = response.headers.get('content-type') || ''
+
+          if (response.ok && contentType.includes('text/html')) {
+            const responseCopy = response.clone()
+            void caches.open(CACHE_NAME).then((cache) => cache.put('/', responseCopy))
+          }
+
           return response
         })
         .catch(() => caches.match('/')),
@@ -58,8 +69,13 @@ self.addEventListener('fetch', (event) => {
         (cachedResponse) =>
           cachedResponse ??
           fetch(request).then((response) => {
-            const responseCopy = response.clone()
-            void caches.open(CACHE_NAME).then((cache) => cache.put(request, responseCopy))
+            const contentType = response.headers.get('content-type') || ''
+
+            if (response.ok && !contentType.includes('text/html')) {
+              const responseCopy = response.clone()
+              void caches.open(CACHE_NAME).then((cache) => cache.put(request, responseCopy))
+            }
+
             return response
           }),
       ),

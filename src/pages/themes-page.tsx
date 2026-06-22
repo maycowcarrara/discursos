@@ -7,7 +7,7 @@ import {
   FolderTree,
   PencilLine,
   Plus,
-  Search,
+  RotateCcw,
   Sparkles,
   Trash2,
 } from 'lucide-react'
@@ -15,10 +15,15 @@ import { useState, type ChangeEvent } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
+import { ActionMenu } from '@/components/app/action-menu'
+import { CompactEntityCard } from '@/components/app/compact-entity-card'
 import { EmptyState } from '@/components/app/empty-state'
+import { EntityPageShell } from '@/components/app/entity-page-shell'
+import { EntityToolbar } from '@/components/app/entity-toolbar'
 import { MetadataChip } from '@/components/app/metadata-chip'
+import { MetricStrip } from '@/components/app/metric-strip'
 import { PageHeader } from '@/components/app/page-header'
-import { PageHeaderStat } from '@/components/app/page-header-stat'
+import { ResponsiveFormPanel } from '@/components/app/responsive-form-panel'
 import { useAuth } from '@/components/auth/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -85,6 +90,7 @@ const themeFormSchema = z.object({
 })
 
 type ThemeCategoryFilter = 'all' | ThemeCategory
+type ThemeStatusFilter = 'all' | 'active' | 'inactive'
 
 type FeedbackState =
   | {
@@ -129,7 +135,9 @@ export function ThemesPage() {
   const toast = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<ThemeCategoryFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<ThemeStatusFilter>('all')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isFormPanelOpen, setIsFormPanelOpen] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isParsingImport, setIsParsingImport] = useState(false)
@@ -171,8 +179,11 @@ export function ThemesPage() {
 
   const filteredThemes = (themesQuery.data ?? []).filter((item) => {
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' ? item.isActive : !item.isActive)
 
-    if (!matchesCategory) {
+    if (!matchesCategory || !matchesStatus) {
       return false
     }
 
@@ -254,6 +265,7 @@ export function ThemesPage() {
       }
 
       setEditingId(null)
+      setIsFormPanelOpen(false)
       reset(defaultThemeFormValues)
     } catch (error) {
       const message = getErrorMessage(error)
@@ -295,6 +307,7 @@ export function ThemesPage() {
 
       if (editingId === id) {
         setEditingId(null)
+        setIsFormPanelOpen(false)
         reset(defaultThemeFormValues)
       }
 
@@ -318,6 +331,7 @@ export function ThemesPage() {
     setEditingId(null)
     setFeedback(null)
     reset(defaultThemeFormValues)
+    setIsFormPanelOpen(true)
   }
 
   function handleStartEdit(id: string) {
@@ -328,6 +342,75 @@ export function ThemesPage() {
 
     if (theme) {
       reset(toThemeFormValues(theme))
+    }
+
+    setIsFormPanelOpen(true)
+  }
+
+  function handleFormPanelOpenChange(open: boolean) {
+    setIsFormPanelOpen(open)
+
+    if (!open) {
+      setEditingId(null)
+      reset(defaultThemeFormValues)
+    }
+  }
+
+  async function handleRestore(id: string, title: string) {
+    if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    const theme = themesQuery.data?.find((item) => item.id === id)
+
+    if (!theme) {
+      const message = 'O tema selecionado não foi encontrado.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Restaurar o tema "${title}" na base ativa?`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setFeedback(null)
+
+    try {
+      await updateThemeMutation.mutateAsync({
+        ...toThemeFormValues(theme),
+        isActive: true,
+        id,
+        actorUid: user.uid,
+        actorName,
+      })
+
+      const message = 'Tema restaurado com sucesso.'
+      setFeedback({
+        tone: 'success',
+        message,
+      })
+      toast.success(message)
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
     }
   }
 
@@ -414,73 +497,109 @@ export function ThemesPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <EntityPageShell>
       <PageHeader
         eyebrow="Catálogo"
         title="Temas"
         description="Mantenha o catálogo oficial enxuto, categorizado e pronto para as próximas designações."
         actions={
-          <Button
-            variant="outline"
-            onClick={() => setIsImportModalOpen(true)}
-            disabled={isSubmitting}
-          >
-            <FileUp className="size-4" />
-            Importar PDF
-          </Button>
-        }
-        meta={
-          <>
-            <PageHeaderStat
-              label="No catálogo"
-              value={String(totalThemes)}
-              icon={BookText}
-              tone="blue"
-            />
-            <PageHeaderStat
-              label="Ativos"
-              value={String(activeThemesCount)}
-              icon={Plus}
-              tone="green"
-            />
-            <PageHeaderStat
-              label="Categorias"
-              value={String(categoriesCount)}
-              icon={FolderTree}
-              tone="amber"
-            />
-            <PageHeaderStat
-              label="Inativos"
-              value={String(inactiveThemesCount)}
-              icon={PencilLine}
-              tone="slate"
-            />
-          </>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(true)}
+              disabled={isSubmitting}
+            >
+              <FileUp className="size-4" />
+              Importar PDF
+            </Button>
+            <Button onClick={handleStartCreate} disabled={isSubmitting}>
+              <Plus className="size-4" />
+              Novo tema
+            </Button>
+          </div>
         }
       />
 
-      <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-        <Card>
-          <CardHeader className="gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <CardTitle className="text-2xl">{formModeLabel}</CardTitle>
-                <CardDescription>
-                  {editingTheme
-                    ? 'Atualize número, categoria, status e observações nesta mesma tela.'
-                    : 'Cadastre um novo tema com número único, categoria oficial e título claro.'}
-                </CardDescription>
-              </div>
-              {editingTheme ? (
-                <Button variant="outline" onClick={handleStartCreate} disabled={isSubmitting}>
-                  Cancelar edição
-                </Button>
-              ) : null}
-            </div>
-          </CardHeader>
+      <MetricStrip
+        items={[
+          {
+            label: 'No catálogo',
+            value: String(totalThemes),
+            icon: BookText,
+            tone: 'blue',
+          },
+          {
+            label: 'Ativos',
+            value: String(activeThemesCount),
+            icon: Plus,
+            tone: 'green',
+          },
+          {
+            label: 'Categorias',
+            value: String(categoriesCount),
+            icon: FolderTree,
+            tone: 'amber',
+          },
+          {
+            label: 'Inativos',
+            value: String(inactiveThemesCount),
+            icon: PencilLine,
+            tone: 'slate',
+          },
+        ]}
+      />
 
-          <CardContent>
-            <form className="space-y-5" onSubmit={submitHandler}>
+      {feedback && !isFormPanelOpen && !isImportModalOpen ? (
+        <div className={getFeedbackContainerClassName(feedback.tone)}>
+          {feedback.message}
+        </div>
+      ) : null}
+
+      <section className="space-y-4">
+        <ResponsiveFormPanel
+          open={isFormPanelOpen}
+          onOpenChange={handleFormPanelOpenChange}
+          title={formModeLabel}
+          description={
+            editingTheme
+              ? 'Atualize número, categoria, status e observações do tema selecionado.'
+              : 'Cadastre um novo tema com número único, categoria oficial e título claro.'
+          }
+          footer={
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-muted-foreground">
+                {editingTheme
+                  ? `Última atualização em ${formatUpdatedAt(
+                      editingTheme.updatedAt.toDate(),
+                    )}.`
+                  : 'Os temas inativos continuam preservados para consultas futuras.'}
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  variant="outline"
+                  type="button"
+                  disabled={isSubmitting || !isDirty}
+                  onClick={() => reset(toThemeFormValues(editingTheme))}
+                >
+                  Restaurar
+                </Button>
+                <Button
+                  variant="outline"
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleFormPanelOpenChange(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" form="theme-form" disabled={isSubmitting}>
+                  <Plus className="size-4" />
+                  {editingTheme ? 'Salvar alterações' : 'Salvar tema'}
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <form id="theme-form" className="space-y-5" onSubmit={submitHandler}>
               <div className="grid gap-4">
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-foreground">Número</span>
@@ -615,35 +734,11 @@ export function ThemesPage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {editingTheme
-                    ? `Última atualização em ${formatUpdatedAt(
-                        editingTheme.updatedAt.toDate(),
-                      )}.`
-                    : 'Os temas inativos continuam preservados para consultas futuras.'}
-                </p>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    type="button"
-                    disabled={isSubmitting || !isDirty}
-                    onClick={() => reset(toThemeFormValues(editingTheme))}
-                  >
-                    Restaurar
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    <Plus className="size-4" />
-                    {editingTheme ? 'Salvar alterações' : 'Salvar tema'}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+          </form>
+        </ResponsiveFormPanel>
 
         <Card>
-          <CardHeader className="gap-4">
+          <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <CardTitle className="text-2xl">Catálogo oficial</CardTitle>
@@ -651,49 +746,62 @@ export function ThemesPage() {
                   Lista completa, ordenada por número e pronta para busca rápida por categoria.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                <span>Ordenação</span>
-                <span className="font-medium text-foreground">Número ascendente</span>
-              </div>
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-[1fr_240px_220px]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-11"
-                  placeholder="Buscar por número, título, categoria ou observação..."
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                />
-              </div>
-              <select
-                className={selectClassName}
-                value={categoryFilter}
-                onChange={(event) =>
-                  setCategoryFilter(event.target.value as ThemeCategoryFilter)
-                }
-              >
-                <option value="all">Todas as categorias</option>
-                {themeCategoryOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <div className="flex h-11 items-center rounded-2xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm">
-                {filteredThemes.length} resultado(s) de {totalThemes}
-              </div>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-4">
+            <EntityToolbar
+              searchValue={searchTerm}
+              searchPlaceholder="Buscar por número, título, categoria ou observação..."
+              onSearchChange={setSearchTerm}
+              summary={
+                <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                  <span>Resultados</span>
+                  <span className="font-medium text-foreground">
+                    {filteredThemes.length}/{totalThemes}
+                  </span>
+                </div>
+              }
+              filters={
+                <>
+                  <select
+                    className={selectClassName}
+                    value={categoryFilter}
+                    onChange={(event) =>
+                      setCategoryFilter(event.target.value as ThemeCategoryFilter)
+                    }
+                  >
+                    <option value="all">Todas as categorias</option>
+                    {themeCategoryOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className={selectClassName}
+                    value={statusFilter}
+                    onChange={(event) =>
+                      setStatusFilter(event.target.value as ThemeStatusFilter)
+                    }
+                  >
+                    <option value="all">Todos os status</option>
+                    <option value="active">Ativos</option>
+                    <option value="inactive">Inativos</option>
+                  </select>
+                  <div className="flex h-11 items-center rounded-xl border border-input bg-background px-4 py-2 text-sm text-muted-foreground shadow-sm">
+                    Número ascendente
+                  </div>
+                </>
+              }
+            />
+
             {themesQuery.isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((item) => (
                   <div
                     key={item}
-                    className="h-40 animate-pulse rounded-xl border border-border bg-background"
+                    className="h-24 animate-pulse rounded-lg border border-border bg-background"
                   />
                 ))}
               </div>
@@ -721,64 +829,74 @@ export function ThemesPage() {
             filteredThemes.length > 0 ? (
               <div className="space-y-3">
                 {filteredThemes.map((theme) => (
-                  <div
+                  <CompactEntityCard
                     key={theme.id}
-                    className="rounded-xl border border-border bg-background p-4"
-                  >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="flex min-w-0 gap-4">
-                        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                          <BookText className="size-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <Badge variant={theme.isActive ? 'default' : 'outline'}>
-                              {theme.isActive ? 'Ativo' : 'Inativo'}
-                            </Badge>
-                            <MetadataChip
-                              label="Tema"
-                              value={String(theme.number)}
-                            />
-                            <MetadataChip
-                              label="Categoria"
-                              value={getThemeCategoryLabel(theme.category)}
-                            />
-                          </div>
-                          <h3 className="mt-2 text-xl font-semibold text-foreground">
-                            {theme.title}
-                          </h3>
-                          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                            {theme.notes || 'Sem observações cadastradas.'}
-                          </p>
-                          <div className="mt-4">
-                            <MetadataChip
-                              label="Atualizado"
-                              value={formatUpdatedAt(theme.updatedAt.toDate())}
-                            />
-                          </div>
-                        </div>
+                    leading={
+                      <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-sm font-black text-primary">
+                        {theme.number}
                       </div>
-
-                      <div className="flex flex-col gap-2 sm:flex-row lg:flex-row lg:items-center">
-                        <Button
-                          variant="outline"
-                          onClick={() => handleStartEdit(theme.id)}
-                          disabled={isSubmitting}
-                        >
-                          <PencilLine className="size-4" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleDelete(theme.id, theme.title)}
-                          disabled={isSubmitting || !theme.isActive}
-                        >
-                          <Trash2 className="size-4" />
-                          Excluir
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                    }
+                    title={theme.title}
+                    subtitle={`Tema ${theme.number}`}
+                    badges={
+                      <>
+                        <Badge variant={theme.isActive ? 'default' : 'outline'}>
+                          {theme.isActive ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                        <Badge variant="outline">
+                          {getThemeCategoryLabel(theme.category)}
+                        </Badge>
+                      </>
+                    }
+                    primaryAction={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full sm:w-auto"
+                        onClick={() => handleStartEdit(theme.id)}
+                        disabled={isSubmitting}
+                      >
+                        <PencilLine className="size-4" />
+                        Editar
+                      </Button>
+                    }
+                    secondaryActions={
+                      <ActionMenu
+                        items={[
+                          {
+                            label: 'Restaurar',
+                            icon: RotateCcw,
+                            disabled: isSubmitting || theme.isActive,
+                            onSelect: () => handleRestore(theme.id, theme.title),
+                          },
+                          {
+                            label: 'Inativar',
+                            icon: Trash2,
+                            disabled: isSubmitting || !theme.isActive,
+                            tone: 'danger',
+                            onSelect: () => handleDelete(theme.id, theme.title),
+                          },
+                        ]}
+                      />
+                    }
+                    metadata={
+                      <>
+                        <MetadataChip
+                          label="Categoria"
+                          value={getThemeCategoryLabel(theme.category)}
+                        />
+                        <MetadataChip
+                          label="Atualizado"
+                          value={formatUpdatedAt(theme.updatedAt.toDate())}
+                        />
+                      </>
+                    }
+                    footer={
+                      theme.notes ? (
+                        <p className="line-clamp-1">Obs.: {theme.notes}</p>
+                      ) : null
+                    }
+                  />
                 ))}
               </div>
             ) : null}
@@ -896,6 +1014,6 @@ export function ThemesPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
-    </div>
+    </EntityPageShell>
   )
 }
