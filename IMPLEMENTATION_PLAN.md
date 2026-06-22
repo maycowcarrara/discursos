@@ -49,6 +49,7 @@
 * reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
 * revisão do Dashboard com abas `Na congregação` e `Fora da congregação`, mantendo impressão filtrada por aba
 * plano técnico de reorganização dos cards, listas, filtros e formulários documentado em `docs/ui-reorganization-plan.md`
+* remoção da escolha manual de ano base nas Configurações; o painel usa automaticamente o ano atual, preservando handoff de outro ano via `evento` + `ano`
 * simplificação dos status de oradores para `ativo`, `indisponível` e `inativo`, consolidando férias como indisponibilidade temporária e transferidos como inativos preservados no histórico
 * controle explícito de e-mails por revisão da designação, mantendo notificações automáticas desligadas por padrão, um único lembrete automático 4 dias antes e envio manual de confirmação como ação única até a próxima edição
 * confirmação por WhatsApp com mensagem completa de data, discurso, origem, destino, endereço, dia e horário da reunião
@@ -95,7 +96,7 @@
 * tipagem TypeScript estrita das coleções oficiais
 * base `services/firestore` criada
 * hooks reutilizáveis com TanStack Query para leitura inicial
-* leitura e escrita inicial de `settings/app` com foco no ano padrão do painel
+* leitura e escrita inicial de `settings/app` entregue na Fase 3; na V1 atual o ano do painel deixou de ser configuração manual e passou a ser derivado automaticamente do ano corrente
 * páginas de `congregations`, `themes` e `speakers` conectadas ao Firestore em modo leitura
 
 ### Firestore — avanço da Fase 3
@@ -166,7 +167,7 @@
 
 ### Dashboard — fechamento da Fase 9
 
-* dashboard principal conectado a leituras reais de `calendarEvents`, `assignments`, `congregations` e `settings/app`
+* dashboard principal conectado a leituras reais de `calendarEvents`, `assignments` e `congregations`
 * janela operacional com os próximos 8 sábados, sem depender dos mocks iniciais
 * métricas de pendências, sem designação, aguardando resposta e próximos eventos especiais
 * destaque do próximo sábado com status, tipo de evento, orador, congregação e tema quando houver cobertura
@@ -417,7 +418,7 @@ Criar:
 
 Entregas desta fase:
 
-* `settings/app` com leitura e salvamento real do ano padrão do painel
+* `settings/app` com persistência inicial do ano padrão entregue historicamente; a interface atual não expõe mais esse ajuste porque o ano operacional é automático
 * `congregations`, `themes` e `speakers` em leitura real
 * validação de documentos via tipagem estrita no frontend
 * `calendarEvents` em leitura real por ano

@@ -71,7 +71,7 @@ Próxima etapa obrigatória:
 * tipagem TypeScript estrita para as coleções oficiais do Firestore
 * camada `services/firestore` criada
 * hooks reutilizáveis com TanStack Query para leitura inicial
-* `settings/app` conectado ao Firestore com leitura e salvamento
+* `settings/app` conectado ao Firestore na entrega inicial; na V1 atual o ano operacional é automático e não fica exposto como ajuste manual
 * páginas de `congregations`, `themes` e `speakers` conectadas ao Firestore em modo leitura
 
 ### Avanço da Fase 3
@@ -141,7 +141,7 @@ Próxima etapa obrigatória:
 
 ### Fechamento da Fase 9
 
-* dashboard principal ligado a leituras reais de `calendarEvents`, `assignments`, `congregations` e `settings/app`
+* dashboard principal ligado a leituras reais de `calendarEvents`, `assignments` e `congregations`
 * janela com os próximos 8 sábados sem depender dos mocks iniciais
 * métricas operacionais de pendências, sem designação, aguardando resposta e próximos eventos especiais
 * destaque do próximo sábado com status atual, tipo de evento, orador, congregação e tema quando houver cobertura
@@ -223,7 +223,7 @@ Executar:
 
 Entregue até o início da Fase 12:
 
-* `settings/app` com persistência real
+* `settings/app` preservado por compatibilidade, sem controle manual de ano na interface atual
 * CRUD completo de `congregations`
 * CRUD completo de `themes`
 * CRUD completo de `speakers`

@@ -45,7 +45,7 @@ import {
   emailDeliveryUnavailableMessage,
   isEmailDeliveryConfigured,
 } from '@/config/email'
-import { useAppSettingsQuery, useCalendarSettingsQuery } from '@/hooks/use-app-settings'
+import { useCalendarSettingsQuery } from '@/hooks/use-app-settings'
 import {
   useAssignmentsByYearQuery,
   useConfirmAssignmentMutation,
@@ -622,9 +622,8 @@ export function AssignmentsPage() {
   )
   const todayDateKey = useMemo(() => getLocalDateKey(new Date(referenceNow)), [referenceNow])
 
-  const appSettingsQuery = useAppSettingsQuery()
   const calendarSettingsQuery = useCalendarSettingsQuery()
-  const activeYear = appSettingsQuery.data?.defaultYear ?? currentYear
+  const activeYear = currentYear
   const requestedCalendarEventId = searchParams.get('evento')?.trim() ?? ''
   const requestedCalendarEventYearParam = parseCalendarEventYearParam(
     searchParams.get('ano'),

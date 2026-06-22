@@ -1,11 +1,10 @@
 import { useContext, useSyncExternalStore } from 'react'
 
-import { Building2, CalendarClock, CalendarDays, Clock3 } from 'lucide-react'
+import { Building2, CalendarDays, Clock3 } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 
 import { PageHeaderContext } from '@/components/app/page-header-context'
 import { getNavigationItem } from '@/config/navigation'
-import { useAppSettingsQuery } from '@/hooks/use-app-settings'
 import { useCongregationsQuery } from '@/hooks/use-congregations'
 import { cn } from '@/lib/utils'
 
@@ -18,9 +17,7 @@ export function AppTopbar() {
     pageHeaderStore?.getHeader ?? (() => null),
     () => null,
   )
-  const appSettingsQuery = useAppSettingsQuery()
   const congregationsQuery = useCongregationsQuery()
-  const baseYear = appSettingsQuery.data?.defaultYear ?? new Date().getFullYear()
   const localCongregation =
     congregationsQuery.data?.find((congregation) => congregation.isLocal) ?? null
   const isDashboard = currentItem.href === '/'
@@ -49,11 +46,6 @@ export function AppTopbar() {
     },
   ]
   const dashboardSummaryItems = [
-    {
-      icon: CalendarClock,
-      label: 'Ano base',
-      value: String(baseYear),
-    },
     {
       icon: CalendarDays,
       label: 'Hoje',

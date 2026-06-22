@@ -35,7 +35,6 @@ import {
   emailDeliveryUnavailableMessage,
   isEmailDeliveryConfigured,
 } from '@/config/email'
-import { useAppSettingsQuery } from '@/hooks/use-app-settings'
 import { useRequestManualAssignmentConfirmationEmailMutation } from '@/hooks/use-assignments'
 import { useCongregationsQuery } from '@/hooks/use-congregations'
 import { useDashboardSnapshotQuery } from '@/hooks/use-dashboard'
@@ -188,7 +187,6 @@ export function DashboardPage() {
   today.setHours(0, 0, 0, 0)
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('inCongregation')
-  const appSettingsQuery = useAppSettingsQuery()
   const { user } = useAuth()
   const toast = useToast()
   const requestManualEmailMutation =
@@ -257,11 +255,9 @@ export function DashboardPage() {
   )
   const nextSpeaker = nextSpeakerQuery.data
   const combinedError =
-    appSettingsQuery.error ??
     congregationsQuery.error ??
     dashboardSnapshotQuery.error
   const isLoading =
-    appSettingsQuery.isLoading ||
     congregationsQuery.isLoading ||
     dashboardSnapshotQuery.isLoading
 

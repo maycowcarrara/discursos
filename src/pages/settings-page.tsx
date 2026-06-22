@@ -3,7 +3,6 @@ import {
   CalendarDays,
   Clock3,
   Save,
-  Settings2,
   ShieldCheck,
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -31,19 +30,14 @@ import {
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import {
-  useAppSettingsQuery,
   useCalendarSettingsQuery,
-  useSaveAppSettingsMutation,
   useSaveCalendarSettingsMutation,
 } from '@/hooks/use-app-settings'
 import { useRecentAuditLogsQuery } from '@/hooks/use-audit-logs'
 import { useNotificationsByStatusQuery } from '@/hooks/use-notifications'
 import {
-  defaultAppSettingsValues,
   defaultCalendarSettingsValues,
-  toAppSettingsFormValues,
   toCalendarSettingsFormValues,
-  type AppSettingsFormValues,
   type CalendarSettingsFormValues,
 } from '@/services/firestore/settings-service'
 import type { CalendarSyncRunStatus } from '@/types/firestore'
@@ -57,16 +51,6 @@ import {
   notificationStatusLabels,
   notificationTypeLabels,
 } from '@/utils/operations-display'
-
-const appSettingsFormSchema = z.object({
-  defaultYear: z
-    .number({
-      error: 'Informe um ano válido.',
-    })
-    .int('Informe um ano inteiro.')
-    .min(2024, 'Use um ano a partir de 2024.')
-    .max(2100, 'Use um ano até 2100.'),
-})
 
 const calendarSettingsFormSchema = z
   .object({
@@ -147,23 +131,12 @@ function getCalendarRunStatusClassName(status?: CalendarSyncRunStatus | null) {
 export function SettingsPage() {
   const { user } = useAuth()
   const toast = useToast()
-  const appSettingsQuery = useAppSettingsQuery()
   const calendarSettingsQuery = useCalendarSettingsQuery()
-  const saveAppSettingsMutation = useSaveAppSettingsMutation()
   const saveCalendarSettingsMutation = useSaveCalendarSettingsMutation()
   const pendingNotificationsQuery = useNotificationsByStatusQuery('pending', 6)
   const failedNotificationsQuery = useNotificationsByStatusQuery('failed', 4)
   const auditLogsQuery = useRecentAuditLogsQuery(6)
 
-  const {
-    formState: { errors: appErrors, isDirty: isAppDirty },
-    handleSubmit: handleAppSubmit,
-    register: registerApp,
-    reset: resetApp,
-  } = useForm<AppSettingsFormValues>({
-    resolver: zodResolver(appSettingsFormSchema),
-    defaultValues: defaultAppSettingsValues,
-  })
   const {
     formState: { errors: calendarErrors, isDirty: isCalendarDirty },
     handleSubmit: handleCalendarSubmit,
@@ -175,29 +148,8 @@ export function SettingsPage() {
   })
 
   useEffect(() => {
-    resetApp(toAppSettingsFormValues(appSettingsQuery.data))
-  }, [appSettingsQuery.data, resetApp])
-
-  useEffect(() => {
     resetCalendar(toCalendarSettingsFormValues(calendarSettingsQuery.data))
   }, [calendarSettingsQuery.data, resetCalendar])
-
-  const submitAppHandler = handleAppSubmit(async (values) => {
-    if (!user) {
-      toast.error('Sua sessão expirou. Entre novamente para continuar.')
-      return
-    }
-
-    try {
-      await saveAppSettingsMutation.mutateAsync({
-        ...values,
-        actorUid: user.uid,
-      })
-      toast.success('Ano padrão salvo com sucesso.')
-    } catch (error) {
-      toast.error(getErrorMessage(error))
-    }
-  })
 
   const submitCalendarHandler = handleCalendarSubmit(async (values) => {
     if (!user) {
@@ -217,37 +169,26 @@ export function SettingsPage() {
     }
   })
 
-  const persistedSettings = appSettingsQuery.data
   const persistedCalendarSettings = calendarSettingsQuery.data
   const notificationsError =
     pendingNotificationsQuery.error ?? failedNotificationsQuery.error
   const pendingNotifications = pendingNotificationsQuery.data ?? []
   const failedNotifications = failedNotificationsQuery.data ?? []
   const recentAuditLogs = auditLogsQuery.data ?? []
-  const isAppLoading = appSettingsQuery.isLoading
   const isCalendarLoading = calendarSettingsQuery.isLoading
-  const isAppSaving = saveAppSettingsMutation.isPending
   const isCalendarSaving = saveCalendarSettingsMutation.isPending
+  const currentYear = new Date().getFullYear()
 
   return (
     <EntityPageShell>
       <PageHeader
         eyebrow="Ajustes do sistema"
         title="Configurações"
-        description="Defina a base do painel, mantenha a integração da agenda alinhada e acompanhe os últimos envios e movimentos administrativos."
+        description="Mantenha a integração da agenda alinhada, administre acessos e acompanhe os últimos envios e movimentos administrativos."
       />
 
       <MetricStrip
         items={[
-          {
-            label: 'Painel',
-            value: persistedSettings ? 'Configurado' : 'Pendente',
-            detail: persistedSettings
-              ? `Ano ${persistedSettings.defaultYear}`
-              : 'Configuração inicial',
-            icon: Settings2,
-            tone: persistedSettings ? 'green' : 'amber',
-          },
           {
             label: 'Agenda',
             value: persistedCalendarSettings?.enabled ? 'Ativa' : 'Desligada',
@@ -283,104 +224,18 @@ export function SettingsPage() {
                 ? 'amber'
                 : 'green',
           },
+          {
+            label: 'Ano atual',
+            value: String(currentYear),
+            detail: 'Usado automaticamente no painel',
+            icon: CalendarDays,
+            tone: 'blue',
+          },
         ]}
       />
 
       <section className="grid gap-5 xl:grid-cols-[1.06fr_0.94fr]">
         <div className="space-y-5">
-          <Card className="rounded-lg shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-start gap-3">
-                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Settings2 className="size-5" />
-                </div>
-                <div>
-                  <CardTitle>Base do painel</CardTitle>
-                  <CardDescription>
-                    Defina o ano de referência usado como base nas telas administrativas.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent>
-              <form className="space-y-4" onSubmit={submitAppHandler}>
-                <div className="grid gap-4 md:max-w-[18rem]">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-foreground">
-                      Ano padrão
-                    </span>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      {...registerApp('defaultYear', {
-                        valueAsNumber: true,
-                      })}
-                    />
-                    {appErrors.defaultYear ? (
-                      <p className="text-sm text-rose-600 dark:text-rose-300">
-                        {appErrors.defaultYear.message}
-                      </p>
-                    ) : null}
-                  </label>
-                </div>
-
-                {appSettingsQuery.isError ? (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                    {getErrorMessage(appSettingsQuery.error)}
-                  </div>
-                ) : null}
-
-                {saveAppSettingsMutation.isSuccess ? (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                    Ano padrão salvo com sucesso.
-                  </div>
-                ) : null}
-
-                {saveAppSettingsMutation.isError ? (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                    {getErrorMessage(saveAppSettingsMutation.error)}
-                  </div>
-                ) : null}
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {persistedSettings
-                      ? `Última atualização em ${formatUpdatedAt(
-                          persistedSettings.updatedAt.toDate(),
-                        )}.`
-                      : 'A configuração inicial ainda não foi salva.'}
-                  </p>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Button
-                      variant="outline"
-                      type="button"
-                      disabled={isAppLoading || isAppSaving}
-                      onClick={() =>
-                        resetApp(toAppSettingsFormValues(appSettingsQuery.data))
-                      }
-                    >
-                      Restaurar valores
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={
-                        isAppLoading ||
-                        isAppSaving ||
-                        (!isAppDirty && !!persistedSettings)
-                      }
-                    >
-                      <Save className="size-4" />
-                      {persistedSettings
-                        ? 'Salvar ajustes'
-                        : 'Criar configuração inicial'}
-                    </Button>
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
           <AdminUsersCard />
 
           <Card className="rounded-lg shadow-sm">

@@ -128,7 +128,8 @@ Exemplo de `settings/app`:
 
 Observações:
 
-* `settings/app` mantém apenas o ano operacional padrão usado nas telas administrativas
+* `settings/app.defaultYear` permanece como campo legado de compatibilidade da Fase 3, mas a V1 atual não deve expor escolha manual de ano base ao usuário
+* as telas administrativas devem derivar o ano operacional do ano corrente do navegador, exceto quando um fluxo trouxer ano explícito por rota, como o handoff Dashboard -> Designações com `evento` + `ano`
 * o nome exibido no painel e nas automações deve reutilizar a congregação local ativa em `congregations`
 * o locale operacional da V1 permanece fixo em `pt-BR`, sem campo configurável no Firestore
 
