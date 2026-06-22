@@ -10,9 +10,11 @@ import {
   MessageCircle,
   Mic2,
   Plus,
+  Printer,
   Sparkles,
   UsersRound,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { EntityPageShell } from '@/components/app/entity-page-shell'
@@ -40,6 +42,16 @@ import { useDashboardSnapshotQuery } from '@/hooks/use-dashboard'
 import { useNotificationByIdQuery } from '@/hooks/use-notifications'
 import { useSpeakerByIdQuery } from '@/hooks/use-speakers'
 import { cn } from '@/lib/utils'
+import type {
+  AssignmentDocument,
+  CongregationDocument,
+  FirestoreRecord,
+} from '@/types/firestore'
+import {
+  getAssignmentMovementLabel,
+  inferAssignmentMovementType,
+  type AssignmentMovementType,
+} from '@/utils/assignment-history'
 import {
   assignmentStatusLabels,
   calendarEventTypeLabels,
@@ -55,6 +67,16 @@ type DashboardSaturdayEntryView = ReturnType<
 >[number]
 
 type DashboardEntryStatus = 'confirmed' | 'pending' | 'event'
+type DashboardTab = 'inCongregation' | 'outsideCongregation'
+type OperationalAssignmentDocument = AssignmentDocument & {
+  status: 'pending' | 'confirmed'
+}
+
+type DashboardOutgoingAssignmentEntry = {
+  assignment: FirestoreRecord<OperationalAssignmentDocument>
+  destinationCongregation: FirestoreRecord<CongregationDocument> | null
+  movementLabel: string
+}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -129,6 +151,28 @@ function getAssignmentCreateHref(entry: DashboardSaturdayEntryView) {
   return `/designacoes?${params.toString()}`
 }
 
+function isOperationalAssignment(
+  assignment: FirestoreRecord<AssignmentDocument>,
+): assignment is FirestoreRecord<OperationalAssignmentDocument> {
+  return assignment.status === 'pending' || assignment.status === 'confirmed'
+}
+
+function getAssignmentMovement(
+  assignment: FirestoreRecord<AssignmentDocument>,
+  congregationsById: Map<string, FirestoreRecord<CongregationDocument>>,
+): AssignmentMovementType {
+  return inferAssignmentMovementType(assignment, congregationsById)
+}
+
+function getDashboardTabClass(isActive: boolean) {
+  return cn(
+    'inline-flex min-h-10 flex-1 items-center justify-center rounded-lg px-3 py-2 text-sm font-black transition-colors sm:flex-none',
+    isActive
+      ? 'bg-blue-600 text-white shadow-sm dark:bg-blue-500 dark:text-white'
+      : 'bg-white text-slate-700 hover:bg-blue-50 hover:text-blue-700 dark:bg-card dark:text-foreground dark:hover:bg-blue-500/10 dark:hover:text-blue-200',
+  )
+}
+
 const cardClass =
   'overflow-hidden rounded-lg border-gray-200 shadow-sm'
 
@@ -143,6 +187,7 @@ export function DashboardPage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  const [activeTab, setActiveTab] = useState<DashboardTab>('inCongregation')
   const appSettingsQuery = useAppSettingsQuery()
   const { user } = useAuth()
   const toast = useToast()
@@ -153,14 +198,55 @@ export function DashboardPage() {
 
   const calendarEvents = dashboardSnapshotQuery.data?.calendarEvents ?? []
   const assignments = dashboardSnapshotQuery.data?.assignments ?? []
+  const congregations = congregationsQuery.data ?? []
+  const congregationsById = new Map(
+    congregations.map((congregation) => [congregation.id, congregation]),
+  )
   const localCongregation =
-    congregationsQuery.data?.find((congregation) => congregation.isLocal) ?? null
-  const upcomingSaturdayEntries = buildDashboardSaturdayEntries(
+    congregations.find((congregation) => congregation.isLocal) ?? null
+  const allUpcomingSaturdayEntries = buildDashboardSaturdayEntries(
     calendarEvents,
     assignments,
     today,
     10,
   )
+  const upcomingSaturdayEntries = allUpcomingSaturdayEntries.map((entry) => {
+    if (!entry.assignment) {
+      return entry
+    }
+
+    const movementType = getAssignmentMovement(entry.assignment, congregationsById)
+
+    if (movementType !== 'outgoing') {
+      return entry
+    }
+
+    return {
+      ...entry,
+      assignment: null,
+      isUnassigned: !entry.event.blocksAssignments,
+      isAwaitingResponse: false,
+    }
+  })
+  const outgoingAssignmentEntries: DashboardOutgoingAssignmentEntry[] = assignments
+    .filter(isOperationalAssignment)
+    .filter((assignment) => {
+      if (assignment.eventDate.toDate().getTime() < today.getTime()) {
+        return false
+      }
+
+      return getAssignmentMovement(assignment, congregationsById) === 'outgoing'
+    })
+    .sort(
+      (left, right) =>
+        left.eventDate.toMillis() - right.eventDate.toMillis(),
+    )
+    .map((assignment) => ({
+      assignment,
+      destinationCongregation:
+        congregationsById.get(assignment.localCongregationId) ?? null,
+      movementLabel: getAssignmentMovementLabel('outgoing'),
+    }))
   const nextSaturdayEntry = upcomingSaturdayEntries[0] ?? null
   const nextAssignment = nextSaturdayEntry?.assignment ?? null
   const remainingSaturdayEntries = upcomingSaturdayEntries.slice(1)
@@ -186,7 +272,7 @@ export function DashboardPage() {
   const HighlightIcon = highlightStyle.Icon
   const nextSpeakerEmail = nextSpeaker?.email.trim() ?? ''
   const nextDestinationCongregation = nextAssignment
-    ? congregationsQuery.data?.find(
+    ? congregations.find(
         (congregation) => congregation.id === nextAssignment.localCongregationId,
       ) ?? null
     : null
@@ -276,6 +362,12 @@ export function DashboardPage() {
       Icon: Building2,
     },
   ] as const
+  const activeTabLabel =
+    activeTab === 'inCongregation' ? 'Na congregação' : 'Fora da congregação'
+  const printGeneratedAt = new Date().toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  })
   const nextSaturdayDateLabel = nextSaturdayEntry
     ? formatInlineDate(nextSaturdayEntry.event.date.toDate())
     : ''
@@ -302,9 +394,9 @@ export function DashboardPage() {
   const confirmedAssignmentCount = upcomingSaturdayEntries.filter(
     (entry) => entry.assignment?.status === 'confirmed',
   ).length
-  const blockedEventCount = upcomingSaturdayEntries.filter(
-    (entry) => entry.event.blocksAssignments,
-  ).length
+  function handlePrintDashboardTab() {
+    window.print()
+  }
 
   async function handleRequestManualConfirmationEmail() {
     if (!nextAssignment) {
@@ -353,50 +445,274 @@ export function DashboardPage() {
   }
 
   return (
-    <EntityPageShell className="mx-auto max-w-7xl">
-      <PageHeader
-        eyebrow="Painel"
-        title="Dashboard"
-        description="Acompanhe o próximo discurso, lacunas de cobertura e atalhos principais da operação."
-      />
+    <EntityPageShell className="dashboard-print-surface mx-auto max-w-7xl">
+      <div className="app-print-hidden">
+        <PageHeader
+          eyebrow="Painel"
+          title="Dashboard"
+          description="Acompanhe o próximo discurso, lacunas de cobertura e atalhos principais da operação."
+        />
+      </div>
 
-      <MetricStrip
-        items={[
-          {
-            label: 'Próximas datas',
-            value: String(upcomingSaturdayEntries.length),
-            detail: 'Janela operacional',
-            icon: CalendarDays,
-            tone: 'blue',
-          },
-          {
-            label: 'Sem designação',
-            value: String(uncoveredSaturdayCount),
-            detail: 'Precisam de ação',
-            icon: Clock3,
-            tone: 'amber',
-          },
-          {
-            label: 'Confirmadas',
-            value: String(confirmedAssignmentCount),
-            detail: 'Cobertura fechada',
-            icon: CheckCircle2,
-            tone: 'green',
-          },
-          {
-            label: 'Eventos especiais',
-            value: String(blockedEventCount),
-            detail:
-              pendingAssignmentCount > 0
-                ? `${pendingAssignmentCount} pendente(s)`
-                : 'Sem pendências',
-            icon: Sparkles,
-            tone: 'slate',
-          },
-        ]}
-      />
+      <div className="app-print-hidden">
+        <MetricStrip
+          items={[
+            {
+              label: 'Próximas datas',
+              value: String(upcomingSaturdayEntries.length),
+              detail: 'Janela operacional',
+              icon: CalendarDays,
+              tone: 'blue',
+            },
+            {
+              label: 'Sem designação',
+              value: String(uncoveredSaturdayCount),
+              detail: 'Precisam de ação',
+              icon: Clock3,
+              tone: 'amber',
+            },
+            {
+              label: 'Confirmadas',
+              value: String(confirmedAssignmentCount),
+              detail: 'Cobertura fechada',
+              icon: CheckCircle2,
+              tone: 'green',
+            },
+            {
+              label: 'Discursos fora',
+              value: String(outgoingAssignmentEntries.length),
+              detail:
+                pendingAssignmentCount > 0
+                  ? `${pendingAssignmentCount} pendente(s) na congregação`
+                  : 'Locais em outras congregações',
+              icon: UsersRound,
+              tone: 'slate',
+            },
+          ]}
+        />
+      </div>
 
-      <Card className={cardClass}>
+      <section className="space-y-3">
+        <div className="app-print-hidden flex flex-col gap-3 rounded-lg border border-gray-200 bg-slate-100 p-2 dark:border-border dark:bg-background sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
+            role="tablist"
+            aria-label="Visões do dashboard"
+          >
+            <button
+              type="button"
+              className={getDashboardTabClass(activeTab === 'inCongregation')}
+              onClick={() => setActiveTab('inCongregation')}
+              role="tab"
+              aria-selected={activeTab === 'inCongregation'}
+            >
+              Na congregação
+            </button>
+            <button
+              type="button"
+              className={getDashboardTabClass(activeTab === 'outsideCongregation')}
+              onClick={() => setActiveTab('outsideCongregation')}
+              role="tab"
+              aria-selected={activeTab === 'outsideCongregation'}
+            >
+              Fora da congregação
+            </button>
+          </div>
+        </div>
+
+        <div className="dashboard-print-header border-b border-slate-200 pb-3">
+          <p className="text-xs font-bold uppercase text-slate-500">
+            {localCongregation?.name ?? 'Congregação local'}
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-slate-950">
+            {activeTabLabel}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Gerado em {printGeneratedAt}
+          </p>
+        </div>
+
+        {activeTab === 'inCongregation' ? (
+          <div className="dashboard-print-list space-y-3">
+            {upcomingSaturdayEntries.length > 0 ? (
+              upcomingSaturdayEntries.map((entry) => {
+                const assignment = entry.assignment
+                const statusLabel = getEntryStatusLabel(entry)
+                const speakerOrEvent = assignment
+                  ? assignment.speakerName
+                  : entry.event.blocksAssignments
+                    ? entry.event.title
+                    : 'Sem designação'
+                const origin = assignment
+                  ? assignment.originCongregationName
+                  : entry.event.blocksAssignments
+                    ? calendarEventTypeLabels[entry.event.type]
+                    : 'A definir'
+                const destination = assignment
+                  ? assignment.localCongregationName
+                  : localCongregation?.name ?? 'Congregação local'
+                const theme = assignment
+                  ? `${assignment.themeNumber} - ${assignment.themeTitle}`
+                  : entry.event.blocksAssignments
+                    ? 'Não se aplica'
+                    : 'A definir'
+                const notes = assignment?.notes.trim()
+                  ? assignment.notes
+                  : entry.event.blocksAssignments
+                    ? 'Data bloqueada para designação.'
+                    : 'Escolher orador e tema.'
+
+                return (
+                  <article
+                    key={entry.event.id}
+                    className="dashboard-print-card rounded-lg border border-slate-300 p-3 text-slate-900"
+                  >
+                    <div className="flex items-start justify-between gap-5">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Orador/evento
+                        </p>
+                        <h3 className="text-base font-black leading-tight text-slate-950">
+                          {speakerOrEvent}
+                        </h3>
+                        <p className="mt-1 text-sm font-semibold leading-snug text-slate-800">
+                          {theme}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Status
+                        </p>
+                        <p className="text-sm font-bold text-slate-800">
+                          {statusLabel}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-3 border-t border-slate-200 pt-3 text-sm">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Data e hora
+                        </p>
+                        <p className="font-bold text-slate-950">
+                          {formatInlineDate(entry.event.date.toDate())}
+                          {' · '}
+                          {nextSaturdayMeetingTime}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Origem
+                        </p>
+                        <p className="font-semibold text-slate-800">{origin}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Destino
+                        </p>
+                        <p className="font-black text-slate-950">{destination}</p>
+                      </div>
+                    </div>
+
+                    <p className="mt-2 border-t border-slate-100 pt-2 text-xs font-semibold text-slate-600">
+                      {notes}
+                    </p>
+                  </article>
+                )
+              })
+            ) : (
+              <p className="py-4 text-sm text-slate-600">
+                Nenhum sábado carregado para impressão.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {activeTab === 'outsideCongregation' ? (
+          <div className="dashboard-print-list space-y-3">
+            {outgoingAssignmentEntries.length > 0 ? (
+              outgoingAssignmentEntries.map(
+                ({ assignment, destinationCongregation }) => (
+                  <article
+                    key={assignment.id}
+                    className="dashboard-print-card rounded-lg border border-slate-300 p-3 text-slate-900"
+                  >
+                    <div className="flex items-start justify-between gap-5">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Irmão
+                        </p>
+                        <h3 className="text-base font-black leading-tight text-slate-950">
+                          {assignment.speakerName}
+                        </h3>
+                        <p className="mt-1 text-sm font-semibold leading-snug text-slate-800">
+                          {assignment.themeNumber} - {assignment.themeTitle}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Status
+                        </p>
+                        <p className="text-sm font-bold text-slate-800">
+                          {assignmentStatusLabels[assignment.status]}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-3 border-t border-slate-200 pt-3 text-sm">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Dia e hora
+                        </p>
+                        <p className="font-bold text-slate-950">
+                          {formatInlineDate(assignment.eventDate.toDate())}
+                          {destinationCongregation
+                            ? ` · ${destinationCongregation.meetingDay}, ${destinationCongregation.meetingTime}`
+                            : ' · Horário a definir'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Destino
+                        </p>
+                        <p className="font-black text-slate-950">
+                          {assignment.localCongregationName}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Endereço
+                        </p>
+                        <p className="font-semibold text-slate-800">
+                          {destinationCongregation?.address || 'A definir'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {assignment.notes ? (
+                      <p className="mt-2 border-t border-slate-100 pt-2 text-xs font-semibold text-slate-600">
+                        {assignment.notes}
+                      </p>
+                    ) : null}
+                  </article>
+                ),
+              )
+            ) : (
+              <p className="py-4 text-sm text-slate-600">
+                Nenhum discurso fora programado para impressão.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+      {activeTab === 'inCongregation' ? (
+      <Card className={cn(cardClass, 'app-print-hidden')}>
         <CardHeader className="border-b border-gray-100 bg-white p-4 pb-3 dark:border-border dark:bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -405,11 +721,21 @@ export function DashboardPage() {
                 Próximo discurso
               </CardTitle>
             </div>
-            {!isLoading && !combinedError && nextSaturdayEntry ? (
-              <StatusPill status={nextSaturdayStatus}>
-                {getEntryStatusLabel(nextSaturdayEntry)}
-              </StatusPill>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              {!isLoading && !combinedError && nextSaturdayEntry ? (
+                <StatusPill status={nextSaturdayStatus}>
+                  {getEntryStatusLabel(nextSaturdayEntry)}
+                </StatusPill>
+              ) : null}
+              <button
+                type="button"
+                className={cn(quickActionClass, 'app-print-hidden')}
+                onClick={handlePrintDashboardTab}
+              >
+                <Printer className="size-3.5" />
+                Imprimir
+              </button>
+            </div>
           </div>
         </CardHeader>
 
@@ -631,8 +957,137 @@ export function DashboardPage() {
           ) : null}
         </CardContent>
       </Card>
+      ) : (
+        <Card className={cn(cardClass, 'app-print-hidden')}>
+          <CardHeader className="border-b border-gray-100 bg-white p-4 pb-3 dark:border-border dark:bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-sm font-black text-blue-800 dark:text-blue-200 md:text-base">
+                  <UsersRound className="size-4" />
+                  Fora da congregação
+                </CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Próximos discursos em que oradores locais servem outras congregações.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={cn(quickActionClass, 'app-print-hidden')}
+                onClick={handlePrintDashboardTab}
+              >
+                <Printer className="size-3.5" />
+                Imprimir
+              </button>
+            </div>
+          </CardHeader>
 
-      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <CardContent className="p-3 md:p-4">
+            {isLoading ? (
+              <div className="flex min-h-28 items-center justify-center rounded-lg border border-dashed border-border bg-slate-50 dark:bg-background">
+                <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : null}
+
+            {!isLoading && combinedError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-semibold text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {getErrorMessage(combinedError)}
+              </div>
+            ) : null}
+
+            {!isLoading && !combinedError && outgoingAssignmentEntries.length === 0 ? (
+              <EmptyState
+                className="px-4 py-6"
+                title="Nenhum discurso fora programado"
+                description="Quando um orador local for designado para uma congregação parceira, a saída aparecerá aqui."
+              />
+            ) : null}
+
+            {!isLoading && !combinedError && outgoingAssignmentEntries.length > 0 ? (
+              <div className="grid gap-3">
+                {outgoingAssignmentEntries.map(
+                  ({ assignment, destinationCongregation, movementLabel }) => (
+                    <article
+                      key={assignment.id}
+                      className="dashboard-print-card rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-border dark:bg-card"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-200">
+                          {movementLabel}
+                        </span>
+                        <StatusPill status={assignment.status}>
+                          {assignmentStatusLabels[assignment.status]}
+                        </StatusPill>
+                        <span className="text-sm font-semibold text-muted-foreground">
+                          {formatInlineDate(assignment.eventDate.toDate())}
+                        </span>
+                        <span className="ml-auto hidden text-xs font-semibold text-muted-foreground lg:inline">
+                          Origem: {assignment.originCongregationName}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)]">
+                        <div className="min-w-0">
+                          <h3 className="text-base font-black leading-tight text-slate-950 dark:text-foreground">
+                            {assignment.speakerName}
+                          </h3>
+                          <p className="mt-1 text-sm font-semibold leading-snug text-slate-800 dark:text-foreground">
+                            {assignment.themeNumber} - {assignment.themeTitle}
+                          </p>
+                        </div>
+
+                        <div className="min-w-0 space-y-1 text-sm lg:border-l lg:border-slate-200 lg:pl-4 dark:lg:border-border">
+                          <p className="font-semibold text-slate-950 dark:text-foreground">
+                            <span className="mr-1 text-[10px] font-black uppercase text-muted-foreground">
+                              Dia e hora
+                            </span>
+                            {formatInlineDate(assignment.eventDate.toDate())}
+                            {destinationCongregation
+                              ? ` · ${destinationCongregation.meetingDay}, ${destinationCongregation.meetingTime}`
+                              : ' · Horário a definir'}
+                          </p>
+                          <p className="font-black text-slate-950 dark:text-foreground">
+                            <span className="mr-1 text-[10px] font-black uppercase text-blue-700 dark:text-blue-200">
+                              Destino
+                            </span>
+                            {assignment.localCongregationName}
+                          </p>
+                          <p className="font-semibold text-muted-foreground">
+                            <span className="mr-1 text-[10px] font-black uppercase">
+                              Endereço
+                            </span>
+                            {destinationCongregation?.mapsUrl &&
+                            destinationCongregation.address ? (
+                              <a
+                                className="font-black text-blue-700 transition-colors hover:text-blue-800 dark:text-blue-200"
+                                href={destinationCongregation.mapsUrl}
+                                rel="noreferrer"
+                                target="_blank"
+                              >
+                                {destinationCongregation.address}
+                              </a>
+                            ) : (
+                              destinationCongregation?.address || 'A definir'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {assignment.notes ? (
+                        <p className="mt-2 border-t border-slate-100 pt-2 text-sm text-muted-foreground dark:border-border">
+                          {assignment.notes}
+                        </p>
+                      ) : null}
+                    </article>
+                  ),
+                )}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
+      </section>
+
+      <section className="app-print-hidden grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {dashboardShortcuts.map(({ href, label, Icon }) => (
           <Link key={href} className={dashboardShortcutClass} to={href}>
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-200">

@@ -177,3 +177,62 @@
     animation: none;
   }
 }
+
+.dashboard-print-header {
+  display: none;
+}
+
+.dashboard-print-list {
+  display: none;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+    color: #111827;
+    overflow: visible;
+    width: auto;
+  }
+
+  .app-print-hidden,
+  .app-shell-sidebar,
+  .app-shell-topbar,
+  .app-shell-mobile-nav {
+    display: none !important;
+  }
+
+  .app-shell-grid,
+  .app-shell-surface {
+    display: block !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  .app-shell-main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .route-transition {
+    animation: none !important;
+  }
+
+  .dashboard-print-surface {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .dashboard-print-header {
+    display: block !important;
+  }
+
+  .dashboard-print-list {
+    display: block !important;
+  }
+
+  .dashboard-print-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+}

@@ -56,6 +56,8 @@ export function buildAssignmentWhatsAppConfirmationMessage({
 }: Omit<BuildAssignmentWhatsAppUrlInput, 'speaker'>) {
   const meetingDay = destinationCongregation?.meetingDay.trim() || 'Não informado'
   const meetingTime = destinationCongregation?.meetingTime.trim() || 'Não informado'
+  const mapsUrl = destinationCongregation?.mapsUrl.trim() || ''
+  const locationLine = mapsUrl ? [`Localização: ${mapsUrl}`] : []
 
   return [
     `Olá, ${assignment.speakerName}. Tudo bem?`,
@@ -67,6 +69,7 @@ export function buildAssignmentWhatsAppConfirmationMessage({
     `Origem: ${assignment.originCongregationName}`,
     `Destino: ${assignment.localCongregationName}`,
     `Endereço: ${formatDestinationAddress(destinationCongregation)}`,
+    ...locationLine,
     `Dia da reunião: ${meetingDay}`,
     `Horário da reunião: ${meetingTime}`,
     '',

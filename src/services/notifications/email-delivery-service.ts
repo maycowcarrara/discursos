@@ -32,6 +32,35 @@ function buildConfirmationUrl(delivery: ManualAssignmentEmailDelivery) {
   return url.toString()
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function buildMapLinkHtml(mapsUrl: string) {
+  const normalizedMapsUrl = mapsUrl.trim()
+
+  if (!normalizedMapsUrl) {
+    return ''
+  }
+
+  return `<a href="${escapeHtml(normalizedMapsUrl)}" target="_blank" rel="noopener noreferrer">Ver mapa</a>`
+}
+
+function buildCongregationNameTemplateValue(name: string, mapsUrl: string) {
+  const mapLinkHtml = buildMapLinkHtml(mapsUrl)
+
+  if (!mapLinkHtml) {
+    return name
+  }
+
+  return `${escapeHtml(name)} ${mapLinkHtml}`
+}
+
 async function updateDeliveryStatus(
   delivery: ManualAssignmentEmailDelivery,
   result: { errorMessage: string | null; status: 'failed' | 'sent' },
@@ -90,7 +119,14 @@ export async function processManualNotificationImmediately(
             timeZone: 'America/Sao_Paulo',
           }).format(delivery.eventDate),
           event_type_label: calendarEventTypeLabels[delivery.eventType],
-          local_congregation_name: delivery.localCongregationName,
+          local_congregation_map_link: buildMapLinkHtml(
+            delivery.localCongregationMapsUrl,
+          ),
+          local_congregation_maps_url: delivery.localCongregationMapsUrl,
+          local_congregation_name: buildCongregationNameTemplateValue(
+            delivery.localCongregationName,
+            delivery.localCongregationMapsUrl,
+          ),
           notes: delivery.notes,
           notification_type_label: 'Envio manual',
           organization_name: delivery.organizationName.trim() || 'Congregação local',

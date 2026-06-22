@@ -89,6 +89,7 @@ export type ManualAssignmentEmailDelivery = {
   confirmationToken: string
   eventDate: Date
   eventType: AssignmentDocument['eventType']
+  localCongregationMapsUrl: string
   localCongregationName: string
   notes: string
   notificationId: string
@@ -158,6 +159,10 @@ function getAssignmentNotificationRef(assignmentId: string, type: string) {
 
 function getCalendarEventRef(id: string) {
   return doc(firebaseDb, 'calendarEvents', id)
+}
+
+function getCongregationRef(id: string) {
+  return doc(firebaseDb, 'congregations', id)
 }
 
 async function resolveOrganizationName() {
@@ -1468,6 +1473,12 @@ export async function requestManualAssignmentConfirmationEmail({
 
     const manualNotificationRef = getAssignmentNotificationRef(id, 'manual')
     const manualNotificationSnapshot = await transaction.get(manualNotificationRef)
+    const localCongregationSnapshot = await transaction.get(
+      getCongregationRef(assignment.localCongregationId),
+    )
+    const localCongregation = localCongregationSnapshot.exists()
+      ? congregationSchema.parse(localCongregationSnapshot.data())
+      : null
 
     if (manualNotificationSnapshot.exists()) {
       const manualNotification = notificationSchema.parse(
@@ -1545,6 +1556,7 @@ export async function requestManualAssignmentConfirmationEmail({
       confirmationToken: assignmentWithManualRequest.confirmationToken ?? '',
       eventDate: assignment.eventDate.toDate(),
       eventType: assignment.eventType,
+      localCongregationMapsUrl: localCongregation?.mapsUrl.trim() ?? '',
       localCongregationName: assignment.localCongregationName,
       notes: assignment.notes,
       notificationId: manualNotificationRef.id,

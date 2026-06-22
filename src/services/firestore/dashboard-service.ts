@@ -37,6 +37,7 @@ export async function getDashboardSnapshot(
   const calendarEvents = await listUpcomingDashboardCalendarEvents(referenceDate)
   const relevantEventIds = Array.from(
     new Set([
+      ...calendarEvents.map((event) => event.id),
       ...selectUpcomingSaturdayEvents(
         calendarEvents,
         referenceDate,

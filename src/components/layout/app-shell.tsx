@@ -16,13 +16,13 @@ export function AppShell() {
     <div className="min-h-screen bg-background lg:h-screen lg:overflow-hidden">
       <div
         className={cn(
-          'grid min-h-screen w-full grid-cols-1 lg:h-full lg:min-h-0',
+          'app-shell-grid grid min-h-screen w-full grid-cols-1 lg:h-full lg:min-h-0',
           isDesktopSidebarOpen
             ? 'lg:grid-cols-[256px_minmax(0,1fr)]'
             : 'lg:grid-cols-[64px_minmax(0,1fr)]',
         )}
       >
-        <div className="hidden lg:block lg:h-full lg:min-h-0">
+        <div className="app-shell-sidebar hidden lg:block lg:h-full lg:min-h-0">
           <AppSidebar
             desktopExpanded={isDesktopSidebarOpen}
             onDesktopExpandedChange={setIsDesktopSidebarOpen}
@@ -30,10 +30,12 @@ export function AppShell() {
         </div>
 
         <PageHeaderProvider>
-          <div className="app-surface relative min-w-0 overflow-hidden lg:flex lg:h-full lg:min-h-0 lg:flex-col">
-            <AppTopbar />
+          <div className="app-shell-surface app-surface relative min-w-0 overflow-hidden lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+            <div className="app-shell-topbar">
+              <AppTopbar />
+            </div>
 
-            <main className="px-3 py-4 pb-28 md:px-5 md:py-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5 lg:pb-6">
+            <main className="app-shell-main px-3 py-4 pb-28 md:px-5 md:py-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-5 lg:pb-6">
               <div
                 key={`${location.pathname}${location.search}`}
                 className="route-transition"
@@ -45,7 +47,9 @@ export function AppShell() {
         </PageHeaderProvider>
       </div>
 
-      <AppMobileNav onOpenMenu={() => setIsMobileMenuOpen(true)} />
+      <div className="app-shell-mobile-nav">
+        <AppMobileNav onOpenMenu={() => setIsMobileMenuOpen(true)} />
+      </div>
 
       <div
         className={cn(

@@ -47,6 +47,7 @@
 * saneamento completo de PT-BR com correção de acentuação, consistência editorial e mensagens mais claras
 * redução de linguagem técnica nas telas operacionais, preservando detalhes internos apenas onde houver valor administrativo real
 * reorganização do desktop para aproximar a experiência do mockup de referência, sem regredir a navegação mobile já entregue
+* revisão do Dashboard com abas `Na congregação` e `Fora da congregação`, mantendo impressão filtrada por aba
 * plano técnico de reorganização dos cards, listas, filtros e formulários documentado em `docs/ui-reorganization-plan.md`
 * simplificação dos status de oradores para `ativo`, `indisponível` e `inativo`, consolidando férias como indisponibilidade temporária e transferidos como inativos preservados no histórico
 * controle explícito de e-mails por revisão da designação, mantendo notificações automáticas desligadas por padrão, um único lembrete automático 4 dias antes e envio manual de confirmação como ação única até a próxima edição
@@ -196,7 +197,7 @@
 * confirmação pública grava `confirmedAt`, `responseAt` e auditoria no Firestore após validação do token
 * confirmação pública protegida com precondition do Firestore para não reativar designação já substituída em paralelo
 * autenticação do worker no Firestore via service account do Firebase, sem depender de usuário técnico
-* template único do EmailJS reaproveitado para confirmação e lembretes com parâmetros padronizados
+* template único do EmailJS reaproveitado para confirmação e lembretes com parâmetros padronizados, incluindo link de mapa da congregação de destino quando cadastrado
 * sincronização da fila preservando estado já processado quando a identidade de entrega não muda, e reabrindo o ciclo apenas quando a entrega realmente muda
 * edição de designação operacional com automação ativa reabre explicitamente a confirmação, usando `ATUALIZAÇÃO` no assunto sem depender da variação de `scheduledFor`
 * lembrete de 4 dias é cancelado quando a automação for ativada depois do horário oficial, sem disparo tardio com texto incorreto
@@ -721,7 +722,7 @@ Entregas realizadas:
 * confirmação pública por link com validação no worker e escrita segura no Firestore
 * envio manual direto do navegador para o EmailJS e cron exclusivo para `reminder4d`
 * segredos mantidos fora do frontend, via variáveis do worker e service account do Firebase
-* template único do EmailJS alimentado por `email_subject`, `to_email`, `reply_to`, `notification_type_label`, `organization_name`, `speaker_name`, `event_date`, `event_type_label`, `local_congregation_name`, `origin_congregation_name`, `theme_number`, `theme_title`, `status_label`, `notes` e `confirmation_url`
+* template único do EmailJS alimentado por `email_subject`, `to_email`, `reply_to`, `notification_type_label`, `organization_name`, `speaker_name`, `event_date`, `event_type_label`, `local_congregation_name`, `local_congregation_maps_url`, `local_congregation_map_link`, `origin_congregation_name`, `theme_number`, `theme_title`, `status_label`, `notes` e `confirmation_url`
 
 Fluxo operacional oficial da Fase 11:
 

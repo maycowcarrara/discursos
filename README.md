@@ -298,6 +298,8 @@ Parâmetros atuais do template único do EmailJS:
 * `speaker_name`
 * `event_date`
 * `event_type_label`
+* `local_congregation_map_link`
+* `local_congregation_maps_url`
 * `local_congregation_name`
 * `origin_congregation_name`
 * `theme_number`

@@ -189,6 +189,7 @@ type CongregationRecord = {
   city: string
   id: string
   isLocal: boolean
+  mapsUrl: string
   meetingTime: string
   name: string
   state: string
@@ -1582,6 +1583,11 @@ async function sendEmail(env: Env, notification: NotificationRecord, assignment:
 
   const confirmationUrl = buildConfirmationUrl(env, assignment)
   const organizationName = assignment.localCongregationName.trim() || 'Congregação local'
+  const destinationCongregation = await getCongregationById(
+    env,
+    assignment.localCongregationId,
+  )
+  const localCongregationMapsUrl = destinationCongregation?.mapsUrl.trim() ?? ''
   const response = await fetch(emailJsSendUrl, {
     method: 'POST',
     headers: {
@@ -1596,7 +1602,12 @@ async function sendEmail(env: Env, notification: NotificationRecord, assignment:
         confirmation_url: confirmationUrl,
         event_date: formatEventDateLabel(assignment.eventDate, defaultLocale),
         event_type_label: eventTypeLabels[assignment.eventType] ?? assignment.eventType,
-        local_congregation_name: assignment.localCongregationName,
+        local_congregation_map_link: buildMapLinkHtml(localCongregationMapsUrl),
+        local_congregation_maps_url: localCongregationMapsUrl,
+        local_congregation_name: buildCongregationNameTemplateValue(
+          assignment.localCongregationName,
+          localCongregationMapsUrl,
+        ),
         notes: assignment.notes,
         notification_type_label: notificationTypeLabels[notification.type],
         organization_name: organizationName,
@@ -1967,6 +1978,7 @@ async function resolveCalendarSyncCongregation(
     city: '',
     id: '',
     isLocal: true,
+    mapsUrl: '',
     meetingTime: '',
     name: congregationName.trim(),
     state: '',
@@ -2393,6 +2405,7 @@ function parseCongregationDocument(document: FirestoreDocument): CongregationRec
     city: getStringField(document, 'city') ?? '',
     id: getDocumentId(document.name),
     isLocal: getRequiredBooleanField(document, 'isLocal'),
+    mapsUrl: getStringField(document, 'mapsUrl') ?? '',
     meetingTime: getStringField(document, 'meetingTime') ?? '',
     name: getRequiredStringField(document, 'name'),
     state: getStringField(document, 'state') ?? '',
@@ -3394,6 +3407,35 @@ function buildConfirmationUrl(env: Env, assignment: AssignmentRecord) {
   confirmationUrl.searchParams.set('token', assignment.confirmationToken ?? '')
 
   return confirmationUrl.toString()
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function buildMapLinkHtml(mapsUrl: string) {
+  const normalizedMapsUrl = mapsUrl.trim()
+
+  if (!normalizedMapsUrl) {
+    return ''
+  }
+
+  return `<a href="${escapeHtml(normalizedMapsUrl)}" target="_blank" rel="noopener noreferrer">Ver mapa</a>`
+}
+
+function buildCongregationNameTemplateValue(name: string, mapsUrl: string) {
+  const mapLinkHtml = buildMapLinkHtml(mapsUrl)
+
+  if (!mapLinkHtml) {
+    return name
+  }
+
+  return `${escapeHtml(name)} ${mapLinkHtml}`
 }
 
 function resolveNotificationBatchSize(env: Env) {
