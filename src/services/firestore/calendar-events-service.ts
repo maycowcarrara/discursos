@@ -34,7 +34,7 @@ import {
   mergeCalendarEventsWithImplicitSaturdaySlots,
 } from '@/services/firestore/calendar-slots-service'
 
-import { appendAuditLogToBatch } from './audit-logs-service'
+import { appendAuditLogToBatch } from './audit-log-writes'
 import {
   buildPendingGoogleCalendarSyncFields,
   buildSyncedGoogleCalendarSyncFields,

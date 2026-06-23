@@ -3,16 +3,12 @@ import type {
   CalendarEventDocument,
   FirestoreRecord,
 } from '@/types/firestore'
-import {
-  selectUpcomingSaturdayEvents,
-  selectUpcomingSpecialCalendarEvents,
-} from '@/utils/dashboard'
 
-import { listAssignmentsByCalendarEventIds } from './assignments-service'
+import { listUpcomingAssignments } from './assignments-service'
 import { listCalendarEventsByYear } from './calendar-events-service'
 
-const DASHBOARD_SATURDAY_TARGET = 8
-const DASHBOARD_SPECIAL_TARGET = 4
+const DASHBOARD_ASSIGNMENT_TARGET = 80
+
 async function listUpcomingDashboardCalendarEvents(referenceDate: Date) {
   const currentYear = referenceDate.getFullYear()
   const nextYear = currentYear + 1
@@ -34,26 +30,10 @@ export type DashboardSnapshot = {
 export async function getDashboardSnapshot(
   referenceDate: Date,
 ): Promise<DashboardSnapshot> {
-  const calendarEvents = await listUpcomingDashboardCalendarEvents(referenceDate)
-  const relevantEventIds = Array.from(
-    new Set([
-      ...calendarEvents.map((event) => event.id),
-      ...selectUpcomingSaturdayEvents(
-        calendarEvents,
-        referenceDate,
-        DASHBOARD_SATURDAY_TARGET,
-      ).map((event) => event.id),
-      ...selectUpcomingSpecialCalendarEvents(
-        calendarEvents,
-        referenceDate,
-        DASHBOARD_SPECIAL_TARGET,
-      ).map((event) => event.id),
-    ]),
-  )
-  const assignments =
-    relevantEventIds.length > 0
-      ? await listAssignmentsByCalendarEventIds(relevantEventIds)
-      : []
+  const [calendarEvents, assignments] = await Promise.all([
+    listUpcomingDashboardCalendarEvents(referenceDate),
+    listUpcomingAssignments(referenceDate, DASHBOARD_ASSIGNMENT_TARGET),
+  ])
 
   return {
     assignments,

@@ -52,6 +52,12 @@ export default defineConfig({
               priority: 40,
             },
             {
+              name: 'vendor-firebase-firestore',
+              test: /node_modules[\\/](?:@firebase[\\/](?:firestore|webchannel-wrapper)|firebase[\\/]firestore)/,
+              maxSize: 450 * 1024,
+              priority: 35,
+            },
+            {
               name: 'vendor-react',
               test: /node_modules[\\/](?:react|react-dom|react-router|react-router-dom|scheduler)[\\/]/,
               priority: 30,

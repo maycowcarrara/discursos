@@ -2,7 +2,7 @@ import { Timestamp, doc, writeBatch } from 'firebase/firestore'
 
 import { env } from '@/config/env'
 import { firebaseDb } from '@/lib/firebase-db'
-import { appendAuditLogToBatch } from '@/services/firestore/audit-logs-service'
+import { appendAuditLogToBatch } from '@/services/firestore/audit-log-writes'
 import type { ManualAssignmentEmailDelivery } from '@/services/firestore/assignments-service'
 import { assignmentStatusLabels, calendarEventTypeLabels } from '@/utils/calendar-events'
 

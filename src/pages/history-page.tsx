@@ -24,7 +24,10 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { useAssignmentHistoryInfiniteQuery } from '@/hooks/use-assignments'
+import {
+  useAssignmentHistoryInfiniteQuery,
+  useAssignmentHistoryQuery,
+} from '@/hooks/use-assignments'
 import { useCongregationsManagementQuery } from '@/hooks/use-congregations'
 import { useSpeakersManagementQuery } from '@/hooks/use-speakers'
 import { useThemesManagementQuery } from '@/hooks/use-themes'
@@ -196,6 +199,10 @@ export function HistoryPage() {
   const [congregationFilter, setCongregationFilter] = useState('all')
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [periodFeedback, setPeriodFeedback] = useState<string | null>(null)
+  const hasLocalFilters =
+    speakerFilter !== 'all' ||
+    themeFilter !== 'all' ||
+    congregationFilter !== 'all'
 
   const historyQuery = useAssignmentHistoryInfiniteQuery(
     {
@@ -203,6 +210,14 @@ export function HistoryPage() {
       periodEnd: appliedPeriod.periodEnd || null,
     },
     historyPageSize,
+    !hasLocalFilters,
+  )
+  const fullHistoryQuery = useAssignmentHistoryQuery(
+    {
+      periodStart: appliedPeriod.periodStart || null,
+      periodEnd: appliedPeriod.periodEnd || null,
+    },
+    hasLocalFilters,
   )
   const congregationsQuery = useCongregationsManagementQuery()
   const speakersQuery = useSpeakersManagementQuery()
@@ -252,8 +267,11 @@ export function HistoryPage() {
   )
 
   const loadedAssignments = useMemo(
-    () => historyQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [historyQuery.data],
+    () =>
+      hasLocalFilters
+        ? fullHistoryQuery.data ?? []
+        : historyQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [fullHistoryQuery.data, hasLocalFilters, historyQuery.data],
   )
 
   const filteredAssignments = useMemo(() => {
@@ -302,8 +320,16 @@ export function HistoryPage() {
   const shouldShowFilterPanel =
     isFiltersOpen ||
     historyQuery.isError ||
+    fullHistoryQuery.isError ||
     Boolean(filterOptionsError) ||
     Boolean(periodFeedback)
+  const historyIsLoading = hasLocalFilters
+    ? fullHistoryQuery.isLoading
+    : historyQuery.isLoading
+  const historyIsError = hasLocalFilters
+    ? fullHistoryQuery.isError
+    : historyQuery.isError
+  const historyError = hasLocalFilters ? fullHistoryQuery.error : historyQuery.error
 
   function handleApplyPeriod() {
     if (
@@ -439,9 +465,9 @@ export function HistoryPage() {
         </CardHeader>
         {shouldShowFilterPanel ? (
           <CardContent className="space-y-5 p-4 pt-0">
-            {historyQuery.isError ? (
+            {historyIsError ? (
               <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
-                {getErrorMessage(historyQuery.error)}
+                {getErrorMessage(historyError)}
               </div>
             ) : null}
 
@@ -566,11 +592,14 @@ export function HistoryPage() {
         <CardHeader className="p-4">
           <CardTitle className="text-xl">Linha do tempo</CardTitle>
           <CardDescription>
-            A consulta atual cobre {buildPeriodSummary(appliedPeriod.periodStart, appliedPeriod.periodEnd)} com carregamento progressivo.
+            A consulta atual cobre {buildPeriodSummary(appliedPeriod.periodStart, appliedPeriod.periodEnd)}
+            {hasLocalFilters
+              ? ' e carrega todo o período para aplicar os filtros.'
+              : ' com carregamento progressivo.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 pt-0">
-          {historyQuery.isLoading ? (
+          {historyIsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }, (_, index) => (
                 <div
@@ -581,8 +610,8 @@ export function HistoryPage() {
             </div>
           ) : null}
 
-          {!historyQuery.isLoading &&
-          !historyQuery.isError &&
+          {!historyIsLoading &&
+          !historyIsError &&
           loadedAssignments.length === 0 ? (
             <EmptyState
               title="Nenhuma designação encontrada"
@@ -590,8 +619,8 @@ export function HistoryPage() {
             />
           ) : null}
 
-          {!historyQuery.isLoading &&
-          !historyQuery.isError &&
+          {!historyIsLoading &&
+          !historyIsError &&
           loadedAssignments.length > 0 &&
           filteredAssignments.length === 0 ? (
             <EmptyState
@@ -600,8 +629,8 @@ export function HistoryPage() {
             />
           ) : null}
 
-          {!historyQuery.isLoading &&
-          !historyQuery.isError &&
+          {!historyIsLoading &&
+          !historyIsError &&
           timelineSections.length > 0 ? (
             <div className="space-y-6">
               {timelineSections.map((section) => (
@@ -675,7 +704,7 @@ export function HistoryPage() {
                 </section>
               ))}
 
-              {historyQuery.hasNextPage ? (
+              {!hasLocalFilters && historyQuery.hasNextPage ? (
                 <div className="flex justify-center">
                   <Button
                     variant="outline"
@@ -691,7 +720,9 @@ export function HistoryPage() {
                 </div>
               ) : loadedAssignments.length > 0 ? (
                 <div className="rounded-xl border border-dashed border-border bg-background px-4 py-3 text-center text-sm text-muted-foreground">
-                  Todos os registros disponíveis para este filtro já foram carregados.
+                  {hasLocalFilters
+                    ? 'Todos os registros do período foram considerados pelos filtros.'
+                    : 'Todos os registros disponíveis para este período já foram carregados.'}
                 </div>
               ) : null}
             </div>

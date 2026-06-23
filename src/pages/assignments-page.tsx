@@ -3,6 +3,7 @@ import {
   ArrowRightLeft,
   Ban,
   CalendarDays,
+  ChevronDown,
   CheckCircle2,
   CircleAlert,
   Clock3,
@@ -48,6 +49,7 @@ import {
 import type { ImmediateCalendarSyncResult } from '@/services/calendar/google-calendar-delivery-service'
 import { useCalendarSettingsQuery } from '@/hooks/use-app-settings'
 import {
+  useAssignmentsByYearInfiniteQuery,
   useAssignmentsByYearQuery,
   useConfirmAssignmentMutation,
   useCreateAssignmentMutation,
@@ -111,6 +113,7 @@ const selectClassName =
 const emailDeliveryConfigured = isEmailDeliveryConfigured()
 const assignmentFormId = 'assignment-form'
 const specialEventFormId = 'special-event-form'
+const assignmentPageSize = 40
 
 const assignmentFormSchema = z.object({
   calendarEventId: z.string().trim().min(1, 'Selecione o sábado da designação.'),
@@ -740,7 +743,20 @@ export function AssignmentsPage() {
   const specialEventYear = requestedCalendarEventYear ?? activeYear
   const shouldLoadRequestedCalendarEventYear =
     requestedCalendarEventYear !== null && requestedCalendarEventYear !== activeYear
-  const assignmentsQuery = useAssignmentsByYearQuery(activeYear)
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const hasAssignmentListFilters =
+    normalizedSearch.length > 0 ||
+    statusFilter !== 'all' ||
+    movementFilter !== 'all'
+  const assignmentsQuery = useAssignmentsByYearQuery(
+    activeYear,
+    hasAssignmentListFilters,
+  )
+  const assignmentsPageQuery = useAssignmentsByYearInfiniteQuery(
+    activeYear,
+    assignmentPageSize,
+    !hasAssignmentListFilters,
+  )
   const requestedYearAssignmentsQuery = useAssignmentsByYearQuery(
     requestedCalendarEventYear ?? activeYear,
     shouldLoadRequestedCalendarEventYear,
@@ -763,10 +779,18 @@ export function AssignmentsPage() {
     useRequestManualAssignmentConfirmationEmailMutation()
   const requestManualGoogleCalendarSyncMutation = useRequestManualGoogleCalendarSyncMutation()
 
+  const pagedAssignments = useMemo(
+    () => assignmentsPageQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [assignmentsPageQuery.data],
+  )
+  const activeYearAssignments = useMemo(
+    () => (hasAssignmentListFilters ? assignmentsQuery.data ?? [] : pagedAssignments),
+    [assignmentsQuery.data, hasAssignmentListFilters, pagedAssignments],
+  )
   const assignments = useMemo(
     () =>
       [
-        ...(assignmentsQuery.data ?? []),
+        ...activeYearAssignments,
         ...(shouldLoadRequestedCalendarEventYear
           ? requestedYearAssignmentsQuery.data ?? []
           : []),
@@ -780,7 +804,7 @@ export function AssignmentsPage() {
         return right.updatedAt.toMillis() - left.updatedAt.toMillis()
       }),
     [
-      assignmentsQuery.data,
+      activeYearAssignments,
       requestedYearAssignmentsQuery.data,
       shouldLoadRequestedCalendarEventYear,
     ],
@@ -1190,7 +1214,6 @@ export function AssignmentsPage() {
       ) ?? null
     : null
 
-  const normalizedSearch = searchTerm.trim().toLowerCase()
   const filteredAssignments = assignments.filter((assignment) => {
     const movement = inferAssignmentMovementType(assignment, congregationsById)
     const matchesMovement = movementFilter === 'all' || movementFilter === movement
@@ -1267,9 +1290,15 @@ export function AssignmentsPage() {
     calendarSettingsQuery.data?.enabled === true &&
     calendarSettingsQuery.data.autoSyncAssignmentsEnabled === true
   const shouldHideManualGoogleCalendarSyncButton = isAutomaticCalendarSyncEnabled
+  const assignmentsListIsLoading =
+    hasAssignmentListFilters ? assignmentsQuery.isLoading : assignmentsPageQuery.isLoading
+  const assignmentsListIsError =
+    hasAssignmentListFilters ? assignmentsQuery.isError : assignmentsPageQuery.isError
+  const assignmentListError =
+    hasAssignmentListFilters ? assignmentsQuery.error : assignmentsPageQuery.error
 
   const totalQueryErrors = [
-    assignmentsQuery.error,
+    assignmentListError,
     requestedYearAssignmentsQuery.error,
     recentAssignmentsQuery.error,
     calendarEventsQuery.error,
@@ -2322,6 +2351,11 @@ export function AssignmentsPage() {
             <span className="font-medium text-foreground">
               {filteredAssignments.length}/{assignments.length}
             </span>
+            {hasAssignmentListFilters ? (
+              <span className="hidden text-muted-foreground sm:inline">
+                em todo o ano
+              </span>
+            ) : null}
           </div>
         }
       />
@@ -3222,7 +3256,7 @@ export function AssignmentsPage() {
 
         <Card>
           <CardContent className="space-y-4 p-3 sm:p-4">
-            {assignmentsQuery.isLoading || calendarEventsQuery.isLoading ? (
+            {assignmentsListIsLoading || calendarEventsQuery.isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }, (_, index) => (
                   <div
@@ -3233,8 +3267,8 @@ export function AssignmentsPage() {
               </div>
             ) : null}
 
-            {!assignmentsQuery.isLoading &&
-            !assignmentsQuery.isError &&
+            {!assignmentsListIsLoading &&
+            !assignmentsListIsError &&
             filteredAssignments.length === 0 ? (
               <EmptyState
                 title={
@@ -3250,8 +3284,8 @@ export function AssignmentsPage() {
               />
             ) : null}
 
-            {!assignmentsQuery.isLoading &&
-            !assignmentsQuery.isError &&
+            {!assignmentsListIsLoading &&
+            !assignmentsListIsError &&
             filteredAssignments.length > 0 ? (
               <div className="space-y-3">
                 {filteredAssignments.map((assignment) => {
@@ -3567,6 +3601,25 @@ export function AssignmentsPage() {
                     </div>
                   )
                 })}
+                {!hasAssignmentListFilters && assignmentsPageQuery.hasNextPage ? (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => void assignmentsPageQuery.fetchNextPage()}
+                      disabled={assignmentsPageQuery.isFetchingNextPage}
+                    >
+                      <ChevronDown className="size-4" />
+                      {assignmentsPageQuery.isFetchingNextPage
+                        ? 'Carregando mais designações...'
+                        : `Carregar mais ${assignmentPageSize} designações`}
+                    </Button>
+                  </div>
+                ) : !hasAssignmentListFilters && assignments.length > 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-background px-4 py-3 text-center text-sm text-muted-foreground">
+                    Todas as designações carregadas para este ano.
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </CardContent>

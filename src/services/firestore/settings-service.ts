@@ -23,7 +23,7 @@ import {
   type FirestoreRecord,
 } from '@/types/firestore'
 
-import { appendAuditLogToBatch } from './audit-logs-service'
+import { appendAuditLogToBatch } from './audit-log-writes'
 import { buildPendingGoogleCalendarSyncFields } from './google-calendar-sync-service'
 import { getTypedDocument } from './shared'
 

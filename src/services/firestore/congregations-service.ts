@@ -17,7 +17,7 @@ import {
   type FirestoreRecord,
 } from '@/types/firestore'
 
-import { appendAuditLogToBatch } from './audit-logs-service'
+import { appendAuditLogToBatch } from './audit-log-writes'
 import { getTypedCollection, getTypedDocument } from './shared'
 
 export type CongregationFormValues = {

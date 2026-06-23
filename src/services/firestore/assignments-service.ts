@@ -45,7 +45,7 @@ import {
   mergeNotificationDocumentForSync,
 } from '@/utils/notification-sync'
 
-import { appendAuditLogToBatch } from './audit-logs-service'
+import { appendAuditLogToBatch } from './audit-log-writes'
 import {
   buildImplicitCalendarEventFromId,
   buildMaterializedImplicitPublicTalkDocument,
@@ -110,9 +110,16 @@ export type ListAssignmentHistoryInput = {
 }
 
 export type AssignmentHistoryCursor = QueryDocumentSnapshot<DocumentData>
+export type AssignmentYearCursor = QueryDocumentSnapshot<DocumentData>
 
 export type ListAssignmentHistoryPageInput = ListAssignmentHistoryInput & {
   cursor?: AssignmentHistoryCursor | null
+  pageSize?: number
+}
+
+export type ListAssignmentsByYearPageInput = {
+  year: number
+  cursor?: AssignmentYearCursor | null
   pageSize?: number
 }
 
@@ -122,7 +129,14 @@ export type AssignmentHistoryPage = {
   hasMore: boolean
 }
 
+export type AssignmentYearPage = {
+  items: Array<FirestoreRecord<AssignmentDocument>>
+  nextCursor: AssignmentYearCursor | null
+  hasMore: boolean
+}
+
 const defaultAssignmentHistoryPageSize = 40
+const defaultAssignmentYearPageSize = 40
 
 export const defaultAssignmentFormValues: AssignmentFormValues = {
   calendarEventId: '',
@@ -858,6 +872,45 @@ export async function listAssignmentsByYear(
   return getTypedCollection(assignmentsQuery, assignmentSchema)
 }
 
+export async function listAssignmentsByYearPage({
+  cursor,
+  pageSize = defaultAssignmentYearPageSize,
+  year,
+}: ListAssignmentsByYearPageInput): Promise<AssignmentYearPage> {
+  const sanitizedPageSize = Math.max(1, Math.min(pageSize, 100))
+  const rangeStart = Timestamp.fromDate(new Date(year, 0, 1, 0, 0, 0, 0))
+  const rangeEnd = Timestamp.fromDate(new Date(year + 1, 0, 1, 0, 0, 0, 0))
+  const constraints: QueryConstraint[] = [
+    where('eventDate', '>=', rangeStart),
+    where('eventDate', '<', rangeEnd),
+    orderBy('eventDate', 'desc'),
+  ]
+
+  if (cursor) {
+    constraints.push(startAfter(cursor))
+  }
+
+  constraints.push(limit(sanitizedPageSize))
+
+  const assignmentsQuery = query(getAssignmentsCollection(), ...constraints)
+  const snapshot = await getDocs(assignmentsQuery)
+  const items = snapshot.docs.map((documentSnapshot) => {
+    const parsedAssignment = assignmentSchema.parse(documentSnapshot.data())
+
+    return {
+      id: documentSnapshot.id,
+      ...parsedAssignment,
+    }
+  })
+  const nextCursor = snapshot.docs.at(-1) ?? null
+
+  return {
+    items,
+    nextCursor,
+    hasMore: snapshot.docs.length === sanitizedPageSize,
+  }
+}
+
 export async function listRecentAssignments(
   maxItems: number,
 ): Promise<Array<FirestoreRecord<AssignmentDocument>>> {
@@ -868,6 +921,21 @@ export async function listRecentAssignments(
   )
 
   return getTypedCollection(recentAssignmentsQuery, assignmentSchema)
+}
+
+export async function listUpcomingAssignments(
+  referenceDate: Date,
+  maxItems: number,
+): Promise<Array<FirestoreRecord<AssignmentDocument>>> {
+  const sanitizedMaxItems = Math.max(1, Math.min(maxItems, 100))
+  const upcomingAssignmentsQuery = query(
+    getAssignmentsCollection(),
+    where('eventDate', '>=', Timestamp.fromDate(referenceDate)),
+    orderBy('eventDate', 'asc'),
+    limit(sanitizedMaxItems),
+  )
+
+  return getTypedCollection(upcomingAssignmentsQuery, assignmentSchema)
 }
 
 export async function listAssignmentsByCalendarEventIds(

@@ -4,7 +4,7 @@ import { firebaseDb } from '@/lib/firebase-db'
 import { calendarEventSchema } from '@/types/firestore'
 import type { CalendarEventDocument } from '@/types/firestore'
 
-import { appendAuditLogToBatch } from './audit-logs-service'
+import { appendAuditLogToBatch } from './audit-log-writes'
 import { getTypedDocument } from './shared'
 
 type CalendarEventGoogleSyncFields = Pick<

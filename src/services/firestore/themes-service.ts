@@ -23,7 +23,7 @@ import {
 } from '@/types/firestore'
 import type { ThemeImportComparable } from '@/utils/theme-catalog-import'
 
-import { appendAuditLogToBatch, appendAuditLogToTransaction } from './audit-logs-service'
+import { appendAuditLogToBatch, appendAuditLogToTransaction } from './audit-log-writes'
 import { getTypedCollection, getTypedDocument } from './shared'
 
 const maxBatchWrites = 450
