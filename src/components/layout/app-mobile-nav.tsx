@@ -36,14 +36,18 @@ export function AppMobileNav({ onOpenMenu }: AppMobileNavProps) {
           cn(
             'flex min-w-0 flex-col items-center justify-center gap-1 text-center font-bold leading-tight transition-colors',
             isDashboard
-              ? '-mt-5 h-16 rounded-2xl bg-blue-600 px-2 text-[10px] text-white shadow-lg ring-4 ring-white hover:bg-blue-700 dark:ring-card'
+              ? '-mt-5 h-16 rounded-2xl px-2 text-[10px] shadow-lg ring-4 ring-white dark:ring-card'
               : 'h-14 rounded-lg px-1.5 py-2 text-[11px]',
+            isDashboard && (
+              isActive
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700 dark:bg-card dark:text-muted-foreground dark:hover:bg-accent'
+            ),
             !isDashboard && (
               isActive
                 ? 'bg-blue-600 text-white shadow-sm'
                 : 'text-slate-500 hover:bg-blue-50 hover:text-blue-700 dark:text-muted-foreground dark:hover:bg-accent'
             ),
-            isDashboard && isActive && 'bg-blue-700',
           )
         }
       >

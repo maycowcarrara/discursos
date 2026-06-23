@@ -53,19 +53,27 @@ export function AppShell() {
 
       <div
         className={cn(
-          'fixed inset-0 z-40 transition lg:hidden',
+          'fixed inset-0 z-40 lg:hidden',
           isMobileMenuOpen
-            ? 'pointer-events-auto opacity-100'
-            : 'pointer-events-none opacity-0',
+            ? 'pointer-events-auto'
+            : 'pointer-events-none',
         )}
       >
         <button
           type="button"
-          className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm dark:bg-slate-950/65"
+          className={cn(
+            'absolute inset-0 bg-slate-950/45 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none dark:bg-slate-950/65',
+            isMobileMenuOpen ? 'opacity-100' : 'opacity-0',
+          )}
           aria-label="Fechar menu"
           onClick={() => setIsMobileMenuOpen(false)}
         />
-        <div className="absolute inset-y-0 right-0 h-full w-[min(20rem,calc(100vw-2rem))] shadow-2xl">
+        <div
+          className={cn(
+            'absolute inset-y-0 right-0 h-full w-[min(20rem,calc(100vw-2rem))] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none',
+            isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full',
+          )}
+        >
           <AppSidebar
             mobile
             onNavigate={() => setIsMobileMenuOpen(false)}
