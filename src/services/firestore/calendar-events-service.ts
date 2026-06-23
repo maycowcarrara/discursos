@@ -230,6 +230,19 @@ function buildCalendarEventPayload(
   return payload
 }
 
+function removeBlankCalendarEventDescription(
+  calendarEvent: CalendarEventDocument,
+): CalendarEventDocument {
+  if (calendarEvent.description?.trim()) {
+    return calendarEvent
+  }
+
+  const { description, ...calendarEventWithoutDescription } = calendarEvent
+  void description
+
+  return calendarEventWithoutDescription
+}
+
 function buildCalendarEventGoogleSyncFields(
   type: CalendarEventType,
   isActive: boolean,
@@ -453,7 +466,7 @@ export async function updateCalendarEvent({
   }
 
   const now = Timestamp.now()
-  const updatedCalendarEvent: CalendarEventDocument = {
+  const updatedCalendarEvent = removeBlankCalendarEventDescription({
     ...stripRecordId(existingCalendarEvent),
     ...payload,
     ...buildUpdatedCalendarEventGoogleSyncFields(
@@ -464,7 +477,7 @@ export async function updateCalendarEvent({
     ),
     updatedAt: now,
     updatedBy: actorUid,
-  }
+  })
 
   if (nextCalendarEventRef.id !== calendarEventRef.id) {
     await runTransaction(firebaseDb, async (transaction) => {

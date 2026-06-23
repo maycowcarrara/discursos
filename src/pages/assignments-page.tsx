@@ -2237,7 +2237,6 @@ export function AssignmentsPage() {
         description="Defina orador e tema para cada sábado de reunião, com visitantes, locais e confirmações no mesmo fluxo."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-primary/10 text-primary">{activeYear}</Badge>
             <Button
               variant="outline"
               onClick={handleStartSpecialEvent}
