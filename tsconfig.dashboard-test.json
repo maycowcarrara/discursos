@@ -17,5 +17,6 @@
     "src/types/firestore.ts",
     "src/utils/dashboard.ts",
     "src/utils/dashboard.test.ts"
-  ]
+  ],
+  "exclude": []
 }

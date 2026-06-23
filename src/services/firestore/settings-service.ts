@@ -37,6 +37,7 @@ export type SaveAppSettingsInput = AppSettingsFormValues & {
 
 export type CalendarSettingsFormValues = {
   enabled: boolean
+  autoSyncAssignmentsEnabled: boolean
   calendarId: string
   defaultStartTime: string
   defaultDurationMinutes: number
@@ -58,6 +59,7 @@ export const defaultAppSettingsValues: AppSettingsFormValues = {
 
 export const defaultCalendarSettingsValues: CalendarSettingsFormValues = {
   enabled: false,
+  autoSyncAssignmentsEnabled: false,
   calendarId: '',
   defaultStartTime: '19:30',
   defaultDurationMinutes: 90,
@@ -102,6 +104,7 @@ export function toCalendarSettingsFormValues(
 
   return {
     enabled: settings.enabled,
+    autoSyncAssignmentsEnabled: settings.autoSyncAssignmentsEnabled,
     calendarId: settings.calendarId,
     defaultStartTime: settings.defaultStartTime,
     defaultDurationMinutes: settings.defaultDurationMinutes,
@@ -223,6 +226,7 @@ export async function saveAppSettings({
 export async function saveCalendarSettings({
   actorName,
   actorUid,
+  autoSyncAssignmentsEnabled,
   calendarId,
   defaultDurationMinutes,
   defaultStartTime,
@@ -233,6 +237,7 @@ export async function saveCalendarSettings({
   const now = Timestamp.now()
   const nextCalendarSettings: CalendarSettingsDocument = {
     enabled,
+    autoSyncAssignmentsEnabled,
     calendarId: calendarId.trim(),
     defaultStartTime: defaultStartTime.trim(),
     defaultDurationMinutes,
@@ -247,6 +252,7 @@ export async function saveCalendarSettings({
   }
   const queueFullSync = shouldQueueFullCalendarSync(existingSettings, {
     enabled,
+    autoSyncAssignmentsEnabled,
     calendarId,
     defaultStartTime,
     defaultDurationMinutes,

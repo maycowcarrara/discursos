@@ -36,6 +36,7 @@ import {
 } from '@/types/firestore'
 import { buildAssignmentNotificationPlan } from '@/utils/assignment-notifications'
 import {
+  doesCalendarEventBlockAssignments,
   isAssignmentCoveringCalendarSlot,
   toLocalDateKey,
 } from '@/utils/calendar-events'
@@ -619,7 +620,7 @@ async function assertCalendarEventExists(id: string) {
   const calendarEvent = await getTypedDocument(getCalendarEventRef(id), calendarEventSchema)
 
   if (calendarEvent?.isActive) {
-    if (calendarEvent.blocksAssignments) {
+    if (doesCalendarEventBlockAssignments(calendarEvent)) {
       throw new Error(
         'Este evento bloqueia designacoes oficialmente. Escolha um sabado ou evento liberado.',
       )
@@ -747,7 +748,7 @@ function assertCalendarEventAllowsAssignments(
     throw new Error('O sábado selecionado não está mais disponível no calendário ativo.')
   }
 
-  if (calendarEvent.blocksAssignments) {
+  if (doesCalendarEventBlockAssignments(calendarEvent)) {
     throw new Error(
       'Este evento bloqueia designacoes oficialmente. Escolha um sabado ou evento liberado.',
     )

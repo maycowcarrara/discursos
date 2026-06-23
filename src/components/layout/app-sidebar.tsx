@@ -94,7 +94,7 @@ export function AppSidebar({
         className={cn(
           'flex h-full flex-col overflow-hidden bg-sidebar text-sidebar-foreground shadow-xl transition-all duration-300 ease-in-out',
           mobile
-            ? 'w-72 border-l border-blue-500/30'
+            ? 'w-full border-l border-blue-500/30'
             : 'h-full min-h-0 border-r border-blue-500/30',
         )}
       >

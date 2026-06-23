@@ -21,6 +21,7 @@ import {
 } from '@/types/firestore'
 import {
   calendarEventDefaultTitles,
+  doesCalendarEventBlockAssignments,
   formatDateInputValue,
   getBlocksAssignmentsForEventType,
   listSaturdayDateValuesForYear,
@@ -324,6 +325,14 @@ export async function createCalendarEvent({
   const calendarEventRef = payload.isActive
     ? getActiveCalendarEventRef(dateKey)
     : doc(getCalendarEventsCollection())
+  const assignmentCount = await getAssignmentCountByCalendarEventId(calendarEventRef.id)
+
+  if (assignmentCount > 0 && getBlocksAssignmentsForEventType(payload.type)) {
+    throw new Error(
+      'Este sábado já possui histórico de designação e não pode virar bloqueio oficial agora.',
+    )
+  }
+
   const calendarEventDocument: CalendarEventDocument = {
     ...payload,
     ...buildCalendarEventGoogleSyncFields(payload.type, payload.isActive, now),
@@ -426,7 +435,7 @@ export async function updateCalendarEvent({
   if (
     assignmentCount > 0 &&
     getBlocksAssignmentsForEventType(payload.type) &&
-    !existingCalendarEvent.blocksAssignments
+    !doesCalendarEventBlockAssignments(existingCalendarEvent)
   ) {
     throw new Error(
       'Este evento ja possui designacoes vinculadas e nao pode virar bloqueio oficial agora.',

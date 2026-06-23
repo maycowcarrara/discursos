@@ -44,6 +44,9 @@ async function invalidateCalendarQueries(
     queryClient.invalidateQueries({
       queryKey: ['firestore', 'auditLogs'],
     }),
+    queryClient.invalidateQueries({
+      queryKey: ['firestore', 'dashboard'],
+    }),
   ])
 }
 

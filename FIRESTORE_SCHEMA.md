@@ -138,6 +138,7 @@ Exemplo de `settings/calendar`:
 ```ts
 {
   enabled: boolean
+  autoSyncAssignmentsEnabled: boolean
   calendarId: string
   defaultStartTime: string // formato HH:mm
   defaultDurationMinutes: number
@@ -155,6 +156,7 @@ Exemplo de `settings/calendar`:
 Observações:
 
 * `settings/calendar` concentra apenas configuração operacional e status global da integração
+* `autoSyncAssignmentsEnabled` controla se salvamentos, edições e cancelamentos operacionais em `assignments` devem solicitar e processar imediatamente a sincronização do Google Calendar; quando ativo junto com `enabled`, a UI deve ocultar o botão manual `Sincronizar Agenda` em Designações
 * `configurationUpdatedAt` registra apenas a última mudança feita na configuração, sem ser sobrescrito pelos ciclos do worker
 * segredos continuam fora do frontend e do Firestore, no worker
 * a troca de `calendarId` deve preservar rastreabilidade pelo vínculo remoto salvo em `calendarEvents`
@@ -363,7 +365,8 @@ Campos:
 
 Observações:
 
-* para congressos e assembleias, `blocksAssignments` deve ser `true`
+* para congressos, assembleias, visitas e eventos especiais, `blocksAssignments` deve ser `true`
+* `description` guarda observações livres para qualquer exceção de sábado, incluindo tema escolhido pelo superintendente de circuito, local de assembleia/congresso ou motivo de um evento especial
 * sábados comuns podem viver implicitamente nesta coleção lógica sem documento salvo
 * a UI operacional renderiza slots regulares de `publicTalk` implicitamente a partir dos sábados do ano
 * quando existir um `calendarEvents` ativo na mesma data, ele passa a ser a fonte oficial da exceção, bloqueio ou personalização daquele dia
@@ -371,15 +374,15 @@ Observações:
 * o vínculo remoto do Google Calendar deve ficar neste documento, nunca em coleção paralela
 * `googleCalendarEventId` identifica o evento remoto atual
 * `googleCalendarCalendarId` registra em qual calendário remoto o vínculo foi criado, permitindo migração segura de `calendarId`
-* `googleCalendarSyncStatus` registra o estado técnico da integração; o botão manual `Sincronizar Agenda` chama o worker e conclui a tentativa na mesma ação, sem depender do cron
-* `googleCalendarManualSyncRequestedAt` registra a última aprovação manual para publicar, atualizar ou remover o item operacional no Google Calendar
+* `googleCalendarSyncStatus` registra o estado técnico da integração; o botão manual `Sincronizar Agenda` ou a sincronização automática das designações chama o worker e conclui a tentativa na mesma ação, sem depender do cron
+* `googleCalendarManualSyncRequestedAt` registra a última aprovação administrativa para publicar, atualizar ou remover o item operacional no Google Calendar; quando `settings/calendar.autoSyncAssignmentsEnabled = true`, o salvamento da designação passa a ser essa aprovação
 * `googleCalendarClaimId` e `googleCalendarClaimedAt` implementam lease temporário para impedir processamento concorrente do mesmo item
 * `googleCalendarRetryCount` e `googleCalendarSyncScheduledFor` controlam retentativas sem perder a pendência após falha transitória
 * o ID enviado ao Google Calendar deve ser determinístico a partir de `calendarEvents/{id}`, para que uma retomada após falha não duplique o evento remoto
 * campos técnicos de sincronização não devem sobrescrever `updatedAt`, que continua representando mudança real feita no calendário administrativo
 * slots regulares de `publicTalk` não precisam existir no Firestore para aparecer no Dashboard/Designações e também não devem ser publicados no Google Calendar enquanto estiverem sem designação
-* qualquer designação operacional `pending` ou `confirmed` — `orador visitante`, `designação local` ou `discurso fora` — pode ser publicada manualmente no Google Calendar
-* edições, cancelamentos e substituições exigem nova solicitação manual para atualizar ou remover o evento remoto já vinculado
+* qualquer designação operacional `pending` ou `confirmed` — `orador visitante`, `designação local` ou `discurso fora` — pode ser publicada no Google Calendar pelo botão manual ou automaticamente após salvamento, conforme configuração
+* edições, cancelamentos e substituições exigem nova solicitação para atualizar ou remover o evento remoto já vinculado; essa solicitação pode ser automática quando `autoSyncAssignmentsEnabled` estiver ativo
 * quando houver publicação de uma designação, o worker pode usar `assignments.speakerId` para buscar `speakers.email` e tentar adicionar o orador como convidado; se a service account não tiver delegação no domínio, o evento é publicado sem convidado
 * não criar coleção paralela como `events`, `schedules` ou `annualCalendar`
 
@@ -602,7 +605,7 @@ Uma designação só pode ser criada se `themeId` existir em `speakers.themeIds`
 
 ### RN002
 
-Não criar designação quando `calendarEvents.type = "congress"`.
+Não criar designação quando `calendarEvents.type = "congress"`, `"visit"` ou `"special"`.
 
 ### RN003
 

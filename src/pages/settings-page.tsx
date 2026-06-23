@@ -55,6 +55,7 @@ import {
 const calendarSettingsFormSchema = z
   .object({
     enabled: z.boolean(),
+    autoSyncAssignmentsEnabled: z.boolean(),
     calendarId: z.string().trim(),
     defaultStartTime: z
       .string()
@@ -284,6 +285,22 @@ export function SettingsPage() {
                   </div>
                 </label>
 
+                <label className="flex items-start gap-3 rounded-lg border border-border bg-background px-4 py-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 rounded border-border text-primary"
+                    {...registerCalendar('autoSyncAssignmentsEnabled')}
+                  />
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-foreground">
+                      Sincronizar designações automaticamente
+                    </span>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      Quando ligado, salvamentos, edições e cancelamentos atualizam a agenda sem o botão manual.
+                    </p>
+                  </div>
+                </label>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-2 md:col-span-2">
                     <span className="text-sm font-medium text-foreground">
@@ -385,18 +402,6 @@ export function SettingsPage() {
                       : 'A integração ainda não foi configurada.'}
                   </p>
                   <div className="flex flex-col gap-3 sm:flex-row">
-                    <Button
-                      variant="outline"
-                      type="button"
-                      disabled={isCalendarLoading || isCalendarSaving}
-                      onClick={() =>
-                        resetCalendar(
-                          toCalendarSettingsFormValues(calendarSettingsQuery.data),
-                        )
-                      }
-                    >
-                      Restaurar valores
-                    </Button>
                     <Button
                       type="submit"
                       disabled={

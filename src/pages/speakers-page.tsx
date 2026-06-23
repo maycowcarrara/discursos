@@ -348,7 +348,7 @@ export function SpeakersPage() {
 
   const editingSpeaker = speakersQuery.data?.find((item) => item.id === editingId) ?? null
   const {
-    formState: { errors, isDirty },
+    formState: { errors },
     handleSubmit,
     register,
     reset,
@@ -796,14 +796,6 @@ export function SpeakersPage() {
                   : 'O cadastro permanece no histórico mesmo quando sai da base ativa.'}
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={isSubmitting || !isDirty}
-                  onClick={() => reset(toSpeakerFormValues(editingSpeaker))}
-                >
-                  Restaurar
-                </Button>
                 <Button
                   variant="outline"
                   type="button"

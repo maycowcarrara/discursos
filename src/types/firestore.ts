@@ -102,6 +102,7 @@ export const calendarSettingsSchema = baseDocumentSchema
   .merge(authoredDocumentSchema)
   .extend({
     enabled: z.boolean(),
+    autoSyncAssignmentsEnabled: z.boolean().optional().default(false),
     calendarId: z.string(),
     defaultStartTime: z.string(),
     defaultDurationMinutes: z.number().int(),

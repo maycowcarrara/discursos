@@ -45,6 +45,7 @@ import {
   emailDeliveryUnavailableMessage,
   isEmailDeliveryConfigured,
 } from '@/config/email'
+import type { ImmediateCalendarSyncResult } from '@/services/calendar/google-calendar-delivery-service'
 import { useCalendarSettingsQuery } from '@/hooks/use-app-settings'
 import {
   useAssignmentsByYearQuery,
@@ -56,7 +57,9 @@ import {
 } from '@/hooks/use-assignments'
 import {
   useCalendarEventsQuery,
+  useCreateCalendarEventMutation,
   useRequestManualGoogleCalendarSyncMutation,
+  useUpdateCalendarEventMutation,
 } from '@/hooks/use-calendar-events'
 import { useCongregationsManagementQuery } from '@/hooks/use-congregations'
 import { useNotificationsByIdsQuery } from '@/hooks/use-notifications'
@@ -78,6 +81,7 @@ import type {
   AssignmentDocument,
   AssignmentStatus,
   CalendarEventDocument,
+  CalendarEventType,
   SpeakerType,
 } from '@/types/firestore'
 import {
@@ -89,8 +93,11 @@ import { buildAssignmentWhatsAppConfirmationUrl } from '@/utils/assignment-whats
 import { isTimestampInCurrentAssignmentRevision } from '@/utils/notification-sync'
 import {
   assignmentStatusLabels,
+  buildAssignmentCountMapByCalendarEventId,
   buildOperationalAssignmentMapByCalendarEventId,
+  calendarEventDefaultTitles,
   calendarEventTypeLabels,
+  doesCalendarEventBlockAssignments,
   formatTimestampDate,
   isAssignmentCoveringCalendarSlot,
 } from '@/utils/calendar-events'
@@ -103,6 +110,7 @@ const selectClassName =
   'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70'
 const emailDeliveryConfigured = isEmailDeliveryConfigured()
 const assignmentFormId = 'assignment-form'
+const specialEventFormId = 'special-event-form'
 
 const assignmentFormSchema = z.object({
   calendarEventId: z.string().trim().min(1, 'Selecione o sábado da designação.'),
@@ -126,6 +134,11 @@ type FeedbackState =
 
 type MovementType = AssignmentMovementType
 type GoogleCalendarSyncTone = 'error' | 'neutral' | 'success' | 'warning'
+type SpecialCalendarEventType = Exclude<CalendarEventType, 'publicTalk'>
+type AutomaticCalendarSyncFeedback = {
+  tone: 'success' | 'error'
+  message: string
+} | null
 
 type GoogleCalendarSyncState = {
   canRequestSync: boolean
@@ -133,6 +146,39 @@ type GoogleCalendarSyncState = {
   description: string
   label: string
   tone: GoogleCalendarSyncTone
+}
+
+const specialCalendarEventOptions: Array<{
+  value: SpecialCalendarEventType
+  label: string
+  helper: string
+}> = [
+  {
+    value: 'visit',
+    label: 'Visita do superintendente',
+    helper: 'Discurso especial com tema escolhido pelo viajante.',
+  },
+  {
+    value: 'assembly',
+    label: 'Assembleia',
+    helper: 'Fim de semana sem designação normal.',
+  },
+  {
+    value: 'congress',
+    label: 'Congresso',
+    helper: 'Fim de semana reservado para o congresso.',
+  },
+  {
+    value: 'special',
+    label: 'Evento especial',
+    helper: 'Discurso diferente ou exceção local.',
+  },
+]
+
+function isSpecialCalendarEventTypeForForm(
+  type: CalendarEventType,
+): type is SpecialCalendarEventType {
+  return type !== 'publicTalk'
 }
 
 const movementOptions: Array<{
@@ -251,6 +297,29 @@ function parseCalendarEventYearParam(value: string | null) {
   const year = Number.parseInt(value, 10)
 
   return Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : null
+}
+
+function getCalendarEventViewSource(
+  event: FirestoreRecord<CalendarEventDocument>,
+) {
+  const eventWithViewSource = event as FirestoreRecord<CalendarEventDocument> & {
+    viewSource?: unknown
+  }
+
+  if (
+    eventWithViewSource.viewSource === 'explicit' ||
+    eventWithViewSource.viewSource === 'implicit'
+  ) {
+    return eventWithViewSource.viewSource
+  }
+
+  return null
+}
+
+function isImplicitCalendarEvent(
+  event: FirestoreRecord<CalendarEventDocument>,
+) {
+  return getCalendarEventViewSource(event) === 'implicit'
 }
 
 function normalizeMeetingDayLabel(value: string) {
@@ -452,12 +521,38 @@ function getGoogleCalendarSyncBadgeClassName(tone: GoogleCalendarSyncTone) {
   return 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200'
 }
 
-function buildAssignmentSaveFeedbackMessage(baseMessage: string, movementType: MovementType) {
+function buildAssignmentSaveFeedbackMessage(
+  baseMessage: string,
+  movementType: MovementType,
+  automaticCalendarSyncFeedback?: AutomaticCalendarSyncFeedback,
+) {
+  if (automaticCalendarSyncFeedback) {
+    return `${baseMessage} ${automaticCalendarSyncFeedback.message}`
+  }
+
   if (!isGoogleCalendarCandidateMovement(movementType)) {
     return baseMessage
   }
 
   return `${baseMessage} Use "Sincronizar Agenda" quando quiser refletir isso no Google Calendar.`
+}
+
+function buildAutomaticGoogleCalendarSyncMessage(
+  results: ImmediateCalendarSyncResult[],
+) {
+  if (results.length === 0) {
+    return 'Google Calendar verificado automaticamente.'
+  }
+
+  if (results.every((result) => result === 'skipped')) {
+    return 'Google Calendar verificado automaticamente, sem mudanças remotas.'
+  }
+
+  if (results.every((result) => result === 'deleted')) {
+    return 'Google Calendar removido automaticamente.'
+  }
+
+  return 'Google Calendar atualizado automaticamente.'
 }
 
 function GoogleCalendarButtonMark() {
@@ -614,7 +709,16 @@ export function AssignmentsPage() {
   const [visitorCongregationFilterId, setVisitorCongregationFilterId] = useState('')
   const [meetingDateDraft, setMeetingDateDraft] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingSpecialEventId, setEditingSpecialEventId] = useState<string | null>(null)
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false)
+  const [isSpecialEventPanelOpen, setIsSpecialEventPanelOpen] = useState(false)
+  const [specialEventDate, setSpecialEventDate] = useState('')
+  const [specialEventType, setSpecialEventType] =
+    useState<SpecialCalendarEventType>('visit')
+  const [specialEventTitle, setSpecialEventTitle] = useState(
+    calendarEventDefaultTitles.visit,
+  )
+  const [specialEventDescription, setSpecialEventDescription] = useState('')
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [dateFieldFeedback, setDateFieldFeedback] = useState<string | null>(null)
   const [movementTypeOverride, setMovementTypeOverride] = useState<MovementType | null>(
@@ -633,6 +737,7 @@ export function AssignmentsPage() {
       ? requestedCalendarEventYearParam ??
         getYearFromImplicitCalendarEventId(requestedCalendarEventId)
       : null
+  const specialEventYear = requestedCalendarEventYear ?? activeYear
   const shouldLoadRequestedCalendarEventYear =
     requestedCalendarEventYear !== null && requestedCalendarEventYear !== activeYear
   const assignmentsQuery = useAssignmentsByYearQuery(activeYear)
@@ -652,6 +757,8 @@ export function AssignmentsPage() {
   const createAssignmentMutation = useCreateAssignmentMutation()
   const updateAssignmentMutation = useUpdateAssignmentMutation()
   const confirmAssignmentMutation = useConfirmAssignmentMutation()
+  const createCalendarEventMutation = useCreateCalendarEventMutation()
+  const updateCalendarEventMutation = useUpdateCalendarEventMutation()
   const requestManualEmailMutation =
     useRequestManualAssignmentConfirmationEmailMutation()
   const requestManualGoogleCalendarSyncMutation = useRequestManualGoogleCalendarSyncMutation()
@@ -710,19 +817,25 @@ export function AssignmentsPage() {
       }),
     [recentAssignmentsQuery.data],
   )
-  const eligibleEvents = useMemo(
-    () =>
-      [
-        ...(calendarEventsQuery.data ?? []),
-        ...(shouldLoadRequestedCalendarEventYear
-          ? requestedYearCalendarEventsQuery.data ?? []
-          : []),
-      ].filter((event) => !event.blocksAssignments && event.isActive),
+  const loadedCalendarEvents = useMemo(
+    () => [
+      ...(calendarEventsQuery.data ?? []),
+      ...(shouldLoadRequestedCalendarEventYear
+        ? requestedYearCalendarEventsQuery.data ?? []
+        : []),
+    ],
     [
       calendarEventsQuery.data,
       requestedYearCalendarEventsQuery.data,
       shouldLoadRequestedCalendarEventYear,
     ],
+  )
+  const eligibleEvents = useMemo(
+    () =>
+      loadedCalendarEvents.filter(
+        (event) => !doesCalendarEventBlockAssignments(event) && event.isActive,
+      ),
+    [loadedCalendarEvents],
   )
   const congregationsById = useMemo(
     () => new Map((congregationsQuery.data ?? []).map((item) => [item.id, item])),
@@ -731,18 +844,9 @@ export function AssignmentsPage() {
   const calendarEventsById = useMemo(
     () =>
       new Map(
-        [
-          ...(calendarEventsQuery.data ?? []),
-          ...(shouldLoadRequestedCalendarEventYear
-            ? requestedYearCalendarEventsQuery.data ?? []
-            : []),
-        ].map((item) => [item.id, item]),
+        loadedCalendarEvents.map((item) => [item.id, item]),
       ),
-    [
-      calendarEventsQuery.data,
-      requestedYearCalendarEventsQuery.data,
-      shouldLoadRequestedCalendarEventYear,
-    ],
+    [loadedCalendarEvents],
   )
   const speakersById = useMemo(
     () => new Map((speakersQuery.data ?? []).map((item) => [item.id, item])),
@@ -755,6 +859,34 @@ export function AssignmentsPage() {
   const operationalAssignmentMap = useMemo(
     () => buildOperationalAssignmentMapByCalendarEventId(assignments),
     [assignments],
+  )
+  const assignmentCountByCalendarEventId = useMemo(
+    () => buildAssignmentCountMapByCalendarEventId(assignments),
+    [assignments],
+  )
+  const specialEventCandidateEvents = useMemo(
+    () =>
+      [...loadedCalendarEvents]
+        .filter(
+          (event) =>
+            event.isActive &&
+            !assignmentCountByCalendarEventId.has(event.id) &&
+            event.date.toDate().getFullYear() === specialEventYear,
+        )
+        .sort((left, right) => left.date.toMillis() - right.date.toMillis()),
+    [assignmentCountByCalendarEventId, loadedCalendarEvents, specialEventYear],
+  )
+  const blockedCalendarEvents = useMemo(
+    () =>
+      [...loadedCalendarEvents]
+        .filter(
+          (event) =>
+            event.isActive &&
+            doesCalendarEventBlockAssignments(event) &&
+            event.date.toDate().getFullYear() === specialEventYear,
+        )
+        .sort((left, right) => left.date.toMillis() - right.date.toMillis()),
+    [loadedCalendarEvents, specialEventYear],
   )
   const googleCalendarActionOwnerByCalendarEventId = useMemo(
     () => buildGoogleCalendarActionOwnerMapByCalendarEventId(assignments),
@@ -1127,8 +1259,14 @@ export function AssignmentsPage() {
     createAssignmentMutation.isPending ||
     updateAssignmentMutation.isPending ||
     confirmAssignmentMutation.isPending ||
+    createCalendarEventMutation.isPending ||
+    updateCalendarEventMutation.isPending ||
     requestManualEmailMutation.isPending ||
     requestManualGoogleCalendarSyncMutation.isPending
+  const isAutomaticCalendarSyncEnabled =
+    calendarSettingsQuery.data?.enabled === true &&
+    calendarSettingsQuery.data.autoSyncAssignmentsEnabled === true
+  const shouldHideManualGoogleCalendarSyncButton = isAutomaticCalendarSyncEnabled
 
   const totalQueryErrors = [
     assignmentsQuery.error,
@@ -1142,6 +1280,58 @@ export function AssignmentsPage() {
     speakersQuery.error,
     themesQuery.error,
   ].filter(Boolean)
+  async function requestAutomaticGoogleCalendarSync(
+    calendarEventIds: string[],
+  ): Promise<AutomaticCalendarSyncFeedback> {
+    if (!user || !isAutomaticCalendarSyncEnabled) {
+      return null
+    }
+
+    const uniqueCalendarEventIds = Array.from(
+      new Set(calendarEventIds.map((item) => item.trim()).filter(Boolean)),
+    )
+
+    if (uniqueCalendarEventIds.length === 0) {
+      return null
+    }
+
+    try {
+      const results: ImmediateCalendarSyncResult[] = []
+      const errors: string[] = []
+
+      for (const calendarEventId of uniqueCalendarEventIds) {
+        try {
+          results.push(await requestManualGoogleCalendarSyncMutation.mutateAsync({
+            actorUid: user.uid,
+            actorName,
+            calendarEventId,
+            trigger: 'automatic-assignment-change',
+          }))
+        } catch (error) {
+          errors.push(getErrorMessage(error))
+        }
+      }
+
+      if (errors.length > 0) {
+        return {
+          tone: 'error',
+          message: `Google Calendar não atualizou automaticamente: ${errors.join(' ')}`,
+        }
+      }
+
+      return {
+        tone: 'success',
+        message: buildAutomaticGoogleCalendarSyncMessage(results),
+      }
+    } catch (error) {
+      return {
+        tone: 'error',
+        message: `Google Calendar não atualizou automaticamente: ${getErrorMessage(
+          error,
+        )}`,
+      }
+    }
+  }
   const isDashboardHandoffPanelOpen = Boolean(
     requestedCalendarEventId.length > 0 && requestedCalendarEvent,
   )
@@ -1343,6 +1533,220 @@ export function AssignmentsPage() {
     )
   }
 
+  function getDefaultSpecialEventTarget() {
+    if (
+      selectedEvent &&
+      !assignmentCountByCalendarEventId.has(selectedEvent.id) &&
+      selectedEvent.date.toDate().getFullYear() === specialEventYear
+    ) {
+      return selectedEvent
+    }
+
+    return (
+      specialEventCandidateEvents.find(
+        (event) => getLocalDateKey(event.date.toDate()) >= todayDateKey,
+      ) ??
+      specialEventCandidateEvents[0] ??
+      null
+    )
+  }
+
+  function handleStartSpecialEvent() {
+    const targetEvent = getDefaultSpecialEventTarget()
+    const targetType =
+      targetEvent && isSpecialCalendarEventTypeForForm(targetEvent.type)
+        ? targetEvent.type
+        : 'visit'
+
+    setSearchParams({}, { replace: true })
+    setFeedback(null)
+    setEditingSpecialEventId(null)
+    setSpecialEventDate(
+      targetEvent ? getLocalDateKey(targetEvent.date.toDate()) : '',
+    )
+    setSpecialEventType(targetType)
+    setSpecialEventTitle(
+      targetEvent && targetEvent.type !== 'publicTalk'
+        ? targetEvent.title
+        : calendarEventDefaultTitles[targetType],
+    )
+    setSpecialEventDescription(targetEvent?.description ?? '')
+    setIsSpecialEventPanelOpen(true)
+  }
+
+  function handleStartEditSpecialEvent(
+    event: FirestoreRecord<CalendarEventDocument>,
+  ) {
+    const targetType = isSpecialCalendarEventTypeForForm(event.type)
+      ? event.type
+      : 'special'
+
+    setSearchParams({}, { replace: true })
+    setFeedback(null)
+    setEditingSpecialEventId(event.id)
+    setSpecialEventDate(getLocalDateKey(event.date.toDate()))
+    setSpecialEventType(targetType)
+    setSpecialEventTitle(event.title)
+    setSpecialEventDescription(event.description ?? '')
+    setIsSpecialEventPanelOpen(true)
+  }
+
+  function handleSpecialEventTypeChange(nextType: SpecialCalendarEventType) {
+    const previousDefaultTitle = calendarEventDefaultTitles[specialEventType]
+
+    setSpecialEventType(nextType)
+    setSpecialEventTitle((currentTitle) =>
+      currentTitle.trim().length === 0 ||
+      currentTitle.trim() === previousDefaultTitle
+        ? calendarEventDefaultTitles[nextType]
+        : currentTitle,
+    )
+  }
+
+  function handleCloseSpecialEventForm() {
+    setIsSpecialEventPanelOpen(false)
+    setEditingSpecialEventId(null)
+    setSpecialEventDate('')
+    setSpecialEventType('visit')
+    setSpecialEventTitle(calendarEventDefaultTitles.visit)
+    setSpecialEventDescription('')
+  }
+
+  async function handleSubmitSpecialEvent() {
+    if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    const targetEvent = editingSpecialEventId
+      ? loadedCalendarEvents.find((event) => event.id === editingSpecialEventId) ??
+        null
+      : specialEventCandidateEvents.find(
+          (event) => getLocalDateKey(event.date.toDate()) === specialEventDate,
+        ) ?? null
+    const trimmedTitle = specialEventTitle.trim()
+    const trimmedDescription = specialEventDescription.trim()
+
+    if (!targetEvent) {
+      const message =
+        'Escolha um sábado carregado e sem designação operacional vigente.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    if (trimmedTitle.length === 0) {
+      const message = 'Informe o título do evento especial.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    setFeedback(null)
+
+    try {
+      const values = {
+        date: specialEventDate,
+        type: specialEventType,
+        title: trimmedTitle,
+        description: trimmedDescription,
+        congregationId: '',
+        isActive: true,
+        actorUid: user.uid,
+        actorName,
+        targetYear: targetEvent.year,
+      }
+
+      if (isImplicitCalendarEvent(targetEvent)) {
+        await createCalendarEventMutation.mutateAsync(values)
+      } else {
+        await updateCalendarEventMutation.mutateAsync({
+          ...values,
+          id: targetEvent.id,
+        })
+      }
+
+      const message = 'Data especial salva e bloqueada para designação normal.'
+      setFeedback({
+        tone: 'success',
+        message,
+      })
+      toast.success(message)
+      handleCloseSpecialEventForm()
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+    }
+  }
+
+  async function handleUnmarkSpecialEvent(
+    event: FirestoreRecord<CalendarEventDocument>,
+  ) {
+    if (!user) {
+      const message = 'Sua sessão expirou. Entre novamente para continuar.'
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Voltar ${formatTimestampDate(event.date)} para discurso público normal?`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setFeedback(null)
+
+    try {
+      await updateCalendarEventMutation.mutateAsync({
+        id: event.id,
+        date: getLocalDateKey(event.date.toDate()),
+        type: 'publicTalk',
+        title: calendarEventDefaultTitles.publicTalk,
+        description: '',
+        congregationId: '',
+        isActive: true,
+        actorUid: user.uid,
+        actorName,
+        targetYear: event.year,
+      })
+
+      const message = 'Data voltou para discurso público normal.'
+      setFeedback({
+        tone: 'success',
+        message,
+      })
+      toast.success(message)
+    } catch (error) {
+      const message = getErrorMessage(error)
+      setFeedback({
+        tone: 'error',
+        message,
+      })
+      toast.error(message)
+    }
+  }
+
   function handleStartEdit(id: string) {
     const assignment = assignments.find((item) => item.id === id)
 
@@ -1503,24 +1907,36 @@ export function AssignmentsPage() {
           actorUid: user.uid,
           actorName,
         })
+        const automaticCalendarSyncFeedback =
+          await requestAutomaticGoogleCalendarSync([
+            editingAssignment.calendarEventId,
+            values.calendarEventId,
+          ])
 
         const message = buildAssignmentSaveFeedbackMessage(
           values.status === 'confirmed'
             ? 'Designação atualizada e confirmada com sucesso.'
             : 'Designação atualizada com sucesso.',
           movementType,
+          automaticCalendarSyncFeedback,
         )
         setFeedback({
-          tone: 'success',
+          tone: automaticCalendarSyncFeedback?.tone ?? 'success',
           message,
         })
-        toast.success(message)
+        if (automaticCalendarSyncFeedback?.tone === 'error') {
+          toast.error(message)
+        } else {
+          toast.success(message)
+        }
       } else {
         await createAssignmentMutation.mutateAsync({
           ...values,
           actorUid: user.uid,
           actorName,
         })
+        const automaticCalendarSyncFeedback =
+          await requestAutomaticGoogleCalendarSync([values.calendarEventId])
 
         const message = buildAssignmentSaveFeedbackMessage(
           willReplaceCurrentAssignment
@@ -1529,12 +1945,17 @@ export function AssignmentsPage() {
               ? 'Designação criada já como confirmada.'
               : 'Designação criada com sucesso.',
           movementType,
+          automaticCalendarSyncFeedback,
         )
         setFeedback({
-          tone: 'success',
+          tone: automaticCalendarSyncFeedback?.tone ?? 'success',
           message,
         })
-        toast.success(message)
+        if (automaticCalendarSyncFeedback?.tone === 'error') {
+          toast.error(message)
+        } else {
+          toast.success(message)
+        }
       }
 
       setSearchParams({}, { replace: true })
@@ -1581,6 +2002,11 @@ export function AssignmentsPage() {
         actorUid: user.uid,
         actorName,
       })
+      const automaticCalendarSyncFeedback = assignmentToConfirm
+        ? await requestAutomaticGoogleCalendarSync([
+            assignmentToConfirm.calendarEventId,
+          ])
+        : null
 
       if (editingId === id) {
         setEditingId(null)
@@ -1597,12 +2023,17 @@ export function AssignmentsPage() {
         assignmentToConfirm
           ? inferAssignmentMovementType(assignmentToConfirm, congregationsById)
           : 'local',
+        automaticCalendarSyncFeedback,
       )
       setFeedback({
-        tone: 'success',
+        tone: automaticCalendarSyncFeedback?.tone ?? 'success',
         message,
       })
-      toast.success(message)
+      if (automaticCalendarSyncFeedback?.tone === 'error') {
+        toast.error(message)
+      } else {
+        toast.success(message)
+      }
     } catch (error) {
       const message = getErrorMessage(error)
       setFeedback({
@@ -1710,6 +2141,8 @@ export function AssignmentsPage() {
         actorUid: user.uid,
         actorName,
       })
+      const automaticCalendarSyncFeedback =
+        await requestAutomaticGoogleCalendarSync([assignment.calendarEventId])
 
       if (editingId === assignment.id) {
         setEditingId(null)
@@ -1724,12 +2157,17 @@ export function AssignmentsPage() {
       const message = buildAssignmentSaveFeedbackMessage(
         'Designação cancelada com sucesso.',
         inferAssignmentMovementType(assignment, congregationsById),
+        automaticCalendarSyncFeedback,
       )
       setFeedback({
-        tone: 'success',
+        tone: automaticCalendarSyncFeedback?.tone ?? 'success',
         message,
       })
-      toast.success(message)
+      if (automaticCalendarSyncFeedback?.tone === 'error') {
+        toast.error(message)
+      } else {
+        toast.success(message)
+      }
     } catch (error) {
       const message = getErrorMessage(error)
       setFeedback({
@@ -1800,6 +2238,14 @@ export function AssignmentsPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-primary/10 text-primary">{activeYear}</Badge>
+            <Button
+              variant="outline"
+              onClick={handleStartSpecialEvent}
+              disabled={isSubmitting || specialEventCandidateEvents.length === 0}
+            >
+              <Ban className="size-4" />
+              Marcar evento
+            </Button>
             <Button onClick={handleStartCreate} disabled={isSubmitting}>
               <Plus className="size-4" />
               Nova designação
@@ -1880,6 +2326,207 @@ export function AssignmentsPage() {
           </div>
         }
       />
+
+      <ResponsiveFormPanel
+        open={isSpecialEventPanelOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setIsSpecialEventPanelOpen(true)
+            return
+          }
+
+          handleCloseSpecialEventForm()
+        }}
+        title={editingSpecialEventId ? 'Editar evento especial' : 'Marcar evento especial'}
+        description="Use quando o sábado não terá designação normal de discurso público."
+        className="max-w-3xl"
+        footer={
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-muted-foreground">
+              A data salva ficará bloqueada para novas designações normais.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={handleCloseSpecialEventForm}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                form={specialEventFormId}
+                disabled={
+                  isSubmitting ||
+                  (!editingSpecialEventId && specialEventCandidateEvents.length === 0)
+                }
+              >
+                <Ban className="size-4" />
+                {editingSpecialEventId ? 'Salvar alterações' : 'Salvar evento'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <form
+          id={specialEventFormId}
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void handleSubmitSpecialEvent()
+          }}
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Data</span>
+              <select
+                className={selectClassName}
+                value={specialEventDate}
+                onChange={(event) => setSpecialEventDate(event.target.value)}
+                disabled={
+                  Boolean(editingSpecialEventId) ||
+                  specialEventCandidateEvents.length === 0
+                }
+              >
+                <option value="">Escolha uma data sem designação</option>
+                {specialEventCandidateEvents.map((event) => (
+                  <option key={event.id} value={getLocalDateKey(event.date.toDate())}>
+                    {formatTimestampDate(event.date)}
+                    {' - '}
+                    {doesCalendarEventBlockAssignments(event)
+                      ? calendarEventTypeLabels[event.type]
+                      : 'Discurso público'}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Tipo</span>
+              <select
+                className={selectClassName}
+                value={specialEventType}
+                onChange={(event) =>
+                  handleSpecialEventTypeChange(
+                    event.target.value as SpecialCalendarEventType,
+                  )
+                }
+              >
+                {specialCalendarEventOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-foreground">Título</span>
+            <Input
+              value={specialEventTitle}
+              onChange={(event) => setSpecialEventTitle(event.target.value)}
+              placeholder="Ex.: Visita do superintendente de circuito"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-foreground">
+              Descrição/observações
+            </span>
+            <Textarea
+              value={specialEventDescription}
+              onChange={(event) => setSpecialEventDescription(event.target.value)}
+              placeholder="Tema escolhido, local do evento, observações da semana ou motivo da exceção."
+              rows={5}
+            />
+          </label>
+
+          <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium leading-6 text-blue-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100">
+            {
+              specialCalendarEventOptions.find(
+                (option) => option.value === specialEventType,
+              )?.helper
+            }
+          </p>
+        </form>
+      </ResponsiveFormPanel>
+
+      {blockedCalendarEvents.length > 0 ? (
+        <Card className="overflow-hidden rounded-xl border-border shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase text-muted-foreground">
+                  Datas especiais
+                </p>
+                <h2 className="mt-1 text-base font-black text-foreground">
+                  Sábados sem designação normal
+                </h2>
+              </div>
+              <Badge className="w-fit bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-100">
+                {blockedCalendarEvents.length} marcada(s)
+              </Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {blockedCalendarEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="rounded-xl border border-border bg-background px-4 py-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground">
+                        {formatTimestampDate(event.date)}
+                      </p>
+                      <h3 className="mt-1 text-sm font-black text-foreground">
+                        {event.title}
+                      </h3>
+                    </div>
+                    <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-500/10 dark:text-violet-100">
+                      {calendarEventTypeLabels[event.type]}
+                    </Badge>
+                  </div>
+                  {event.description?.trim() ? (
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {event.description}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      Sem observações registradas.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      className="w-full sm:w-auto"
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleStartEditSpecialEvent(event)}
+                      disabled={isSubmitting}
+                    >
+                      <PencilLine className="size-3.5" />
+                      Editar
+                    </Button>
+                    <Button
+                      className="w-full sm:w-auto"
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                      onClick={() => void handleUnmarkSpecialEvent(event)}
+                      disabled={isSubmitting}
+                    >
+                      <XCircle className="size-3.5" />
+                      Desmarcar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <section className="space-y-4">
         <ResponsiveFormPanel
@@ -2695,8 +3342,12 @@ export function AssignmentsPage() {
                     isLatestAssignmentForEvent,
                     movementType: movementTypeForAssignment,
                   })
+                  const canShowManualGoogleCalendarSyncAction = Boolean(
+                    googleCalendarSyncState?.canShowAction &&
+                      !shouldHideManualGoogleCalendarSyncButton,
+                  )
                   const hasCommunicationActions = Boolean(
-                    googleCalendarSyncState?.canShowAction ||
+                    canShowManualGoogleCalendarSyncAction ||
                       canRequestManualEmail ||
                       emailErrorMessage ||
                       whatsappConfirmationUrl,
@@ -2799,13 +3450,16 @@ export function AssignmentsPage() {
                                 role="group"
                                 aria-label="Ações de comunicação"
                               >
-                                {googleCalendarSyncState?.canShowAction ? (
+                                {canShowManualGoogleCalendarSyncAction ? (
                                   <Button
                                     className="w-full lg:w-auto"
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleRequestManualGoogleCalendarSync(assignment)}
-                                    disabled={isSubmitting || !googleCalendarSyncState.canRequestSync}
+                                    disabled={
+                                      isSubmitting ||
+                                      googleCalendarSyncState?.canRequestSync !== true
+                                    }
                                   >
                                     <GoogleCalendarButtonMark />
                                     Sincronizar Agenda

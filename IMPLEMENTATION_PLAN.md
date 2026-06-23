@@ -52,7 +52,9 @@
 * remoção da escolha manual de ano base nas Configurações; o painel usa automaticamente o ano atual, preservando handoff de outro ano via `evento` + `ano`
 * simplificação dos status de oradores para `ativo`, `indisponível` e `inativo`, consolidando férias como indisponibilidade temporária e transferidos como inativos preservados no histórico
 * controle explícito de e-mails por revisão da designação, mantendo notificações automáticas desligadas por padrão, um único lembrete automático 4 dias antes e envio manual de confirmação como ação única até a próxima edição
+* sincronização automática opcional do Google Calendar a cada salvamento, edição ou cancelamento operacional de designação, ocultando o botão manual quando ativa
 * confirmação por WhatsApp com mensagem completa de data, discurso, origem, destino, endereço, dia e horário da reunião
+* marcação direta na tela de Designações para transformar um sábado em visita, assembleia, congresso ou evento especial, com descrição/observações sempre disponível e bloqueio de designação normal
 * validação visual em larguras desktop e mobile antes do aceite final do lançamento
 
 ## Entregas já realizadas
@@ -148,10 +150,11 @@
 * gestão anual real de `calendarEvents` implementada na UI
 * geração automática dos sábados ausentes por ano, sem duplicar eventos ativos
 * cadastro e edição tipados para discurso, congresso, assembleia, visita e especial
-* bloqueio automático de designações para congresso e assembleia via `blocksAssignments`
+* bloqueio automático de designações para congresso, assembleia, visita e evento especial via `blocksAssignments`
 * visão anual por mês com cruzamento leve entre `calendarEvents` e `assignments`
 * arquivamento lógico com reativação por edição e auditoria para create, update e delete
 * bloqueios de integridade para não mover ou arquivar eventos já vinculados a designações
+* descrição/observações disponível para qualquer exceção de sábado, incluindo visita do superintendente de circuito, assembleia, congresso e evento especial
 
 ### Designações — fechamento da Fase 8
 
@@ -208,15 +211,15 @@
 
 ### Google Calendar — fechamento da Fase 12
 
-* `settings/calendar` passa a ser documento real do Firestore para ativação da integração, `calendarId`, horário padrão e duração padrão
+* `settings/calendar` passa a ser documento real do Firestore para ativação da integração, sincronização automática opcional das designações, `calendarId`, horário padrão e duração padrão
 * `calendarEvents` passa a armazenar o vínculo remoto com Google Calendar e o estado oficial de sincronização
-* mudanças em `calendarEvents` continuam registrando o estado técnico, enquanto `assignments` operacionais são sincronizadas imediatamente pelo botão `Sincronizar Agenda`
-* a última aprovação manual passa a ficar registrada em `calendarEvents.googleCalendarManualSyncRequestedAt`, para que publicação, atualização ou remoção operacional não aconteçam sem novo clique
+* mudanças em `calendarEvents` continuam registrando o estado técnico, enquanto `assignments` operacionais são sincronizadas imediatamente pelo botão `Sincronizar Agenda` ou automaticamente após salvamento quando a flag estiver ativa
+* a última aprovação administrativa passa a ficar registrada em `calendarEvents.googleCalendarManualSyncRequestedAt`, para que publicação, atualização ou remoção operacional não aconteçam sem novo clique ou salvamento automático configurado
 * `settings/calendar.configurationUpdatedAt` passa a distinguir alteração real de configuração dos ciclos internos do worker
 * o worker Cloudflare inicia a sincronização segura com Google Calendar usando a mesma service account já adotada na Fase 11
 * a tela de configurações passa a exibir a configuração e o último estado global de sincronização da Fase 12
-* o Google Calendar deixa de espelhar slots vazios e passa a publicar, mediante ação manual, qualquer designação operacional (`orador visitante`, `designação local` ou `discurso fora`), além de `evento especial`
-* quando o cadastro em `speakers` tiver `email`, o worker tenta incluir o orador como convidado; se a service account não tiver delegação no domínio, publica o evento sem convidado para não bloquear a sincronização manual
+* o Google Calendar deixa de espelhar slots vazios e passa a publicar, mediante ação manual ou automática configurada, qualquer designação operacional (`orador visitante`, `designação local` ou `discurso fora`), além de `evento especial`
+* quando o cadastro em `speakers` tiver `email`, o worker tenta incluir o orador como convidado; se a service account não tiver delegação no domínio, publica o evento sem convidado para não bloquear a sincronização
 * mudanças de configuração do Google Calendar reenfileiram eventos especiais ativos e eventos já publicados sem varrer todos os sábados materializados
 
 Impacto técnico desta abertura de fase:
@@ -599,15 +602,18 @@ Critérios:
 
 * bloquear designações em congresso
 * bloquear designações em assembleia
+* bloquear designações em visita do superintendente de circuito
+* bloquear designações em evento especial
 
 Entregas realizadas:
 
 * geração automática dos sábados de cada ano sob demanda
 * `calendarEvents` mantido como estrutura técnica para sábados, exceções, bloqueios e sincronização externa
 * suporte aos tipos `publicTalk`, `congress`, `assembly`, `visit` e `special`
-* bloqueio automático de designações em congressos e assembleias
+* bloqueio automático de designações em congressos, assembleias, visitas e eventos especiais
 * renderização implícita dos sábados regulares, mesmo sem documento salvo
 * `calendarEvents` passa a representar exceções, bloqueios e personalizações do dia, além dos slots materializados sob demanda
+* `calendarEvents.description` guarda observações livres para qualquer exceção de sábado, como tema escolhido pelo superintendente, local de assembleia/congresso ou motivo de um evento especial
 * a antiga tela de Agenda deixou de ser parte da navegação operacional; exceções futuras devem ser tratadas sem reintroduzir cadastro genérico no fluxo principal
 * auditoria para create, update e delete
 
@@ -755,19 +761,19 @@ Status atual:
 
 Entregue:
 
-* publicação, atualização e remoção imediatas pelo botão `Sincronizar Agenda`
+* publicação, atualização e remoção imediatas pelo botão `Sincronizar Agenda` ou pela opção automática nas designações
 * sincronização segura por endpoint administrativo autenticado, sem depender do cron
 
 Entregas desta fase:
 
-* `settings/calendar` com persistência real para `enabled`, `calendarId`, horário padrão e duração padrão
+* `settings/calendar` com persistência real para `enabled`, `autoSyncAssignmentsEnabled`, `calendarId`, horário padrão e duração padrão
 * estado de sincronização do Google Calendar registrado diretamente em `calendarEvents`
-* publicação manual de qualquer designação operacional — `orador visitante`, `designação local` ou `discurso fora` — concluída imediatamente pelo botão `Sincronizar Agenda`
-* aprovação manual persistida no próprio `calendarEvents`, impedindo republicação operacional sem novo pedido
-* alinhamento entre UI e worker para usar a designação operacional vigente como referência da ação manual
+* publicação manual ou automática de qualquer designação operacional — `orador visitante`, `designação local` ou `discurso fora` — concluída imediatamente pelo endpoint administrativo do worker
+* aprovação administrativa persistida no próprio `calendarEvents`, impedindo republicação operacional sem novo pedido quando a sincronização automática estiver desligada
+* alinhamento entre UI e worker para usar a designação operacional vigente como referência da ação manual ou automática
 * worker preparado para criar, atualizar e excluir eventos no Google Calendar por cron e trigger interno
 * calendário remoto restrito a eventos operacionais reais, aceitando designações pendentes ou confirmadas e sem publicar sábados vazios
-* edições exigem nova solicitação manual; cancelamentos e substituições exigem nova solicitação para atualizar ou remover o evento remoto
+* edições, cancelamentos e substituições exigem nova solicitação para atualizar ou remover o evento remoto; quando `autoSyncAssignmentsEnabled` está ativo, essa solicitação ocorre automaticamente e o botão manual fica oculto em Designações
 
 Fechamento técnico entregue:
 
@@ -792,7 +798,7 @@ Não permitir designar tema que o orador não possui.
 
 ## RN002
 
-Não permitir designação em congressos.
+Não permitir designação em congressos, visitas do superintendente de circuito ou eventos especiais.
 
 ---
 

@@ -68,6 +68,7 @@ function makeAssignment(
     themeTitle: 'Tema 101',
     status: 'pending',
     notes: '',
+    emailNotificationsEnabled: false,
     confirmationToken: null,
     confirmedAt: null,
     responseAt: null,
@@ -135,6 +136,45 @@ test('buildDashboardSaturdayEntries e pendencias consideram apenas sabados reais
   assert.deepEqual(
     pendingItems.map((item) => item.kind),
     ['unassigned', 'awaitingResponse'],
+  )
+})
+
+test('eventos bloqueados nao viram pendencia de designacao', () => {
+  const referenceDate = new Date('2026-06-01T00:00:00')
+  const events = [
+    makeEvent('visit-weekend', '2026-06-06', {
+      type: 'visit',
+      title: 'Visita do superintendente',
+      blocksAssignments: false,
+    }),
+    makeEvent('special-weekend', '2026-06-13', {
+      type: 'special',
+      title: 'Discurso especial',
+      blocksAssignments: false,
+    }),
+    makeEvent('assembly-weekend', '2026-06-20', {
+      type: 'assembly',
+      title: 'Assembleia',
+      blocksAssignments: true,
+    }),
+    makeEvent('open-weekend', '2026-06-27'),
+  ]
+
+  const saturdayEntries = buildDashboardSaturdayEntries(events, [], referenceDate)
+  const pendingItems = buildDashboardPendingItems(saturdayEntries)
+
+  assert.deepEqual(
+    saturdayEntries.map((entry) => [entry.event.id, entry.isUnassigned]),
+    [
+      ['visit-weekend', false],
+      ['special-weekend', false],
+      ['assembly-weekend', false],
+      ['open-weekend', true],
+    ],
+  )
+  assert.deepEqual(
+    pendingItems.map((item) => item.event.id),
+    ['open-weekend'],
   )
 })
 

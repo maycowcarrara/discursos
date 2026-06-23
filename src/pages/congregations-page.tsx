@@ -246,7 +246,7 @@ export function CongregationsPage() {
   )
 
   const {
-    formState: { errors: localErrors, isDirty: isLocalFormDirty },
+    formState: { errors: localErrors },
     handleSubmit: handleLocalSubmit,
     register: registerLocal,
     reset: resetLocalForm,
@@ -256,7 +256,7 @@ export function CongregationsPage() {
   })
 
   const {
-    formState: { errors: externalErrors, isDirty: isExternalFormDirty },
+    formState: { errors: externalErrors },
     handleSubmit: handleExternalSubmit,
     register: registerExternal,
     reset: resetExternalForm,
@@ -580,18 +580,6 @@ export function CongregationsPage() {
                 : 'O cadastro será salvo automaticamente como congregação externa.'}
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                variant="outline"
-                type="button"
-                disabled={isSubmitting || !isExternalFormDirty}
-                onClick={() =>
-                  resetExternalForm(
-                    toExternalCongregationFormValues(editingExternalCongregation),
-                  )
-                }
-              >
-                Restaurar
-              </Button>
               <Button
                 variant="outline"
                 type="button"
@@ -1264,14 +1252,6 @@ export function CongregationsPage() {
                     : 'Preencha estes dados para criar a base local fixa da programação.'}
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    type="button"
-                    disabled={isSubmitting || !isLocalFormDirty}
-                    onClick={() => resetLocalForm(localFormValues)}
-                  >
-                    Restaurar
-                  </Button>
                   <Button type="submit" disabled={isSubmitting}>
                     <Save className="size-4" />
                     Salvar base local

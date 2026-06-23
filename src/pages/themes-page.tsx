@@ -154,7 +154,7 @@ export function ThemesPage() {
   const editingTheme = themesQuery.data?.find((item) => item.id === editingId) ?? null
 
   const {
-    formState: { errors, isDirty },
+    formState: { errors },
     handleSubmit,
     register,
     reset,
@@ -575,14 +575,6 @@ export function ThemesPage() {
                   : 'Os temas inativos continuam preservados para consultas futuras.'}
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={isSubmitting || !isDirty}
-                  onClick={() => reset(toThemeFormValues(editingTheme))}
-                >
-                  Restaurar
-                </Button>
                 <Button
                   variant="outline"
                   type="button"

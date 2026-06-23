@@ -54,6 +54,7 @@ import {
 import {
   assignmentStatusLabels,
   calendarEventTypeLabels,
+  doesCalendarEventBlockAssignments,
 } from '@/utils/calendar-events'
 import { buildAssignmentWhatsAppConfirmationUrl } from '@/utils/assignment-whatsapp'
 import { isTimestampInCurrentAssignmentRevision } from '@/utils/notification-sync'
@@ -94,7 +95,7 @@ function formatInlineDate(date: Date) {
 }
 
 function getEntryStatus(entry: DashboardSaturdayEntryView): DashboardEntryStatus {
-  if (entry.event.blocksAssignments) {
+  if (doesCalendarEventBlockAssignments(entry.event)) {
     return 'event'
   }
 
@@ -106,7 +107,7 @@ function getEntryStatus(entry: DashboardSaturdayEntryView): DashboardEntryStatus
 }
 
 function getEntryStatusLabel(entry: DashboardSaturdayEntryView) {
-  if (entry.event.blocksAssignments) {
+  if (doesCalendarEventBlockAssignments(entry.event)) {
     return calendarEventTypeLabels[entry.event.type]
   }
 
@@ -222,7 +223,7 @@ export function DashboardPage() {
     return {
       ...entry,
       assignment: null,
-      isUnassigned: !entry.event.blocksAssignments,
+      isUnassigned: !doesCalendarEventBlockAssignments(entry.event),
       isAwaitingResponse: false,
     }
   })
@@ -368,10 +369,13 @@ export function DashboardPage() {
     ? formatInlineDate(nextSaturdayEntry.event.date.toDate())
     : ''
   const nextSaturdayMeetingTime = localCongregation?.meetingTime ?? 'Horário a definir'
+  const nextSaturdayBlocksAssignments = nextSaturdayEntry
+    ? doesCalendarEventBlockAssignments(nextSaturdayEntry.event)
+    : false
   const nextSaturdayHeadline = nextSaturdayEntry
     ? nextSaturdayEntry.assignment
       ? nextSaturdayEntry.assignment.speakerName
-      : nextSaturdayEntry.event.blocksAssignments
+      : nextSaturdayBlocksAssignments
         ? nextSaturdayEntry.event.title
         : 'Sem designação'
     : ''
@@ -382,7 +386,7 @@ export function DashboardPage() {
     ? `${nextSaturdayEntry.assignment.themeNumber} - ${nextSaturdayEntry.assignment.themeTitle}`
     : 'Ainda não definido'
   const uncoveredSaturdayCount = upcomingSaturdayEntries.filter(
-    (entry) => !entry.assignment && !entry.event.blocksAssignments,
+    (entry) => !entry.assignment && !doesCalendarEventBlockAssignments(entry.event),
   ).length
   const pendingAssignmentCount = upcomingSaturdayEntries.filter(
     (entry) => entry.assignment?.status === 'pending',
@@ -533,15 +537,18 @@ export function DashboardPage() {
             {upcomingSaturdayEntries.length > 0 ? (
               upcomingSaturdayEntries.map((entry) => {
                 const assignment = entry.assignment
+                const entryBlocksAssignments = doesCalendarEventBlockAssignments(
+                  entry.event,
+                )
                 const statusLabel = getEntryStatusLabel(entry)
                 const speakerOrEvent = assignment
                   ? assignment.speakerName
-                  : entry.event.blocksAssignments
+                  : entryBlocksAssignments
                     ? entry.event.title
                     : 'Sem designação'
                 const origin = assignment
                   ? assignment.originCongregationName
-                  : entry.event.blocksAssignments
+                  : entryBlocksAssignments
                     ? calendarEventTypeLabels[entry.event.type]
                     : 'A definir'
                 const destination = assignment
@@ -549,13 +556,14 @@ export function DashboardPage() {
                   : localCongregation?.name ?? 'Congregação local'
                 const theme = assignment
                   ? `${assignment.themeNumber} - ${assignment.themeTitle}`
-                  : entry.event.blocksAssignments
+                  : entryBlocksAssignments
                     ? 'Não se aplica'
                     : 'A definir'
                 const notes = assignment?.notes.trim()
                   ? assignment.notes
-                  : entry.event.blocksAssignments
-                    ? 'Data bloqueada para designação.'
+                  : entryBlocksAssignments
+                    ? entry.event.description?.trim() ||
+                      'Data bloqueada para designação.'
                     : 'Escolher orador e tema.'
 
                 return (
@@ -783,7 +791,7 @@ export function DashboardPage() {
                         <p className="mt-1 text-sm text-muted-foreground">
                           Cobertura definida para a próxima reunião pública.
                         </p>
-                      ) : nextSaturdayEntry.event.blocksAssignments ? (
+                      ) : nextSaturdayBlocksAssignments ? (
                         <p className="mt-1 text-sm text-muted-foreground">
                           Data reservada para {calendarEventTypeLabels[nextSaturdayEntry.event.type].toLowerCase()}.
                         </p>
@@ -801,7 +809,15 @@ export function DashboardPage() {
                   </div>
 
                   {!nextSaturdayEntry.assignment &&
-                  !nextSaturdayEntry.event.blocksAssignments ? (
+                  nextSaturdayBlocksAssignments &&
+                  nextSaturdayEntry.event.description?.trim() ? (
+                    <p className="mt-3 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-sm font-medium leading-6 text-violet-800 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-100">
+                      {nextSaturdayEntry.event.description}
+                    </p>
+                  ) : null}
+
+                  {!nextSaturdayEntry.assignment &&
+                  !nextSaturdayBlocksAssignments ? (
                     <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
                       <span>Ainda falta definir orador e tema para esta data.</span>
                       <Link
@@ -880,11 +896,11 @@ export function DashboardPage() {
                         Ação prioritária
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {nextSaturdayEntry.event.blocksAssignments
+                        {nextSaturdayBlocksAssignments
                           ? 'Nenhuma cobertura é necessária para esta data.'
                           : 'Priorize a escolha do orador e do tema para fechar este sábado.'}
                       </p>
-                      {!nextSaturdayEntry.event.blocksAssignments ? (
+                      {!nextSaturdayBlocksAssignments ? (
                         <Link
                           className={quickActionClass}
                           to={getAssignmentCreateHref(nextSaturdayEntry)}
@@ -903,6 +919,8 @@ export function DashboardPage() {
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {remainingSaturdayEntries.map((entry) => {
                       const entryStatus = getEntryStatus(entry)
+                      const entryBlocksAssignments =
+                        doesCalendarEventBlockAssignments(entry.event)
 
                       return (
                         <div
@@ -930,11 +948,18 @@ export function DashboardPage() {
                           <p className="mt-1 text-xs text-muted-foreground">
                             {entry.assignment
                               ? entry.assignment.speakerName
-                              : entry.event.blocksAssignments
+                              : entryBlocksAssignments
                                 ? entry.event.title
                                 : 'Sem designação'}
                           </p>
-                          {!entry.assignment && !entry.event.blocksAssignments ? (
+                          {!entry.assignment &&
+                          entryBlocksAssignments &&
+                          entry.event.description?.trim() ? (
+                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                              {entry.event.description}
+                            </p>
+                          ) : null}
+                          {!entry.assignment && !entryBlocksAssignments ? (
                             <Link
                               className="mt-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-background dark:text-foreground"
                               to={getAssignmentCreateHref(entry)}

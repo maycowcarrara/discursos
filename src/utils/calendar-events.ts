@@ -206,7 +206,13 @@ export function findFirstAvailableSaturdayDate(
 }
 
 export function getBlocksAssignmentsForEventType(type: CalendarEventType) {
-  return type === 'congress' || type === 'assembly'
+  return type !== 'publicTalk'
+}
+
+export function doesCalendarEventBlockAssignments(
+  event: Pick<CalendarEventDocument, 'blocksAssignments' | 'type'>,
+) {
+  return event.blocksAssignments || getBlocksAssignmentsForEventType(event.type)
 }
 
 function capitalize(value: string) {

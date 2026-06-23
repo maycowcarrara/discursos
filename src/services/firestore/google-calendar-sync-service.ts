@@ -23,6 +23,7 @@ export type RequestManualGoogleCalendarSyncInput = {
   actorName?: string | null
   actorUid: string
   calendarEventId: string
+  trigger?: 'automatic-assignment-change' | 'manual-google-calendar-button'
 }
 
 export function buildPendingGoogleCalendarSyncFields(
@@ -58,6 +59,7 @@ export async function requestManualGoogleCalendarSync({
   actorName,
   actorUid,
   calendarEventId,
+  trigger = 'manual-google-calendar-button',
 }: RequestManualGoogleCalendarSyncInput) {
   const normalizedCalendarEventId = calendarEventId.trim()
 
@@ -110,7 +112,7 @@ export async function requestManualGoogleCalendarSync({
     },
     metadata: {
       source: 'calendar-phase-12',
-      trigger: 'manual-google-calendar-button',
+      trigger,
     },
     createdAt: now,
   })

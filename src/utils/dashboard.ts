@@ -118,6 +118,12 @@ export function isSpecialCalendarEventType(type: CalendarEventType) {
   return type !== 'publicTalk'
 }
 
+function doesCalendarEventBlockAssignments(
+  event: Pick<CalendarEventDocument, 'blocksAssignments' | 'type'>,
+) {
+  return event.blocksAssignments || isSpecialCalendarEventType(event.type)
+}
+
 function sortCalendarEventsAscending(
   left: FirestoreRecord<CalendarEventDocument>,
   right: FirestoreRecord<CalendarEventDocument>,
@@ -183,7 +189,7 @@ export function buildDashboardSaturdayEntries(
       return {
         event,
         assignment,
-        isUnassigned: !event.blocksAssignments && assignment === null,
+        isUnassigned: !doesCalendarEventBlockAssignments(event) && assignment === null,
         isAwaitingResponse: assignment?.status === 'pending',
       }
     })
