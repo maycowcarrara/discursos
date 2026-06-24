@@ -1599,7 +1599,7 @@ export function AssignmentsPage() {
         ? targetEvent.title
         : calendarEventDefaultTitles[targetType],
     )
-    setSpecialEventDescription(targetEvent?.description ?? '')
+    setSpecialEventDescription('')
     setIsSpecialEventPanelOpen(true)
   }
 
