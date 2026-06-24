@@ -182,18 +182,69 @@ export function toLocalDateKey(value: Timestamp | Date) {
   return formatDateInputValue(value)
 }
 
-export function listSaturdayDateValuesForYear(year: number) {
+export function normalizeMeetingDayLabel(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+export function getMeetingDayIndex(meetingDay: string) {
+  const normalizedLabel = normalizeMeetingDayLabel(meetingDay)
+
+  switch (normalizedLabel) {
+    case 'domingo':
+      return 0
+    case 'segunda-feira':
+      return 1
+    case 'terca-feira':
+      return 2
+    case 'quarta-feira':
+      return 3
+    case 'quinta-feira':
+      return 4
+    case 'sexta-feira':
+      return 5
+    case 'sabado':
+      return 6
+    default:
+      return null
+  }
+}
+
+export function listWeekdayDateValuesForYear(year: number, weekdayIndex: number) {
   const firstDayOfYear = new Date(year, 0, 1, 12, 0, 0, 0)
-  const firstSaturdayOffset = (6 - firstDayOfYear.getDay() + 7) % 7
-  const cursor = new Date(year, 0, 1 + firstSaturdayOffset, 12, 0, 0, 0)
-  const saturdayDates: string[] = []
+  const firstWeekdayOffset = (weekdayIndex - firstDayOfYear.getDay() + 7) % 7
+  const cursor = new Date(year, 0, 1 + firstWeekdayOffset, 12, 0, 0, 0)
+  const weekdayDates: string[] = []
 
   while (cursor.getFullYear() === year) {
-    saturdayDates.push(formatDateInputValue(cursor))
+    weekdayDates.push(formatDateInputValue(cursor))
     cursor.setDate(cursor.getDate() + 7)
   }
 
-  return saturdayDates
+  return weekdayDates
+}
+
+export function listMeetingDateValuesForYear(
+  year: number,
+  meetingDayIndex: number | null,
+) {
+  return listWeekdayDateValuesForYear(year, meetingDayIndex ?? 6)
+}
+
+export function listSaturdayDateValuesForYear(year: number) {
+  return listMeetingDateValuesForYear(year, 6)
+}
+
+export function findFirstAvailableMeetingDate(
+  meetingDates: string[],
+  occupiedMeetingDateKeys: Set<string>,
+) {
+  return (
+    meetingDates.find((dateValue) => !occupiedMeetingDateKeys.has(dateValue)) ?? ''
+  )
 }
 
 export function findFirstAvailableSaturdayDate(

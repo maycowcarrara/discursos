@@ -100,6 +100,25 @@ test('selectUpcomingSaturdayEvents ignora evento futuro em dia util', () => {
   )
 })
 
+test('selectUpcomingSaturdayEvents usa domingo quando a reuniao local e domingo', () => {
+  const referenceDate = new Date('2026-06-01T00:00:00')
+  const events = [
+    makeEvent('first-saturday', '2026-06-06'),
+    makeEvent('first-sunday', '2026-06-07'),
+    makeEvent('second-sunday', '2026-06-14', {
+      type: 'visit',
+      title: 'Visita no domingo',
+    }),
+  ]
+
+  const sundayEvents = selectUpcomingSaturdayEvents(events, referenceDate, 8, 0)
+
+  assert.deepEqual(
+    sundayEvents.map((event) => event.id),
+    ['first-sunday', 'second-sunday'],
+  )
+})
+
 test('buildDashboardSaturdayEntries e pendencias consideram apenas sabados reais', () => {
   const referenceDate = new Date('2026-06-01T00:00:00')
   const events = [
@@ -132,6 +151,45 @@ test('buildDashboardSaturdayEntries e pendencias consideram apenas sabados reais
   assert.deepEqual(
     saturdayEntries.map((entry) => entry.event.id),
     ['unassigned-saturday', 'pending-saturday'],
+  )
+  assert.deepEqual(
+    pendingItems.map((item) => item.kind),
+    ['unassigned', 'awaitingResponse'],
+  )
+})
+
+test('buildDashboardSaturdayEntries abre lacunas no dia da reuniao local', () => {
+  const referenceDate = new Date('2026-06-01T00:00:00')
+  const events = [
+    makeEvent('ignored-saturday', '2026-06-06', {
+      title: 'Sabado fora da reuniao local',
+    }),
+    makeEvent('unassigned-sunday', '2026-06-07', {
+      title: 'Domingo sem orador',
+    }),
+    makeEvent('pending-sunday', '2026-06-14', {
+      title: 'Domingo aguardando resposta',
+    }),
+  ]
+  const assignments = [
+    makeAssignment('assignment-1', 'pending-sunday', '2026-06-14', {
+      speakerName: 'Carlos',
+      status: 'pending',
+    }),
+  ]
+
+  const meetingEntries = buildDashboardSaturdayEntries(
+    events,
+    assignments,
+    referenceDate,
+    8,
+    0,
+  )
+  const pendingItems = buildDashboardPendingItems(meetingEntries)
+
+  assert.deepEqual(
+    meetingEntries.map((entry) => entry.event.id),
+    ['unassigned-sunday', 'pending-sunday'],
   )
   assert.deepEqual(
     pendingItems.map((item) => item.kind),

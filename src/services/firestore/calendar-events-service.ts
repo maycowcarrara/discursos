@@ -24,14 +24,14 @@ import {
   doesCalendarEventBlockAssignments,
   formatDateInputValue,
   getBlocksAssignmentsForEventType,
-  listSaturdayDateValuesForYear,
+  listMeetingDateValuesForYear,
   parseDateInputValue,
   toLocalDateKey,
 } from '@/utils/calendar-events'
 import {
   buildCalendarEventsManagementView,
   getImplicitCalendarEventId,
-  mergeCalendarEventsWithImplicitSaturdaySlots,
+  mergeCalendarEventsWithImplicitMeetingSlots,
 } from '@/services/firestore/calendar-slots-service'
 
 import { appendAuditLogToBatch } from './audit-log-writes'
@@ -70,6 +70,7 @@ export type GenerateCalendarYearInput = {
   year: number
   actorUid: string
   actorName?: string | null
+  meetingDayIndex?: number | null
 }
 
 export const defaultCalendarEventFormValues: CalendarEventFormValues = {
@@ -304,18 +305,24 @@ export function toCalendarEventFormValues(
 
 export async function listCalendarEventsByYear(
   year: number,
+  meetingDayIndex: number | null = null,
 ): Promise<Array<FirestoreRecord<CalendarEventDocument>>> {
   const calendarEvents = await listCalendarEventsForYear(year)
 
-  return mergeCalendarEventsWithImplicitSaturdaySlots(year, calendarEvents)
+  return mergeCalendarEventsWithImplicitMeetingSlots(
+    year,
+    calendarEvents,
+    meetingDayIndex,
+  )
 }
 
 export async function listCalendarEventsByYearForManagement(
   year: number,
+  meetingDayIndex: number | null = null,
 ): Promise<Array<FirestoreRecord<CalendarEventDocument>>> {
   const calendarEvents = await listCalendarEventsForYear(year)
 
-  return buildCalendarEventsManagementView(year, calendarEvents)
+  return buildCalendarEventsManagementView(year, calendarEvents, meetingDayIndex)
 }
 
 export async function createCalendarEvent({
@@ -596,20 +603,21 @@ export async function generateCalendarYear({
   year,
   actorName,
   actorUid,
+  meetingDayIndex = null,
 }: GenerateCalendarYearInput) {
   const existingEvents = await listCalendarEventsForYear(year)
   const activeDateKeys = new Set(
     existingEvents.filter((event) => event.isActive).map((event) => toLocalDateKey(event.date)),
   )
-  const saturdayDates = listSaturdayDateValuesForYear(year)
-  const missingSaturdayDates = saturdayDates.filter(
+  const meetingDates = listMeetingDateValuesForYear(year, meetingDayIndex)
+  const missingMeetingDates = meetingDates.filter(
     (dateValue) => !activeDateKeys.has(dateValue),
   )
 
-  if (missingSaturdayDates.length === 0) {
+  if (missingMeetingDates.length === 0) {
     return {
       createdCount: 0,
-      skippedCount: saturdayDates.length,
+      skippedCount: meetingDates.length,
     }
   }
 
@@ -617,7 +625,7 @@ export async function generateCalendarYear({
   let createdCount = 0
 
   await runTransaction(firebaseDb, async (transaction) => {
-    for (const dateValue of missingSaturdayDates) {
+    for (const dateValue of missingMeetingDates) {
       const calendarEventRef = getActiveCalendarEventRef(dateValue)
       const existingSnapshot = await transaction.get(calendarEventRef)
 
@@ -658,7 +666,7 @@ export async function generateCalendarYear({
           after: toAuditSnapshot(calendarEventDocument),
           metadata: {
             source: 'calendar-phase-7',
-            strategy: 'auto-saturday-generation',
+            strategy: 'auto-meeting-day-generation',
           },
           createdAt: now,
         }),
@@ -670,6 +678,6 @@ export async function generateCalendarYear({
 
   return {
     createdCount,
-    skippedCount: saturdayDates.length - createdCount,
+    skippedCount: meetingDates.length - createdCount,
   }
 }

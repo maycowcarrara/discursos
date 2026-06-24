@@ -7,7 +7,7 @@ import type {
 import {
   calendarEventDefaultTitles,
   parseDateInputValue,
-  listSaturdayDateValuesForYear,
+  listMeetingDateValuesForYear,
   toLocalDateKey,
 } from '@/utils/calendar-events'
 
@@ -120,9 +120,10 @@ function sortCalendarEventsByDate(
   return left.id.localeCompare(right.id)
 }
 
-export function mergeCalendarEventsWithImplicitSaturdaySlots(
+export function mergeCalendarEventsWithImplicitMeetingSlots(
   year: number,
   explicitEvents: Array<FirestoreRecord<CalendarEventDocument>>,
+  meetingDayIndex: number | null = null,
 ) {
   const activeExplicitEvents = explicitEvents.filter((event) => event.isActive)
   const activeDateKeys = new Set(
@@ -130,7 +131,7 @@ export function mergeCalendarEventsWithImplicitSaturdaySlots(
   )
   const mergedEvents = activeExplicitEvents.map(normalizeExplicitCalendarEvent)
 
-  listSaturdayDateValuesForYear(year).forEach((dateValue) => {
+  listMeetingDateValuesForYear(year, meetingDayIndex).forEach((dateValue) => {
     if (activeDateKeys.has(dateValue)) {
       return
     }
@@ -144,10 +145,12 @@ export function mergeCalendarEventsWithImplicitSaturdaySlots(
 export function buildCalendarEventsManagementView(
   year: number,
   explicitEvents: Array<FirestoreRecord<CalendarEventDocument>>,
+  meetingDayIndex: number | null = null,
 ) {
-  const activeMergedEvents = mergeCalendarEventsWithImplicitSaturdaySlots(
+  const activeMergedEvents = mergeCalendarEventsWithImplicitMeetingSlots(
     year,
     explicitEvents,
+    meetingDayIndex,
   )
   const archivedExplicitEvents = explicitEvents
     .filter((event) => !event.isActive)

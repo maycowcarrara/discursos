@@ -18,18 +18,26 @@ import {
   type UpdateCalendarEventInput,
 } from '@/services/firestore/calendar-events-service'
 
-export function useCalendarEventsQuery(year: number, enabled = true) {
+export function useCalendarEventsQuery(
+  year: number,
+  enabled = true,
+  meetingDayIndex: number | null = null,
+) {
   return useQuery({
-    queryKey: ['firestore', 'calendarEvents', year],
-    queryFn: () => listCalendarEventsByYear(year),
+    queryKey: ['firestore', 'calendarEvents', year, meetingDayIndex],
+    queryFn: () => listCalendarEventsByYear(year, meetingDayIndex),
     enabled: Number.isFinite(year) && enabled,
   })
 }
 
-export function useCalendarEventsManagementQuery(year: number, enabled = true) {
+export function useCalendarEventsManagementQuery(
+  year: number,
+  enabled = true,
+  meetingDayIndex: number | null = null,
+) {
   return useQuery({
-    queryKey: ['firestore', 'calendarEvents', 'management', year],
-    queryFn: () => listCalendarEventsByYearForManagement(year),
+    queryKey: ['firestore', 'calendarEvents', 'management', year, meetingDayIndex],
+    queryFn: () => listCalendarEventsByYearForManagement(year, meetingDayIndex),
     enabled: Number.isFinite(year) && enabled,
   })
 }

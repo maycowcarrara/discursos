@@ -104,14 +104,25 @@ function isUpcomingEvent(
   return toJsDate(event.date).getTime() >= referenceDate.getTime()
 }
 
+export function isMeetingDate(date: Date, meetingDayIndex: number | null = null) {
+  return date.getDay() === (meetingDayIndex ?? 6)
+}
+
 export function isSaturdayDate(date: Date) {
-  return date.getDay() === 6
+  return isMeetingDate(date, 6)
+}
+
+export function isMeetingCalendarEvent(
+  event: FirestoreRecord<CalendarEventDocument>,
+  meetingDayIndex: number | null = null,
+) {
+  return isMeetingDate(toJsDate(event.date), meetingDayIndex)
 }
 
 export function isSaturdayCalendarEvent(
   event: FirestoreRecord<CalendarEventDocument>,
 ) {
-  return isSaturdayDate(toJsDate(event.date))
+  return isMeetingCalendarEvent(event, 6)
 }
 
 export function isSpecialCalendarEventType(type: CalendarEventType) {
@@ -143,11 +154,13 @@ export function selectUpcomingSaturdayEvents(
   calendarEvents: Array<FirestoreRecord<CalendarEventDocument>>,
   referenceDate: Date,
   maxItems = 8,
+  meetingDayIndex: number | null = null,
 ) {
   return [...calendarEvents]
     .filter(
       (event) =>
-        isUpcomingEvent(event, referenceDate) && isSaturdayCalendarEvent(event),
+        isUpcomingEvent(event, referenceDate) &&
+        isMeetingCalendarEvent(event, meetingDayIndex),
     )
     .sort(sortCalendarEventsAscending)
     .slice(0, maxItems)
@@ -178,11 +191,17 @@ export function buildDashboardSaturdayEntries(
   assignments: Array<FirestoreRecord<AssignmentDocument>>,
   referenceDate: Date,
   maxItems = 8,
+  meetingDayIndex: number | null = null,
 ): DashboardSaturdayEntry[] {
   const operationalAssignmentMap =
     buildOperationalAssignmentMapByCalendarEventId(assignments)
 
-  return selectUpcomingSaturdayEvents(calendarEvents, referenceDate, maxItems)
+  return selectUpcomingSaturdayEvents(
+    calendarEvents,
+    referenceDate,
+    maxItems,
+    meetingDayIndex,
+  )
     .map((event) => {
       const assignment = operationalAssignmentMap.get(event.id) ?? null
 

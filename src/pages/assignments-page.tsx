@@ -101,6 +101,7 @@ import {
   calendarEventTypeLabels,
   doesCalendarEventBlockAssignments,
   formatTimestampDate,
+  getMeetingDayIndex,
   isAssignmentCoveringCalendarSlot,
 } from '@/utils/calendar-events'
 
@@ -323,37 +324,6 @@ function isImplicitCalendarEvent(
   event: FirestoreRecord<CalendarEventDocument>,
 ) {
   return getCalendarEventViewSource(event) === 'implicit'
-}
-
-function normalizeMeetingDayLabel(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-}
-
-function getMeetingDayIndex(meetingDay: string) {
-  const normalizedLabel = normalizeMeetingDayLabel(meetingDay)
-
-  switch (normalizedLabel) {
-    case 'domingo':
-      return 0
-    case 'segunda-feira':
-      return 1
-    case 'terca-feira':
-      return 2
-    case 'quarta-feira':
-      return 3
-    case 'quinta-feira':
-      return 4
-    case 'sexta-feira':
-      return 5
-    case 'sabado':
-      return 6
-    default:
-      return null
-  }
 }
 
 function matchesMeetingDay(
@@ -715,6 +685,8 @@ export function AssignmentsPage() {
   const [editingSpecialEventId, setEditingSpecialEventId] = useState<string | null>(null)
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false)
   const [isSpecialEventPanelOpen, setIsSpecialEventPanelOpen] = useState(false)
+  const [handledSpecialEventHandoffKey, setHandledSpecialEventHandoffKey] =
+    useState('')
   const [specialEventDate, setSpecialEventDate] = useState('')
   const [specialEventType, setSpecialEventType] =
     useState<SpecialCalendarEventType>('visit')
@@ -731,6 +703,8 @@ export function AssignmentsPage() {
 
   const calendarSettingsQuery = useCalendarSettingsQuery()
   const activeYear = currentYear
+  const requestedAction = searchParams.get('acao')?.trim() ?? ''
+  const isSpecialEventHandoffRequested = requestedAction === 'evento-especial'
   const requestedCalendarEventId = searchParams.get('evento')?.trim() ?? ''
   const requestedCalendarEventYearParam = parseCalendarEventYearParam(
     searchParams.get('ano'),
@@ -762,12 +736,26 @@ export function AssignmentsPage() {
     shouldLoadRequestedCalendarEventYear,
   )
   const recentAssignmentsQuery = useRecentAssignmentsQuery(24)
-  const calendarEventsQuery = useCalendarEventsQuery(activeYear)
+  const congregationsQuery = useCongregationsManagementQuery()
+  const localCongregations = useMemo(
+    () => (congregationsQuery.data ?? []).filter((item) => item.isActive && item.isLocal),
+    [congregationsQuery.data],
+  )
+  const localMeetingDay = localCongregations[0]?.meetingDay ?? ''
+  const localMeetingDayIndex = useMemo(
+    () => getMeetingDayIndex(localMeetingDay),
+    [localMeetingDay],
+  )
+  const calendarEventsQuery = useCalendarEventsQuery(
+    activeYear,
+    !congregationsQuery.isLoading,
+    localMeetingDayIndex,
+  )
   const requestedYearCalendarEventsQuery = useCalendarEventsQuery(
     requestedCalendarEventYear ?? activeYear,
-    shouldLoadRequestedCalendarEventYear,
+    shouldLoadRequestedCalendarEventYear && !congregationsQuery.isLoading,
+    localMeetingDayIndex,
   )
-  const congregationsQuery = useCongregationsManagementQuery()
   const speakersQuery = useSpeakersManagementQuery()
   const themesQuery = useThemesManagementQuery()
   const createAssignmentMutation = useCreateAssignmentMutation()
@@ -916,10 +904,6 @@ export function AssignmentsPage() {
     () => buildGoogleCalendarActionOwnerMapByCalendarEventId(assignments),
     [assignments],
   )
-  const localCongregations = useMemo(
-    () => (congregationsQuery.data ?? []).filter((item) => item.isActive && item.isLocal),
-    [congregationsQuery.data],
-  )
   const partnerCongregations = useMemo(
     () => (congregationsQuery.data ?? []).filter((item) => item.isActive && !item.isLocal),
     [congregationsQuery.data],
@@ -953,11 +937,6 @@ export function AssignmentsPage() {
       local: localCongregations[0]?.id ?? '',
     }),
     [localCongregations, partnerCongregations],
-  )
-  const localMeetingDay = localCongregations[0]?.meetingDay ?? ''
-  const localMeetingDayIndex = useMemo(
-    () => getMeetingDayIndex(localMeetingDay),
-    [localMeetingDay],
   )
   const meetingDayEligibleEvents = useMemo(
     () =>
@@ -1144,6 +1123,40 @@ export function AssignmentsPage() {
     requestedCalendarEventId.length > 0
       ? eligibleEvents.find((event) => event.id === requestedCalendarEventId) ?? null
       : null
+  const specialEventHandoffKey = isSpecialEventHandoffRequested
+    ? `${requestedCalendarEventId || 'proxima'}:${requestedCalendarEventYear ?? activeYear}`
+    : ''
+  const specialEventHandoffTarget = useMemo(() => {
+    if (!isSpecialEventHandoffRequested) {
+      return null
+    }
+
+    if (requestedCalendarEventId.length > 0) {
+      if (
+        !requestedCalendarEvent ||
+        assignmentCountByCalendarEventId.has(requestedCalendarEvent.id)
+      ) {
+        return null
+      }
+
+      return requestedCalendarEvent
+    }
+
+    return (
+      specialEventCandidateEvents.find(
+        (event) => getLocalDateKey(event.date.toDate()) >= todayDateKey,
+      ) ??
+      specialEventCandidateEvents[0] ??
+      null
+    )
+  }, [
+    assignmentCountByCalendarEventId,
+    isSpecialEventHandoffRequested,
+    requestedCalendarEvent,
+    requestedCalendarEventId,
+    specialEventCandidateEvents,
+    todayDateKey,
+  ])
   const selectedSpeaker = speakersById.get(watchedSpeakerId) ?? null
   const selectedSpeakerMissingEmail = Boolean(
     selectedSpeaker && selectedSpeaker.email.trim().length === 0,
@@ -1362,7 +1375,9 @@ export function AssignmentsPage() {
     }
   }
   const isDashboardHandoffPanelOpen = Boolean(
-    requestedCalendarEventId.length > 0 && requestedCalendarEvent,
+    !isSpecialEventHandoffRequested &&
+      requestedCalendarEventId.length > 0 &&
+      requestedCalendarEvent,
   )
   const isAssignmentFormPanelOpen =
     isFormPanelOpen || isDashboardHandoffPanelOpen
@@ -1389,6 +1404,7 @@ export function AssignmentsPage() {
   useEffect(() => {
     if (
       editingAssignment ||
+      isSpecialEventHandoffRequested ||
       !requestedCalendarEvent ||
       watchedCalendarEventId === requestedCalendarEvent.id
     ) {
@@ -1405,10 +1421,52 @@ export function AssignmentsPage() {
   }, [
     defaultDestinationIds,
     editingAssignment,
+    isSpecialEventHandoffRequested,
     preferredMovementType,
     requestedCalendarEvent,
     reset,
     watchedCalendarEventId,
+  ])
+
+  useEffect(() => {
+    if (
+      !isSpecialEventHandoffRequested ||
+      specialEventHandoffKey.length === 0 ||
+      handledSpecialEventHandoffKey === specialEventHandoffKey ||
+      !specialEventHandoffTarget
+    ) {
+      return
+    }
+
+    const targetType = isSpecialCalendarEventTypeForForm(
+      specialEventHandoffTarget.type,
+    )
+      ? specialEventHandoffTarget.type
+      : 'visit'
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback(null)
+      setEditingId(null)
+      setIsFormPanelOpen(false)
+      setEditingSpecialEventId(null)
+      setSpecialEventDate(getLocalDateKey(specialEventHandoffTarget.date.toDate()))
+      setSpecialEventType(targetType)
+      setSpecialEventTitle(
+        specialEventHandoffTarget.type !== 'publicTalk'
+          ? specialEventHandoffTarget.title
+          : calendarEventDefaultTitles[targetType],
+      )
+      setSpecialEventDescription('')
+      setIsSpecialEventPanelOpen(true)
+      setHandledSpecialEventHandoffKey(specialEventHandoffKey)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [
+    handledSpecialEventHandoffKey,
+    isSpecialEventHandoffRequested,
+    specialEventHandoffKey,
+    specialEventHandoffTarget,
   ])
 
   useEffect(() => {
@@ -1639,6 +1697,10 @@ export function AssignmentsPage() {
     setSpecialEventType('visit')
     setSpecialEventTitle(calendarEventDefaultTitles.visit)
     setSpecialEventDescription('')
+
+    if (isSpecialEventHandoffRequested) {
+      setSearchParams({}, { replace: true })
+    }
   }
 
   async function handleSubmitSpecialEvent() {
@@ -2371,7 +2433,7 @@ export function AssignmentsPage() {
           handleCloseSpecialEventForm()
         }}
         title={editingSpecialEventId ? 'Editar evento especial' : 'Marcar evento especial'}
-        description="Use quando o sábado não terá designação normal de discurso público."
+        description="Use quando a data de reunião não terá designação normal de discurso público."
         className="max-w-3xl"
         footer={
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

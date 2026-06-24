@@ -1,5 +1,6 @@
 import {
   Building2,
+  Ban,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -55,6 +56,7 @@ import {
   assignmentStatusLabels,
   calendarEventTypeLabels,
   doesCalendarEventBlockAssignments,
+  getMeetingDayIndex,
 } from '@/utils/calendar-events'
 import { buildAssignmentWhatsAppConfirmationUrl } from '@/utils/assignment-whatsapp'
 import { isTimestampInCurrentAssignmentRevision } from '@/utils/notification-sync'
@@ -151,6 +153,19 @@ function getAssignmentCreateHref(entry: DashboardSaturdayEntryView) {
   return `/designacoes?${params.toString()}`
 }
 
+function getSpecialEventCreateHref(entry?: DashboardSaturdayEntryView) {
+  const params = new URLSearchParams({
+    acao: 'evento-especial',
+  })
+
+  if (entry) {
+    params.set('evento', entry.event.id)
+    params.set('ano', String(entry.event.year))
+  }
+
+  return `/designacoes?${params.toString()}`
+}
+
 function isOperationalAssignment(
   assignment: FirestoreRecord<AssignmentDocument>,
 ): assignment is FirestoreRecord<OperationalAssignmentDocument> {
@@ -193,21 +208,27 @@ export function DashboardPage() {
   const requestManualEmailMutation =
     useRequestManualAssignmentConfirmationEmailMutation()
   const congregationsQuery = useCongregationsQuery()
-  const dashboardSnapshotQuery = useDashboardSnapshotQuery(today)
-
-  const calendarEvents = dashboardSnapshotQuery.data?.calendarEvents ?? []
-  const assignments = dashboardSnapshotQuery.data?.assignments ?? []
   const congregations = congregationsQuery.data ?? []
   const congregationsById = new Map(
     congregations.map((congregation) => [congregation.id, congregation]),
   )
   const localCongregation =
     congregations.find((congregation) => congregation.isLocal) ?? null
+  const localMeetingDayIndex = getMeetingDayIndex(localCongregation?.meetingDay ?? '')
+  const dashboardSnapshotQuery = useDashboardSnapshotQuery(
+    today,
+    localMeetingDayIndex,
+    !congregationsQuery.isLoading,
+  )
+
+  const calendarEvents = dashboardSnapshotQuery.data?.calendarEvents ?? []
+  const assignments = dashboardSnapshotQuery.data?.assignments ?? []
   const allUpcomingSaturdayEntries = buildDashboardSaturdayEntries(
     calendarEvents,
     assignments,
     today,
     10,
+    localMeetingDayIndex,
   )
   const upcomingSaturdayEntries = allUpcomingSaturdayEntries.map((entry) => {
     if (!entry.assignment) {
@@ -342,6 +363,11 @@ export function DashboardPage() {
       href: '/designacoes',
       label: 'Designações',
       Icon: ClipboardList,
+    },
+    {
+      href: getSpecialEventCreateHref(),
+      label: 'Marcar evento',
+      Icon: Ban,
     },
     {
       href: '/oradores',
@@ -629,7 +655,7 @@ export function DashboardPage() {
               })
             ) : (
               <p className="py-4 text-sm text-slate-600">
-                Nenhum sábado carregado para impressão.
+                Nenhuma data carregada para impressão.
               </p>
             )}
           </div>
@@ -759,8 +785,8 @@ export function DashboardPage() {
           {!isLoading && !combinedError && !nextSaturdayEntry ? (
             <EmptyState
               className="px-4 py-6"
-              title="Nenhum sábado carregado"
-              description="Os sábados regulares são calculados automaticamente; confira a conexão com o Firestore para carregar a cobertura."
+              title="Nenhuma data carregada"
+              description="As datas regulares são calculadas automaticamente a partir da reunião da congregação local; confira a conexão com o Firestore para carregar a cobertura."
             />
           ) : null}
 
@@ -820,13 +846,22 @@ export function DashboardPage() {
                   !nextSaturdayBlocksAssignments ? (
                     <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
                       <span>Ainda falta definir orador e tema para esta data.</span>
-                      <Link
-                        className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-black text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
-                        to={getAssignmentCreateHref(nextSaturdayEntry)}
-                      >
-                        <Plus className="size-3.5" />
-                        Designar
-                      </Link>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 text-xs font-black text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
+                          to={getAssignmentCreateHref(nextSaturdayEntry)}
+                        >
+                          <Plus className="size-3.5" />
+                          Designar
+                        </Link>
+                        <Link
+                          className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 text-xs font-black text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 dark:hover:bg-amber-500/20"
+                          to={getSpecialEventCreateHref(nextSaturdayEntry)}
+                        >
+                          <Ban className="size-3.5" />
+                          Bloquear data
+                        </Link>
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -898,16 +933,25 @@ export function DashboardPage() {
                       <p className="text-sm text-muted-foreground">
                         {nextSaturdayBlocksAssignments
                           ? 'Nenhuma cobertura é necessária para esta data.'
-                          : 'Priorize a escolha do orador e do tema para fechar este sábado.'}
+                          : 'Priorize a escolha do orador e do tema para fechar esta data.'}
                       </p>
                       {!nextSaturdayBlocksAssignments ? (
-                        <Link
-                          className={quickActionClass}
-                          to={getAssignmentCreateHref(nextSaturdayEntry)}
-                        >
-                          <Plus className="size-3.5" />
-                          Nova designação
-                        </Link>
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            className={quickActionClass}
+                            to={getAssignmentCreateHref(nextSaturdayEntry)}
+                          >
+                            <Plus className="size-3.5" />
+                            Nova designação
+                          </Link>
+                          <Link
+                            className={quickActionClass}
+                            to={getSpecialEventCreateHref(nextSaturdayEntry)}
+                          >
+                            <Ban className="size-3.5" />
+                            Bloquear data
+                          </Link>
+                        </div>
                       ) : null}
                     </div>
                   )}
@@ -960,13 +1004,22 @@ export function DashboardPage() {
                             </p>
                           ) : null}
                           {!entry.assignment && !entryBlocksAssignments ? (
-                            <Link
-                              className="mt-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-background dark:text-foreground"
-                              to={getAssignmentCreateHref(entry)}
-                            >
-                              <Plus className="size-3.5" />
-                              Designar
-                            </Link>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Link
+                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-background dark:text-foreground"
+                                to={getAssignmentCreateHref(entry)}
+                              >
+                                <Plus className="size-3.5" />
+                                Designar
+                              </Link>
+                              <Link
+                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-border dark:bg-background dark:text-foreground"
+                                to={getSpecialEventCreateHref(entry)}
+                              >
+                                <Ban className="size-3.5" />
+                                Bloquear data
+                              </Link>
+                            </div>
                           ) : null}
                         </div>
                       )
@@ -1108,7 +1161,7 @@ export function DashboardPage() {
       )}
       </section>
 
-      <section className="app-print-hidden grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="app-print-hidden grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {dashboardShortcuts.map(({ href, label, Icon }) => (
           <Link key={href} className={dashboardShortcutClass} to={href}>
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-200">
